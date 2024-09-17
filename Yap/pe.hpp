@@ -30,6 +30,8 @@ class PE {
 protected:
 	PEStatus_t Status = NotSet;
 	Buffer DosStub = { 0 };
+	Buffer Overlay = { 0 };
+	DWORD OverlayOffset = 0;
 	BYTE** pSectionData = NULL;
 	IMAGE_DOS_HEADER DosHeader = { 0 };
 	ComboNTHeaders NTHeaders = { 0 };
@@ -178,7 +180,7 @@ public:
 	/// </summary>
 	void MoveSections();
 
-	void DeleteSection(_In_ WORD wIndex);
+	virtual void DeleteSection(_In_ WORD wIndex);
 	void OverwriteSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_opt_ size_t szBytes);
 	void InsertSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_ IMAGE_SECTION_HEADER Header);
 	WORD FindSection(_In_ char* sName);
@@ -186,6 +188,9 @@ public:
 	Buffer* GetDosStub();
 	void StripDosStub();
 	IAT_ENTRY* GetIAT();
+	Buffer* GetOverlay();
+	void DiscardOverlay();
+	DWORD GetOverlayOffset();
 	
 	/// <summary>
 	/// Finds a section by RVA

@@ -130,7 +130,6 @@ DWORD Asm::FindSectionIndex(_In_ DWORD dwRVA) {
 	return _UI32_MAX;
 }
 
-// To be replaced
 DWORD Asm::FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 	Vector<Line>* Lines = Sections.At(dwSec).Lines;
 
@@ -152,6 +151,10 @@ DWORD Asm::FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 	size_t szMin = 0, szMax = Lines->Size(), i = 0;
 	while (szMin < szMax) {
 		i = szMin + (szMax - szMin) * 0.5;
+
+		if (szMin + 1 == szMax) {
+			i = szMin = szMax;
+		}
 
 		// Check index
 		if (dwRVA >= Lines->At(i).OldRVA && dwRVA < Lines->At(i).OldRVA + GetLineSize(Lines->At(i))) {
@@ -315,7 +318,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 					WORD SecIndex = FindSectionIndex(disp);
 					DWORD i = FindPosition(SecIndex, disp);
 					if (i == _UI32_MAX) {
-						LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for %x\n", disp);
+						LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for %#x\n", disp);
 						return false;
 					}
 					if (i != _UI32_MAX - 1) Sections.At(SecIndex).Lines->Insert(i, TempJumpTable);
@@ -334,7 +337,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 					WORD SecIndex = FindSectionIndex(disp);
 					DWORD i = FindPosition(SecIndex, disp);
 					if (i == _UI32_MAX) {
-						LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for %x\n", disp);
+						LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for %#x\n", disp);
 						return false;
 					}
 					if (i != _UI32_MAX - 1) Sections.At(SecIndex).Lines->Insert(i, TempJumpTable);
@@ -346,14 +349,14 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 				// Make sure the operand is an address, dont jump to registers yet
 				if ((CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_MEMORY && CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE) || (CraftedLine.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && (CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_RIP && CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_NONE))) {
 					ZydisFormatterFormatInstruction(&Formatter, &CraftedLine.Decoded.Instruction, CraftedLine.Decoded.Operands, CraftedLine.Decoded.Instruction.operand_count_visible, FormattedBuf, 128, GetBaseAddress() + dwRVA, NULL);
-					LOG(Warning, MODULE_REASSEMBLER, "Can\'t resolve jump-to address at %x (%s)\n", dwRVA, FormattedBuf);
+					LOG(Warning, MODULE_REASSEMBLER, "Can\'t resolve jump-to address at %#x (%s)\n", dwRVA, FormattedBuf);
 				}
 
 				// Calculate absolute address
 				else {
 					uint64_t u64Referencing;
 					if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&CraftedLine.Decoded.Instruction, &CraftedLine.Decoded.Operands[0], CraftedLine.OldRVA, &u64Referencing))) {
-						LOG(Failed, MODULE_REASSEMBLER, "Failed to disassemble instruction at %p\n", GetBaseAddress() + CraftedLine.OldRVA);
+						LOG(Failed, MODULE_REASSEMBLER, "Failed to disassemble instruction at 0x%p\n", GetBaseAddress() + CraftedLine.OldRVA);
 						TempLines.Release();
 						return false;
 					}
@@ -371,24 +374,34 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 							WORD wContainingIndex = FindSectionByRVA(u64Referencing);
 							IMAGE_SECTION_HEADER* pContainingHeader = GetSectionHeader(wContainingIndex);
 							if (!pContainingHeader || wContainingIndex == _UI16_MAX) {
-								LOG(Failed, MODULE_REASSEMBLER, "Failed to disassemble code pointed to at %x\n", u64Referencing);
+								LOG(Failed, MODULE_REASSEMBLER, "Failed to disassemble code pointed to at %#x\n", u64Referencing);
 								TempLines.Release();
 								return false;
 							}
 
 							// Extract the address
+							Line insert;
+							insert.OldRVA = u64Referencing;
 							u64Referencing = ReadRVA<uint64_t>(u64Referencing);
 							if (!u64Referencing) {
-								LOG(Warning, MODULE_REASSEMBLER, "Failed to retrieve address at RVA %p\n", GetBaseAddress() + u64Referencing);
+								LOG(Warning, MODULE_REASSEMBLER, "Failed to retrieve address at VA 0x%p\n", u64Referencing);
 								u64Referencing = 0;
 							}
 							
 							// Insert address
-							Line insert;
 							insert.Type = Pointer;
 							insert.Pointer.IsAbs = true;
 							insert.Pointer.Abs = u64Referencing;
 							// At this point I got contacted by a discord scammer and decided to bait them instead of coding, continue here please!
+							// Im back :)
+							{
+								WORD wInsertAt = FindPosition(wContainingIndex, insert.OldRVA);
+								if (wInsertAt == _UI16_MAX) {
+									LOG(Warning, MODULE_REASSEMBLER, "Failed to find position to insert line at 0x%p\n", GetBaseAddress() + insert.OldRVA);
+								} else if (wInsertAt != _UI16_MAX - 1) {
+									Sections.At(wContainingIndex).Lines->Insert(wInsertAt, insert);
+								}
+							}
 
 							u64Referencing -= GetBaseAddress();
 						}
@@ -463,6 +476,23 @@ bool Asm::Disassemble() {
 	}
 	LOG(Info, MODULE_REASSEMBLER, "Beginning disassembly\n");
 
+	// Insert known absolutes
+	Vector<DWORD> relocs = GetRelocations();
+	for (int i = 0; i < relocs.Size(); i++) {
+		Line insert;
+		insert.OldRVA = relocs.At(i);
+		insert.Type = Pointer;
+		insert.Pointer.IsAbs = true;
+		insert.Pointer.Abs = ReadRVA<uint64_t>(insert.OldRVA);
+		WORD wContainingSec = FindSectionIndex(insert.OldRVA);
+		WORD wIndex = FindPosition(wContainingSec, insert.OldRVA);
+		if (wIndex == _UI16_MAX || wContainingSec == _UI16_MAX) {
+			LOG(Warning, MODULE_REASSEMBLER, "Failed to find position to insert line at 0x%p\n", GetBaseAddress() + insert.OldRVA);
+			continue;
+		}
+		Sections.At(wContainingSec).Lines->Insert(wIndex, insert);
+	}
+
 	// Initialize Zydis
 	ZydisDecoderInit(&Decoder, GetMachine(), x86 ? ZYDIS_STACK_WIDTH_32 : ZYDIS_STACK_WIDTH_64);
 
@@ -470,14 +500,14 @@ bool Asm::Disassemble() {
 	if (!DisasmRecursive(GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint)) {
 		return false;
 	}
-	LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled Entry Point (%p)\n", GetBaseAddress() + GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint);
+	LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled Entry Point (0x%p)\n", GetBaseAddress() + GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint);
 
 	// Error check (TEMPORARY)
 	{
 		Vector<Line>* Lines = Sections.At(FindSectionIndex(GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint)).Lines;
 		for (size_t i = 0; i < Lines->Size() - 1; i++) {
 			if (Lines->At(i).OldRVA + GetLineSize(Lines->At(i)) > Lines->At(i + 1).OldRVA) {
-				LOG(Failed, MODULE_REASSEMBLER, "Peepee poopoo (%p + %u -> %p)\n", GetBaseAddress() + Lines->At(i).OldRVA, GetLineSize(Lines->At(i)), GetBaseAddress() + Lines->At(i + 1).OldRVA);
+				LOG(Failed, MODULE_REASSEMBLER, "Peepee poopoo (0x%p + %u -> 0x%p)\n", GetBaseAddress() + Lines->At(i).OldRVA, GetLineSize(Lines->At(i)), GetBaseAddress() + Lines->At(i + 1).OldRVA);
 				return false;
 			}
 		}
@@ -490,7 +520,7 @@ bool Asm::Disassemble() {
 			if (!DisasmRecursive(pCallbacks[i] - GetBaseAddress())) {
 				return false;
 			}
-			LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled TLS Callback (%p)\n", pCallbacks[i]);
+			LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled TLS Callback (0x%p)\n", pCallbacks[i]);
 		}
 	}
 
@@ -668,7 +698,7 @@ bool Asm::FixAddresses() {
 						_SecIndex = FindSectionIndex(u64Referencing);
 						_LineIndex = FindIndex(_SecIndex, u64Referencing);
 						if (_LineIndex == _UI32_MAX) {
-							LOG(Failed, MODULE_REASSEMBLER, "Failed to find location of RVA %x\n", u64Referencing);
+							LOG(Failed, MODULE_REASSEMBLER, "Failed to find location of RVA %#x\n", u64Referencing);
 							return false;
 						}
 						
@@ -694,10 +724,29 @@ bool Asm::FixAddresses() {
 				if (line.bRelative) line.JumpTable.Base = TranslateOldAddress(line.JumpTable.Base);
 				DWORD NewValue = TranslateOldAddress(u64Referencing);
 				if (NewValue == _UI32_MAX) {
-					LOG(Failed, MODULE_REASSEMBLER, "Failed to translate switch case targetting %x\n", u64Referencing);
+					LOG(Failed, MODULE_REASSEMBLER, "Failed to translate switch case targetting %#x\n", u64Referencing);
 					return false;
 				}
 				line.JumpTable.Value = NewValue - (line.bRelative ? line.JumpTable.Base : 0);
+			}
+
+			// Absolutes
+			else if (line.Type == Pointer) {
+				u64Referencing = (line.Pointer.IsAbs ? line.Pointer.Abs - GetBaseAddress() : line.Pointer.RVA);
+
+				// Do the thing
+				DWORD NewValue = TranslateOldAddress(u64Referencing);
+				if (NewValue == _UI32_MAX) {
+					LOG(Failed, MODULE_REASSEMBLER, "Failed to translate pointer pointing at 0x%p\n", GetBaseAddress() + u64Referencing);
+					return false;
+				}
+
+				// Apply
+				if (line.Pointer.IsAbs) {
+					line.Pointer.Abs = GetBaseAddress() + NewValue;
+				} else {
+					line.Pointer.RVA = NewValue;
+				}
 			}
 		}
 	}
@@ -875,6 +924,17 @@ bool Asm::Assemble() {
 			case RawInsert:
 				Buf.Merge(line.RawInsert);
 				break;
+			case Pointer:
+				if (Lines->At(i).Pointer.IsAbs) {
+					*reinterpret_cast<uint64_t*>(Buf.pBytes + Buf.u64Size - sizeof(uint64_t)) = Lines->At(i).Pointer.Abs;
+				} else {
+					*reinterpret_cast<DWORD*>(Buf.pBytes + Buf.u64Size - sizeof(DWORD)) = Lines->At(i).Pointer.RVA;
+				}
+				break;
+			case Padding:
+				break;
+			default:
+				LOG(Warning, MODULE_REASSEMBLER, "No data inserted at %#x!\n", Lines->At(i).NewRVA);
 			}
 		}
 
@@ -902,6 +962,95 @@ bool Asm::Assemble() {
 	return true;
 }
 
+bool Asm::Strip() {
+	LOG(Info_Extended, MODULE_REASSEMBLER, "Stripping PE\n");
+	// Debug directory
+	if (NTHeaders.x64.OptionalHeader.DataDirectory[6].Size && NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress) {
+		IMAGE_DEBUG_DIRECTORY debug = ReadRVA<IMAGE_DEBUG_DIRECTORY>(NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress);
+		RemoveData(debug.AddressOfRawData, debug.SizeOfData);
+		RemoveData(NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress, NTHeaders.x64.OptionalHeader.DataDirectory[6].Size);
+		LOG(Info, MODULE_REASSEMBLER, "Removed debug directory (%#x bytes)\n", debug.SizeOfData + NTHeaders.x64.OptionalHeader.DataDirectory[6].Size);
+		NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress = NTHeaders.x64.OptionalHeader.DataDirectory[6].Size = 0;
+	}
+
+	// Symbol table
+	if (NTHeaders.x64.FileHeader.PointerToSymbolTable && NTHeaders.x64.FileHeader.PointerToSymbolTable < OverlayOffset) {
+		LOG(Warning, MODULE_REASSEMBLER, "Stripping non-overlay symbols, this is untested code!\n");
+		// Find debug sections
+		IMAGE_SYMBOL sym;
+		DWORD rva = RawToRVA(NTHeaders.x64.FileHeader.PointerToSymbolTable);
+		DWORD end = rva + sizeof(IMAGE_SYMBOL) * NTHeaders.x64.FileHeader.NumberOfSymbols;
+		for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSymbols; i++) {
+			ReadRVA(rva + sizeof(IMAGE_SYMBOL) * i, &sym, sizeof(IMAGE_SYMBOL));
+			if (!sym.N.Name.Short) {
+				char* str = ReadRVAString(rva + sizeof(IMAGE_SYMBOL) * NTHeaders.x64.FileHeader.NumberOfSymbols + sym.N.Name.Long);
+				int len = lstrlenA(str);
+				end += len;
+				if (len > 7) {
+					char bak = str[7];
+					str[7] = 0;
+					if (!lstrcmpA(str, ".debug_")) {
+						if (pSectionHeaders[sym.SectionNumber - 1].Misc.VirtualSize || pSectionHeaders[sym.SectionNumber - 1].VirtualAddress) {
+							str[7] = bak;
+							LOG(Info, MODULE_REASSEMBLER, "Unloaded section %.8s (%s)\n", pSectionHeaders[sym.SectionNumber - 1].Name, str);
+							pSectionHeaders[sym.SectionNumber - 1].Misc.VirtualSize = 0;
+							pSectionHeaders[sym.SectionNumber - 1].VirtualAddress = 0;
+						}
+					}
+					str[7] = bak;
+				}
+			}
+		}
+		RemoveData(rva, end - rva);
+		LOG(Info, MODULE_REASSEMBLER, "Removed %d symbols\n", NTHeaders.x64.FileHeader.NumberOfSymbols);
+	}
+
+	// Overlay
+	if (NTHeaders.x64.FileHeader.PointerToSymbolTable >= OverlayOffset) {
+		IMAGE_SYMBOL* pSyms = reinterpret_cast<IMAGE_SYMBOL*>(GetOverlay()->pBytes + (NTHeaders.x64.FileHeader.PointerToSymbolTable - OverlayOffset));
+		char* pStrs = reinterpret_cast<char*>(pSyms) + sizeof(IMAGE_SYMBOL) * NTHeaders.x64.FileHeader.NumberOfSymbols;
+		for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSymbols; i++) {
+			if (!pSyms[i].N.Name.Short && pSyms[i].N.Name.Long) {
+				char* str = pStrs + pSyms[i].N.Name.Long;
+				if (lstrlenA(str) > 7) {
+					char bak = str[7];
+					str[7] = 0;
+					if (!lstrcmpA(str, ".debug_")) {
+						if (pSectionHeaders[pSyms[i].SectionNumber - 1].Misc.VirtualSize || pSectionHeaders[pSyms[i].SectionNumber - 1].VirtualAddress) {
+							str[7] = bak;
+							LOG(Info, MODULE_REASSEMBLER, "Unloaded section %.8s (%s)\n", pSectionHeaders[pSyms[i].SectionNumber - 1].Name, str);
+							pSectionHeaders[pSyms[i].SectionNumber - 1].Misc.VirtualSize = 0;
+							pSectionHeaders[pSyms[i].SectionNumber - 1].VirtualAddress = 0;
+						}
+					}
+					str[7] = bak;
+				}
+			}
+		}
+		LOG(Info, MODULE_REASSEMBLER, "Removed %d symbols\n", NTHeaders.x64.FileHeader.NumberOfSymbols);
+	}
+	DiscardOverlay();
+
+	// Useless sections
+	for (WORD i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+		if (!pSectionHeaders[i].VirtualAddress || !pSectionHeaders[i].Misc.VirtualSize) {
+			LOG(Info, MODULE_REASSEMBLER, "Removed section %.8s\n", pSectionHeaders[i].Name);
+			DeleteSection(i);
+			i--;
+		}
+	}
+	NTHeaders.x64.FileHeader.PointerToSymbolTable = 0;
+	NTHeaders.x64.FileHeader.NumberOfSymbols = 0;
+
+	LOG(Success, MODULE_REASSEMBLER, "Stripped\n");
+	return true;
+}
+
+void Asm::DeleteSection(_In_ WORD wIndex) {
+	Sections.Remove(wIndex);
+	PE::DeleteSection(wIndex);
+}
+
 DWORD Asm::GetAssembledSize(_In_ DWORD SectionIndex) {
 	DWORD dwSize = 0;
 	Vector<Line>* Lines = Sections.At(SectionIndex).Lines;
@@ -919,10 +1068,20 @@ void Asm::InsertLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ Line Li
 DWORD Asm::TranslateOldAddress(_In_ DWORD dwRVA) {
 	if (dwRVA < NTHeaders.x64.OptionalHeader.SizeOfHeaders) return dwRVA;
 
-	DWORD SecIndex = FindSectionIndex(dwRVA);
+	// Check if in between headers
+	DWORD SecIndex = 0;
+	for (; SecIndex < Sections.Size(); SecIndex++) {
+		if (dwRVA < Sections.At(SecIndex).OldRVA) {
+			return (SecIndex ? (dwRVA + Sections.At(SecIndex - 1).NewRVA) - Sections.At(SecIndex - 1).OldRVA : dwRVA);
+		}
+		else if (dwRVA >= Sections.At(SecIndex).OldRVA && dwRVA < Sections.At(SecIndex).OldRVA + Sections.At(SecIndex).OldSize) {
+			break;
+		}
+	}
+
 	DWORD szIndex = FindIndex(SecIndex, dwRVA);
 	if (szIndex == _UI32_MAX) {
-		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate address %x\n", dwRVA);
+		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate address %#x\n", dwRVA);
 		return 0;
 	}
 	if (szIndex < Sections.At(SecIndex).Lines->Size()) {
@@ -951,13 +1110,13 @@ void Asm::RemoveData(_In_ DWORD dwRVA, _In_ DWORD dwSize) {
 	DWORD sec = FindSectionIndex(dwRVA);
 	DWORD i = FindIndex(sec, dwRVA);
 	if (i == _UI32_MAX) {
-		LOG(Warning, MODULE_REASSEMBLER, "Failed to remove data at range %x - %x\n", dwRVA, dwRVA + dwSize);
+		LOG(Warning, MODULE_REASSEMBLER, "Failed to remove data at range %#x - %#x\n", dwRVA, dwRVA + dwSize);
 		return;
 	}
 
 	Line data = Sections.At(sec).Lines->At(i);
 	if (data.Type != Embed || data.OldRVA > dwRVA || data.OldRVA + GetLineSize(data) < dwRVA + dwSize) {
-		LOG(Warning, MODULE_REASSEMBLER, "Failed to remove data at range %x - %x (this version can be fixed later)\n", dwRVA, dwRVA + dwSize);
+		LOG(Warning, MODULE_REASSEMBLER, "Failed to remove data at range %#x - %#x (this version can be fixed later)\n", dwRVA, dwRVA + dwSize);
 		return;
 	}
 
@@ -1212,6 +1371,8 @@ DWORD GetLineSize(_In_ Line line) {
 		return sizeof(DWORD);
 	case RawInsert:
 		return line.RawInsert.u64Size;
+	case Pointer:
+		return (line.Pointer.IsAbs ? sizeof(uint64_t) : sizeof(DWORD));
 	}
 	return 0;
 }

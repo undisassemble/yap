@@ -6,9 +6,9 @@
 #include "imgui_internal.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
-#pragma comment(lib, "d3d11.lib")
 #include "util.h"
 #include "asm.hpp"
+#pragma comment(lib, "d3d11.lib")
 
 static ID3D11Device* g_pd3dDevice = nullptr;
 static ID3D11DeviceContext* g_pd3dDeviceContext = nullptr;
@@ -19,7 +19,7 @@ bool bMinimized = false, bOpen = true, bInitialized = false;;
 const int width = 850;
 const int height = 560;
 ImGuiWindow* pWindow = NULL;
-Asm* _pAssembly = NULL;
+extern Asm* pAssembly;
 
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 DWORD WINAPI WindowThread(void* args);
@@ -31,7 +31,7 @@ void EndGUI();
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 DWORD WINAPI ParsePE(void* args) {
-	Data.PEFunctions = _pAssembly->FindFunctions();
+	Data.PEFunctions = pAssembly->FindFunctions();
 	return 0;
 }
 
@@ -80,8 +80,8 @@ void DrawGUI() {
 		if (Data.hDropFile) {
 			char File[MAX_PATH];
 			if (DragQueryFileA(Data.hDropFile, 0, File, MAX_PATH)) {
-				_pAssembly = new Asm(File);
-				if (_pAssembly->GetStatus()) {
+				pAssembly = new Asm(File);
+				if (pAssembly->GetStatus()) {
 					MessageBoxA(Data.hWnd, "Could not parse binary!", NULL, MB_OK | MB_ICONERROR);
 				} else {
 					Data.bParsing = true;
@@ -113,7 +113,7 @@ void DrawGUI() {
 			ImGui::SliderInt("Mutation Level", &Options.Packing.MutationLevel, 1, 15);
 			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
 			//DEBUG_ONLY(IMGUI_TOGGLE("Evade Dumpers", Options.Packing.bEvadeDumpers));
-			DEBUG_ONLY(ImGui::SetItemTooltip("Attempts to throw off PE dumpers."));
+			//DEBUG_ONLY(ImGui::SetItemTooltip("Attempts to throw off PE dumpers."));
 			IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT);
 			ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT.");
 			IMGUI_TOGGLE("Generate False Info", Options.Packing.bFalseSymbols);
@@ -245,6 +245,7 @@ void DrawGUI() {
 
 		ImGui::EndTabBar();
 		//ImGui::SetCursorPos(ImVec2(800 - ImGui::GetWindowScrollbarRect(ImGui::GetCurrentWindow(), ImGuiAxis_Y).GetWidth(), 532 + ImGui::GetScrollY()));
+		ImGui::SetCursorPos(ImVec2(800, 530));
 		if (ImGui::Button("Begin")) {
 			CreateThread(0, 0, Begin, 0, 0, 0);
 		}

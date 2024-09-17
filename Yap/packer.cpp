@@ -1919,6 +1919,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 }
 
 bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinary) {
+	// Argument validation
 	if (!pOriginal || !pPackedBinary) {
 		LOG(Failed, MODULE_PACKER, "Invalid arguments\n");
 		return false;
@@ -1969,9 +1970,9 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 
 	// Setup DOS header & stub (e_lfanew is managed by PE)
 	if (true) {
-		pPackedBinary->GetDosStub()->u64Size = 0x40;
-		pPackedBinary->GetDosStub()->pBytes = reinterpret_cast<BYTE*>(malloc(0x40));
-		memcpy(pPackedBinary->GetDosStub()->pBytes, "\x0E\x1F\xBA\x0E\x00\xB4\x09\xCD\x21\xB8\x01\x4C\xCD\x21\x54\x68\x69\x73\x20\x70\x72\x6F\x67\x72\x61\x6D\x20\x63\x61\x6E\x6E\x6F\x74\x20\x62\x65\x20\x72\x75\x6E\x20\x69\x6E\x20\x44\x4F\x53\x20\x6D\x6F\x64\x65\x2E\x0D\x0D\x0A\x24\x00\x00\x00\x00\x00\x00\x00", 0x40);
+		pPackedBinary->GetDosStub()->u64Size = pOriginal->GetDosStub()->u64Size;
+		pPackedBinary->GetDosStub()->pBytes = reinterpret_cast<BYTE*>(malloc(pPackedBinary->GetDosStub()->u64Size));
+		memcpy(pPackedBinary->GetDosStub()->pBytes, pOriginal->GetDosStub()->pBytes, pOriginal->GetDosStub()->u64Size);
 	}
 	pPackedBinary->GetDosHeader()->e_magic = IMAGE_DOS_SIGNATURE;
 	pPackedBinary->GetDosHeader()->e_lfanew = sizeof(IMAGE_DOS_HEADER) + pPackedBinary->GetDosStub()->u64Size;

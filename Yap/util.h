@@ -271,10 +271,10 @@ struct Data_t {
 #endif
 };
 
+DWORD WINAPI Begin(void* args);
 extern Data_t Data;
 extern HANDLE hLogFile;
 extern HANDLE hStdOut;
-DWORD WINAPI Begin(void* args);
 
 #ifndef UTIL_STRUCT_ONLY
 struct Options_t {

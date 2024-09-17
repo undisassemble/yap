@@ -92,10 +92,30 @@ public:
 	Asm(_In_ HANDLE hFile);
 	~Asm();
 
+	/// <summary>
+	/// Strips debug info & symbols.
+	/// </summary>
+	/// <returns>Success/failure</returns>
+	bool Strip();
+
 	DWORD TranslateOldAddress(_In_ DWORD dwRVA);
 
+	/// <summary>
+	/// Finds line with given RVA.
+	/// </summary>
+	/// <param name="dwSec">Section index</param>
+	/// <param name="dwRVA">RVA</param>
+	/// <returns>Index of line, or _UI16_MAX if not found</returns>
 	DWORD FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA);
+	
+	/// <summary>
+	/// Finds position where line with given RVA should be inserted.
+	/// </summary>
+	/// <param name="dwSec">Section index</param>
+	/// <param name="dwRVA">RVA</param>
+	/// <returns>Index to insert at, or _UI16_MAX - 1 if already exists</returns>
 	DWORD FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA);
+	
 	DWORD FindSectionIndex(_In_ DWORD dwRVA);
 
 	bool Disassemble();
@@ -103,7 +123,7 @@ public:
 	/// <summary>
 	/// Assembles existing assembly
 	/// </summary>
-	/// <returns>Success</returns>
+	/// <returns>Success/failure</returns>
 	bool Assemble();
 
 	/// <summary>
@@ -122,6 +142,8 @@ public:
 
 	size_t GetNumLines();
 	Vector<AsmSection> GetSections();
+
+	void DeleteSection(_In_ WORD wIndex) override;
 
 	/// <summary>
 	/// Fixes addresses in existing asm code

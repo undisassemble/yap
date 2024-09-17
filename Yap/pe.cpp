@@ -23,20 +23,26 @@ PE::PE(_In_ bool x86) {
 }
 
 PE::~PE() {
-	if (this->pSectionData && false) {
-		for (int i = 0; i < this->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-			if (this->pSectionData[i])
-				free(this->pSectionData[i]);
+	if (pSectionData && false) {
+		for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+			if (pSectionData[i])
+				free(pSectionData[i]);
 		}
-		free(this->pSectionData);
+		free(pSectionData);
 	}
-	if (this->pSectionHeaders)
-		free(this->pSectionHeaders);
+	if (pSectionHeaders)
+		free(pSectionHeaders);
 	if (DosStub.pBytes && DosStub.u64Size) {
 		free(DosStub.pBytes);
 		DosStub.pBytes = reinterpret_cast<BYTE*>(DosStub.u64Size = 0);
 	}
-	this->Status = NotSet;
+	if (Overlay.pBytes) {
+		free(Overlay.pBytes);
+		Overlay.pBytes = 0;
+		Overlay.u64Size = 0;
+	}
+	OverlayOffset = 0;
+	Status = NotSet;
 }
 
 PE::PE(_In_ PE* pOther) {
@@ -135,6 +141,17 @@ bool PE::ParseFile(_In_ HANDLE hFile) {
 			pSectionData[i] = NULL;
 		}
 	}
+
+	// Overlay
+	OverlayOffset = pSectionHeaders[NTHeaders.x64.FileHeader.NumberOfSections - 1].PointerToRawData + pSectionHeaders[NTHeaders.x64.FileHeader.NumberOfSections - 1].SizeOfRawData;
+	Overlay.u64Size = szBytes - OverlayOffset;
+	if (Overlay.u64Size) {
+		Overlay.pBytes = reinterpret_cast<BYTE*>(malloc(Overlay.u64Size));
+		memcpy(Overlay.pBytes, pBytes + szBytes - Overlay.u64Size, Overlay.u64Size);
+	} else {
+		OverlayOffset = 0;
+	}
+
 	Status = PEStatus_t::Normal;
 	free(pBytes);
 	szBytes = 0;
@@ -195,7 +212,7 @@ ZydisMachineMode PE::GetMachine() {
 }
 
 WORD PE::FindSectionByRaw(_In_ DWORD dwRaw) {
-	if (this->Status)
+	if (Status || dwRaw >= OverlayOffset)
 		return _UI16_MAX;
 
 	for (WORD i = 0; i < this->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
@@ -222,10 +239,10 @@ WORD PE::FindSectionByRVA(_In_ DWORD dwRVA) {
 }
 
 DWORD PE::RVAToRaw(_In_ DWORD dwRVA) {
-	if (this->Status)
+	if (Status)
 		return 0;
 
-	IMAGE_SECTION_HEADER* pHeader = this->GetSectionHeader(this->FindSectionByRVA(dwRVA));
+	IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(FindSectionByRVA(dwRVA));
 
 	if (pHeader)
 		return pHeader->PointerToRawData + (dwRVA - pHeader->VirtualAddress);
@@ -234,10 +251,12 @@ DWORD PE::RVAToRaw(_In_ DWORD dwRVA) {
 }
 
 DWORD PE::RawToRVA(_In_ DWORD dwRaw) {
-	if (this->Status)
+	if (Status)
 		return 0;
+	
+	if (dwRaw >= OverlayOffset) return 0;
 
-	IMAGE_SECTION_HEADER* pHeader = this->GetSectionHeader(this->FindSectionByRaw(dwRaw));
+	IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(FindSectionByRaw(dwRaw));
 
 	if (pHeader)
 		return pHeader->VirtualAddress + (dwRaw - pHeader->PointerToRawData);
@@ -534,6 +553,11 @@ bool PE::ProduceBinary(_In_ HANDLE hFile) {
 		}
 	}
 
+	// Overlay
+	if (Overlay.u64Size && Overlay.pBytes) {
+		if (!WriteFile(hFile, Overlay.pBytes, Overlay.u64Size, NULL, NULL)) return false;
+	}
+
 	return true;
 }
 
@@ -653,4 +677,20 @@ Vector<DWORD> PE::GetRelocations() {
 		} while (pRelocation->SizeOfBlock);
 	}
 	return ret;
+}
+
+
+Buffer* PE::GetOverlay() {
+	return &Overlay;
+}
+
+void PE::DiscardOverlay() {
+	OverlayOffset = 0;
+	if (Overlay.pBytes) free(Overlay.pBytes);
+	Overlay.pBytes = 0;
+	Overlay.u64Size = 0;
+}
+
+DWORD PE::GetOverlayOffset() {
+	return OverlayOffset;
 }

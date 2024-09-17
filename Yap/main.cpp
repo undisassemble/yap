@@ -169,10 +169,10 @@ DWORD WINAPI Begin(void* args) {
 						n = snprintf(buf, 512, "%8.8s:%p\tPadding %#x\n", pAssembly->GetSectionHeader(SecIndex)->Name, pAssembly->GetBaseAddress() + line.OldRVA, line.Padding.Size);
 						break;
 					case JumpTable:
-						n = snprintf(buf, 512, "%8.8s:%p\tcase %p\n", pAssembly->GetSectionHeader(SecIndex)->Name, pAssembly->GetBaseAddress() + line.OldRVA, pAssembly->GetBaseAddress() + ((line.bRelative ? line.JumpTable.Base : 0) + line.JumpTable.Value));
+						n = snprintf(buf, 512, "%8.8s:%p\tcase 0x%p\n", pAssembly->GetSectionHeader(SecIndex)->Name, pAssembly->GetBaseAddress() + line.OldRVA, pAssembly->GetBaseAddress() + ((line.bRelative ? line.JumpTable.Base : 0) + line.JumpTable.Value));
 						break;
 					case Pointer:
-						n = snprintf(buf, 512, "%8.8s:%p\tPtr %p\n", pAssembly->GetSectionHeader(SecIndex)->Name, pAssembly->GetBaseAddress() + line.OldRVA, (line.Pointer.IsAbs ? line.Pointer.Abs : pAssembly->GetBaseAddress() + line.Pointer.RVA));
+						n = snprintf(buf, 512, "%8.8s:%p\tPtr 0x%p\n", pAssembly->GetSectionHeader(SecIndex)->Name, pAssembly->GetBaseAddress() + line.OldRVA, (line.Pointer.IsAbs ? line.Pointer.Abs : pAssembly->GetBaseAddress() + line.Pointer.RVA));
 					case Encoded:
 						break;
 					}
@@ -192,6 +192,7 @@ DWORD WINAPI Begin(void* args) {
 				pAssembly->InsertNewLine(pAssembly->FindSectionIndex(pAssembly->GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint), 0, &Request);
 			}
 		}
+		if (Options.Reassembly.bStrip) pAssembly->Strip();
 
 		// Fixup
 		if (!pAssembly->FixAddresses()) {
