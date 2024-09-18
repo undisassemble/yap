@@ -441,47 +441,14 @@ WORD PE::FindSection(_In_ char* sName) {
 
 void PE::FixHeaders() {
 	// DOS Header
-	this->DosHeader.e_lfanew = sizeof(IMAGE_DOS_HEADER) + DosStub.u64Size;
+	DosHeader.e_lfanew = sizeof(IMAGE_DOS_HEADER) + DosStub.u64Size;
 
-	// NT Headers
-	this->NTHeaders.x64.FileHeader.TimeDateStamp = 0;
-	this->NTHeaders.x64.FileHeader.SizeOfOptionalHeader = this->x86 ? sizeof(IMAGE_OPTIONAL_HEADER32) : sizeof(IMAGE_OPTIONAL_HEADER64);
-	//this->NTHeaders.x64.FileHeader.Characteristics |=  IMAGE_FILE_RELOCS_STRIPPED; - Dont know if this flag is a good idea
-	this->NTHeaders.x64.OptionalHeader.SizeOfImage = this->pSectionHeaders[this->NTHeaders.x64.FileHeader.NumberOfSections - 1].VirtualAddress + this->pSectionHeaders[this->NTHeaders.x64.FileHeader.NumberOfSections - 1].Misc.VirtualSize;
-	this->NTHeaders.x64.OptionalHeader.SizeOfHeaders = sizeof(IMAGE_DOS_HEADER) + this->NTHeaders.x64.FileHeader.SizeOfOptionalHeader + sizeof(IMAGE_SECTION_HEADER) * this->NTHeaders.x64.FileHeader.NumberOfSections;
-	if (this->NTHeaders.x64.OptionalHeader.SizeOfHeaders % this->NTHeaders.x64.OptionalHeader.FileAlignment) {
-		this->NTHeaders.x64.OptionalHeader.SizeOfHeaders += this->NTHeaders.x64.OptionalHeader.FileAlignment - this->NTHeaders.x64.OptionalHeader.SizeOfHeaders % this->NTHeaders.x64.OptionalHeader.FileAlignment;
-	}
-	if (this->x86) {
-		this->NTHeaders.x86.OptionalHeader.NumberOfRvaAndSizes = IMAGE_NUMBEROF_DIRECTORY_ENTRIES;
-	} else {
-		this->NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes = IMAGE_NUMBEROF_DIRECTORY_ENTRIES;
-	}
-
-	// Fixes sizes and bases
-	this->NTHeaders.x64.OptionalHeader.BaseOfCode = this->NTHeaders.x64.OptionalHeader.SizeOfCode = this->NTHeaders.x64.OptionalHeader.SizeOfInitializedData = this->NTHeaders.x64.OptionalHeader.SizeOfUninitializedData = 0;
-	if (this->x86) this->NTHeaders.x86.OptionalHeader.BaseOfData = 0;
-	for (int i = 0; i < this->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-		// SizeOfCode & BaseOfCode
-		if (this->pSectionHeaders[i].Characteristics & IMAGE_SCN_CNT_CODE) {
-			this->NTHeaders.x64.OptionalHeader.SizeOfCode += this->pSectionHeaders[i].SizeOfRawData;
-			if (!this->NTHeaders.x64.OptionalHeader.BaseOfCode || this->pSectionHeaders[i].VirtualAddress < this->NTHeaders.x64.OptionalHeader.BaseOfCode) {
-				this->NTHeaders.x64.OptionalHeader.BaseOfCode = this->pSectionHeaders[i].VirtualAddress;
-			}
-		}
-
-		// SizeOfInitializedData & BaseOfData
-		if (this->pSectionHeaders[i].Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) {
-			this->NTHeaders.x64.OptionalHeader.SizeOfInitializedData += this->pSectionHeaders[i].SizeOfRawData;
-			if (this->x86 && (!this->NTHeaders.x86.OptionalHeader.BaseOfData || this->pSectionHeaders[i].VirtualAddress < this->NTHeaders.x86.OptionalHeader.BaseOfData)) {
-				this->NTHeaders.x86.OptionalHeader.BaseOfData = this->pSectionHeaders[i].VirtualAddress;
-			}
-		}
-
-		// SizeOfUninitializedData
-		if (this->pSectionHeaders[i].Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA) {
-			this->NTHeaders.x64.OptionalHeader.SizeOfUninitializedData += this->pSectionHeaders[i].Misc.VirtualSize;
-		}
+	// Raw addresses
+	DWORD Raw = NTHeaders.x64.OptionalHeader.SizeOfHeaders;
+	for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+		Raw += (Raw % NTHeaders.x64.OptionalHeader.FileAlignment) ? NTHeaders.x64.OptionalHeader.FileAlignment - (Raw % NTHeaders.x64.OptionalHeader.FileAlignment) : 0;
+		pSectionHeaders[i].PointerToRawData = Raw;
+		Raw += pSectionHeaders[i].SizeOfRawData;
 	}
 }
 
@@ -568,7 +535,7 @@ bool PE::ProduceBinary(_In_ char* sName) {
 		return false;
 	}
 
-	bool bRet = this->ProduceBinary(hFile);
+	bool bRet = ProduceBinary(hFile);
 
 	// Close
 	CloseHandle(hFile);

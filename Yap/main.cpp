@@ -184,15 +184,16 @@ DWORD WINAPI Begin(void* args) {
 #endif
 
 		// Modify
+		if (Options.Reassembly.bStrip) pAssembly->Strip();
 		if (Options.Reassembly.bTest) {
 			ZydisEncoderRequest Request;
+			ZeroMemory(&Request, sizeof(ZydisEncoderRequest));
 			Request.mnemonic = ZYDIS_MNEMONIC_NOP;
 			Request.operand_count = 0;
 			for (int i = 0; i < 50; i++) {
 				pAssembly->InsertNewLine(pAssembly->FindSectionIndex(pAssembly->GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint), 0, &Request);
 			}
 		}
-		if (Options.Reassembly.bStrip) pAssembly->Strip();
 
 		// Fixup
 		if (!pAssembly->FixAddresses()) {
@@ -236,7 +237,12 @@ DWORD WINAPI Begin(void* args) {
 	do {
 		Data.bWaitingOnFile = true;
 		while (Data.bWaitingOnFile) Sleep(1);
-		if (pAssembly->ProduceBinary(Data.SaveFileName)) break;
+		if (!pAssembly->ProduceBinary(Data.SaveFileName)) {
+			LOG(Failed, MODULE_YAP, "Failed to save file!\n");
+			goto th_exit;
+		} else {
+			break;
+		}
 	} while (!Data.bUserCancelled);
 	if (Data.bUserCancelled) {
 		LOG(Info, MODULE_YAP, "User cancelled\n");

@@ -493,6 +493,117 @@ bool Asm::Disassemble() {
 		Sections.At(wContainingSec).Lines->Insert(wIndex, insert);
 	}
 
+	// Insert known RVAs
+	{
+		Line insert;
+		insert.Type = Pointer;
+		insert.Pointer.IsAbs = false;
+
+		// IAT
+		if (NTHeaders.x64.OptionalHeader.DataDirectory[1].VirtualAddress && NTHeaders.x64.OptionalHeader.DataDirectory[1].Size) {
+			// Insert entries
+			IAT_ENTRY entry = { 0 };
+			insert.OldRVA = NTHeaders.x64.OptionalHeader.DataDirectory[1].VirtualAddress;
+			WORD wSecIndex = FindSectionIndex(insert.OldRVA);
+			WORD wIndex = FindPosition(wSecIndex, insert.OldRVA);
+			if (wIndex == _UI32_MAX || wSecIndex == _UI32_MAX) {
+				LOG(Failed, MODULE_REASSEMBLER, "Failed to insert IAT!\n");
+				return false;
+			}
+			do {
+				ReadRVA(insert.OldRVA, &entry, sizeof(IAT_ENTRY));
+				insert.Pointer.RVA = entry.LookupRVA;
+				Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+				wIndex++;
+				insert.OldRVA += sizeof(DWORD) * 3;
+				insert.Pointer.RVA = entry.NameRVA;
+				Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+				wIndex++;
+				insert.OldRVA += sizeof(DWORD);
+				insert.Pointer.RVA = entry.ThunkRVA;
+				Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+				wIndex++;
+				insert.OldRVA += sizeof(DWORD);
+			} while (entry.LookupRVA && entry.NameRVA);
+			
+			// Insert names
+			IAT_ENTRY* pEntries = GetIAT();
+			for (int i = 0; pEntries && pEntries[i].LookupRVA; i++) {
+				// Begin
+				insert.OldRVA = pEntries[i].LookupRVA;
+				WORD wSecIndex = FindSectionIndex(insert.OldRVA);
+				WORD wIndex = FindPosition(wSecIndex, insert.OldRVA);
+				if (wIndex == _UI32_MAX || wSecIndex == _UI32_MAX) {
+					LOG(Failed, MODULE_REASSEMBLER, "Failed to insert IAT!\n");
+					return false;
+				}
+				if (wIndex == _UI32_MAX - 1) {
+					continue;
+				}
+
+				// Do
+				do {
+					insert.Pointer.RVA = ReadRVA<DWORD>(insert.OldRVA);
+					Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+					wIndex++;
+					insert.OldRVA += sizeof(uint64_t);
+				} while (insert.Pointer.RVA);
+			}
+		}
+
+		// Exports
+		if (NTHeaders.x64.OptionalHeader.DataDirectory[0].VirtualAddress && NTHeaders.x64.OptionalHeader.DataDirectory[0].Size) {
+			IMAGE_EXPORT_DIRECTORY ExportTable = ReadRVA<IMAGE_EXPORT_DIRECTORY>(NTHeaders.x64.OptionalHeader.DataDirectory[0].VirtualAddress);
+			insert.OldRVA = NTHeaders.x64.OptionalHeader.DataDirectory[0].VirtualAddress + sizeof(DWORD) * 7;
+			WORD wSecIndex = FindSectionIndex(insert.OldRVA);
+			WORD wIndex = FindPosition(wSecIndex, insert.OldRVA);
+			if (wIndex == _UI32_MAX || wSecIndex == _UI32_MAX) {
+				LOG(Failed, MODULE_REASSEMBLER, "Failed to insert exports!\n");
+				return false;
+			}
+			insert.Pointer.RVA = ExportTable.AddressOfFunctions;
+			Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+			wIndex++;
+			insert.OldRVA += sizeof(DWORD);
+			insert.Pointer.RVA = ExportTable.AddressOfNames;
+			Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+			wIndex++;
+			insert.OldRVA += sizeof(DWORD);
+			insert.Pointer.RVA = ExportTable.AddressOfNameOrdinals;
+			Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+
+			// Functions
+			insert.OldRVA = ExportTable.AddressOfFunctions;
+			wSecIndex = FindSectionIndex(insert.OldRVA);
+			wIndex = FindPosition(wSecIndex, insert.OldRVA);
+			if (wIndex == _UI32_MAX || wSecIndex == _UI32_MAX) {
+				LOG(Failed, MODULE_REASSEMBLER, "Failed to insert exports!\n");
+				return false;
+			}
+			for (int i = 0; i < ExportTable.NumberOfFunctions; i++) {
+				insert.Pointer.RVA = ReadRVA<DWORD>(insert.OldRVA);
+				Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+				wIndex++;
+				insert.OldRVA += sizeof(DWORD);
+			}
+
+			// Names
+			insert.OldRVA = ExportTable.AddressOfNames;
+			wSecIndex = FindSectionIndex(insert.OldRVA);
+			wIndex = FindPosition(wSecIndex, insert.OldRVA);
+			if (wIndex == _UI32_MAX || wSecIndex == _UI32_MAX) {
+				LOG(Failed, MODULE_REASSEMBLER, "Failed to insert exports!\n");
+				return false;
+			}
+			for (int i = 0; i < ExportTable.NumberOfNames; i++) {
+				insert.Pointer.RVA = ReadRVA<DWORD>(insert.OldRVA);
+				Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+				wIndex++;
+				insert.OldRVA += sizeof(DWORD);
+			}
+		}
+	}
+
 	// Initialize Zydis
 	ZydisDecoderInit(&Decoder, GetMachine(), x86 ? ZYDIS_STACK_WIDTH_32 : ZYDIS_STACK_WIDTH_64);
 
@@ -772,12 +883,6 @@ bool Asm::FixAddresses() {
 		}
 	}
 
-	// Fix exports
-	Vector<DWORD> Exports = GetExportedFunctionRVAs();
-	for (int i = 0; i < Exports.Size(); i++) {
-		Exports.Replace(i, TranslateOldAddress(Exports.At(i)));
-	}
-
 	// Fix relocations
 	Vector<DWORD> Relocations = GetRelocations();
 	for (int i = 0; i < Relocations.Size(); i++) {
@@ -800,8 +905,6 @@ bool Asm::FixAddresses() {
 			NTHeaders.x64.OptionalHeader.DataDirectory[i].VirtualAddress = NTHeaders.x64.OptionalHeader.DataDirectory[i].Size = 0;
 		}
 	}
-
-	// Fix imports
 
 	LOG(Success, MODULE_REASSEMBLER, "Patched instructions\n");
 	return true;
@@ -904,6 +1007,7 @@ bool Asm::Assemble() {
 					LOG(Info_Extended, MODULE_REASSEMBLER, "In section %.8s\n", GetSectionHeader(i)->Name);
 					return false;
 				}
+				continue;
 			}
 
 			// Insert data
@@ -931,8 +1035,6 @@ bool Asm::Assemble() {
 					*reinterpret_cast<DWORD*>(Buf.pBytes + Buf.u64Size - sizeof(DWORD)) = Lines->At(i).Pointer.RVA;
 				}
 				break;
-			case Padding:
-				break;
 			default:
 				LOG(Warning, MODULE_REASSEMBLER, "No data inserted at %#x!\n", Lines->At(i).NewRVA);
 			}
@@ -958,6 +1060,8 @@ bool Asm::Assemble() {
 		GetSectionHeader(i)->VirtualAddress = Sections.At(i).NewRVA;
 		GetSectionHeader(i)->Misc.VirtualSize = Sections.At(i).NewSize;
 	}
+
+	FixHeaders();
 	LOG(Success, MODULE_REASSEMBLER, "Finished assembly\n");
 	return true;
 }
@@ -1092,14 +1196,20 @@ DWORD Asm::TranslateOldAddress(_In_ DWORD dwRVA) {
 }
 
 bool Asm::InsertNewLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ ZydisEncoderRequest* pRequest) {
-	if (SectionIndex >= Sections.Size() || LineIndex > Sections.At(SectionIndex).Lines->Size()) return false;
+	if (!pRequest || SectionIndex >= Sections.Size() || LineIndex > Sections.At(SectionIndex).Lines->Size()) return false;
+	pRequest->machine_mode = ZYDIS_MACHINE_MODE_LONG_64;
 	Line line = { 0 };
 	line.Type = Encoded;
 	ZyanUSize sz = ZYDIS_MAX_INSTRUCTION_LENGTH;
-	bool success = ZYAN_SUCCESS(ZydisEncoderEncodeInstruction(pRequest, &line.Encoded.Raw, &sz));
-	line.Encoded.Size = sz;
-	if (success) Sections.At(SectionIndex).Lines->Insert(LineIndex, line);
-	return success;
+	ZyanStatus status = ZydisEncoderEncodeInstruction(pRequest, line.Encoded.Raw, &sz);
+	if (ZYAN_SUCCESS(status)) {
+		line.Encoded.Size = sz;
+		Sections.At(SectionIndex).Lines->Insert(LineIndex, line);
+		return true;
+	} else {
+		LOG(Failed, MODULE_REASSEMBLER, "Failed to assemble line: %s\n", ZydisErrorToString(status));
+		return false;
+	}
 }
 
 void Asm::DeleteLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex) {

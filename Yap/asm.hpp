@@ -105,7 +105,7 @@ public:
 	/// </summary>
 	/// <param name="dwSec">Section index</param>
 	/// <param name="dwRVA">RVA</param>
-	/// <returns>Index of line, or _UI16_MAX if not found</returns>
+	/// <returns>Index of line, or _UI32_MAX if not found</returns>
 	DWORD FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA);
 	
 	/// <summary>
@@ -113,7 +113,7 @@ public:
 	/// </summary>
 	/// <param name="dwSec">Section index</param>
 	/// <param name="dwRVA">RVA</param>
-	/// <returns>Index to insert at, or _UI16_MAX - 1 if already exists</returns>
+	/// <returns>Index to insert at, or _UI32_MAX - 1 if already exists</returns>
 	DWORD FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA);
 	
 	DWORD FindSectionIndex(_In_ DWORD dwRVA);

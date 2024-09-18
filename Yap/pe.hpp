@@ -3,7 +3,7 @@
 #include "util.h"
 
 enum PEStatus_t : BYTE {
-	Normal = 0,							// No noticed errors
+	Normal = 0,								// No noticed errors
 	NotSet = 1,								// Parser has not been given a file
 	NoFile = 2,								// File provided does not exist
 	NotPE = 3,								// File provided is not a PE or is corrupt
