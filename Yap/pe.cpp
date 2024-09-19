@@ -346,7 +346,7 @@ void PE::RebaseImage(_In_ uint64_t u64NewBase) {
 					WriteRVA<uint64_t>(rva, value);
 				}
 				nOff += relocation.SizeOfBlock;
-			} while (relocation.SizeOfBlock);
+			} while (relocation.SizeOfBlock && reloc.Size > nOff);
 		}
 	}
 	NTHeaders.x64.OptionalHeader.ImageBase = u64NewBase;
@@ -641,7 +641,7 @@ Vector<DWORD> PE::GetRelocations() {
 				ret.Push(pRelocation->VirtualAddress + (i & 0b0000111111111111));
 			}
 			nOff += pRelocation->SizeOfBlock;
-		} while (pRelocation->SizeOfBlock);
+		} while (pRelocation->SizeOfBlock && NTHeaders.x64.OptionalHeader.DataDirectory[5].Size > nOff && sec.u64Size > nOff);
 	}
 	return ret;
 }

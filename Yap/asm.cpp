@@ -131,10 +131,11 @@ DWORD Asm::FindSectionIndex(_In_ DWORD dwRVA) {
 }
 
 DWORD Asm::FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
+	if (dwSec > Sections.Size()) return _UI32_MAX;
 	Vector<Line>* Lines = Sections.At(dwSec).Lines;
 
 	// If no lines exist, it will just be the first line
-	if (!Lines->Size())
+	if (!Lines || !Lines->Size())
 		return _UI32_MAX;
 
 	// Check bounds
@@ -800,12 +801,32 @@ bool Asm::FixAddresses() {
 			line = Lines->At(i);
 			if (line.Type == Decoded) {
 				for (j = 0; j < line.Decoded.Instruction.operand_count_visible; j++) {
-					if (IsInstructionMemory(&line.Decoded.Instruction, &line.Decoded.Operands[j]) && (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&line.Decoded.Instruction, &line.Decoded.Operands[j], line.OldRVA, &u64Referencing)) || (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && !line.Decoded.Operands[j].mem.disp.value) || (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && !line.Decoded.Operands[j].imm.is_relative))) {
-						if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Decoded.Operands[j].mem.base != ZYDIS_REGISTER_RIP)// && this->pLines[i].Operands[j].mem.base != ZYDIS_REGISTER_NONE)
+					if (IsInstructionMemory(&line.Decoded.Instruction, &line.Decoded.Operands[j])) {
+						if (IsInstructionCF(&line.Decoded.Instruction) && line.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER)
+							continue;
+						if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && ((line.Decoded.Operands[j].mem.base != ZYDIS_REGISTER_RIP && line.Decoded.Operands[j].mem.base != ZYDIS_REGISTER_NONE) || line.Decoded.Operands[j].mem.index != ZYDIS_REGISTER_NONE))
 							continue;
 
 						// Find target
-						ZydisCalcAbsoluteAddress(&line.Decoded.Instruction, line.Decoded.Operands, line.OldRVA, &u64Referencing);
+						ZyanStatus status = ZydisCalcAbsoluteAddress(&line.Decoded.Instruction, &line.Decoded.Operands[j], line.OldRVA, &u64Referencing);
+						if (ZYAN_FAILED(status)) {
+							ZydisFormatter fmt;
+							ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
+							char op[128];
+							ZydisFormatterFormatInstruction(&fmt, &line.Decoded.Instruction, line.Decoded.Operands, line.Decoded.Instruction.operand_count_visible, op, 128, GetBaseAddress() + line.OldRVA, NULL);
+							LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate absolute address of memory: %s (%s)\n", ZydisErrorToString(status), op);
+							return false;
+						}
+
+						if (u64Referencing < Sections.At(0).OldRVA) {
+							ZydisFormatter fmt;
+							ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
+							char op[128];
+							ZydisFormatterFormatOperand(&fmt, &line.Decoded.Instruction, &line.Decoded.Operands[j], op, 128, GetBaseAddress() + line.OldRVA, NULL);
+							LOG(Warning, MODULE_REASSEMBLER, "Failed to translate address at %p (%s)\n", GetBaseAddress() + line.OldRVA, op);
+							continue;
+						}
+
 						_SecIndex = FindSectionIndex(u64Referencing);
 						_LineIndex = FindIndex(_SecIndex, u64Referencing);
 						if (_LineIndex == _UI32_MAX) {
@@ -814,13 +835,14 @@ bool Asm::FixAddresses() {
 						}
 						
 						// Calc offset
-						i64Off = (Sections.At(_SecIndex).Lines->At(_LineIndex).NewRVA - Sections.At(_SecIndex).Lines->At(_LineIndex).OldRVA) - (line.NewRVA - line.OldRVA);
+						i64Off = Sections.At(_SecIndex).Lines->At(_LineIndex).NewRVA - Sections.At(_SecIndex).Lines->At(_LineIndex).OldRVA;
+						if (line.Decoded.Operands[j].mem.base == ZYDIS_REGISTER_RIP) i64Off -= (line.NewRVA - line.OldRVA);
 
 						// Apply offset
-						if (line.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
-							line.Decoded.Operands[0].imm.value.s += i64Off;
-						} else if (line.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY) {
-							line.Decoded.Operands[0].mem.disp.value += i64Off;
+						if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
+							line.Decoded.Operands[j].imm.value.s += i64Off;
+						} else if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY) {
+							line.Decoded.Operands[j].mem.disp.value += i64Off;
 						}
 					}
 				}
@@ -859,6 +881,8 @@ bool Asm::FixAddresses() {
 					line.Pointer.RVA = NewValue;
 				}
 			}
+
+			Lines->Replace(i, line);
 		}
 	}
 
@@ -895,6 +919,7 @@ bool Asm::FixAddresses() {
 	insert.Type = RawInsert;
 	insert.RawInsert = relocs;
 	InsertLine(SecIndex, FindPosition(SecIndex, NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress), insert);
+	NTHeaders.x64.OptionalHeader.DataDirectory[5].Size = relocs.u64Size;
 
 	// Fix data dirs
 	for (int i = 0; i < 16; i++) {
@@ -930,16 +955,15 @@ bool Asm::Assemble() {
 
 			// Translate to encoder request
 			if (ZYAN_FAILED(Status = ZydisEncoderDecodedInstructionToEncoderRequest(&line.Decoded.Instruction, line.Decoded.Operands, line.Decoded.Instruction.operand_count_visible, &Request))) {
-				LOG(Failed, MODULE_REASSEMBLER, "Assembler failed at translation\n");
+				LOG(Failed, MODULE_REASSEMBLER, "Assembler failed at translation (%s)\n", ZydisErrorToString(Status));
 				return false;
 			}
 			
 			// Encode the actual instruction
 			Size = ZYDIS_MAX_INSTRUCTION_LENGTH;
 			if (ZYAN_FAILED(Status = ZydisEncoderEncodeInstruction(&Request, Raw, &Size))) {
-				LOG(Failed, MODULE_REASSEMBLER, "Assembler failed at encoding (%s)\n", ZydisErrorToString(Status));
-				LOG(Info_Extended, MODULE_REASSEMBLER, "Failed at line %zu\n", i + 1)
-					return false;
+				LOG(Failed, MODULE_REASSEMBLER, "Assembler failed to encode instruction at %p (%s)\n", GetBaseAddress() + line.OldRVA, ZydisErrorToString(Status));
+				return false;
 			}
 
 			// Encoded instruction was larger than the original instruction, this may get fixed later
@@ -1007,6 +1031,9 @@ bool Asm::Assemble() {
 					LOG(Info_Extended, MODULE_REASSEMBLER, "In section %.8s\n", GetSectionHeader(i)->Name);
 					return false;
 				}
+				AsmSection sec = Sections.At(SecIndex);
+				sec.NewSize += Lines->At(i).Padding.Size;
+				Sections.Replace(SecIndex, sec);
 				continue;
 			}
 
@@ -1145,6 +1172,7 @@ bool Asm::Strip() {
 	}
 	NTHeaders.x64.FileHeader.PointerToSymbolTable = 0;
 	NTHeaders.x64.FileHeader.NumberOfSymbols = 0;
+	NTHeaders.x64.FileHeader.Characteristics |= IMAGE_FILE_LOCAL_SYMS_STRIPPED | IMAGE_FILE_DEBUG_STRIPPED;
 
 	LOG(Success, MODULE_REASSEMBLER, "Stripped\n");
 	return true;
