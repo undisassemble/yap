@@ -836,7 +836,7 @@ bool Asm::FixAddresses() {
 						
 						// Calc offset
 						i64Off = Sections.At(_SecIndex).Lines->At(_LineIndex).NewRVA - Sections.At(_SecIndex).Lines->At(_LineIndex).OldRVA;
-						if (line.Decoded.Operands[j].mem.base == ZYDIS_REGISTER_RIP) i64Off -= (line.NewRVA - line.OldRVA);
+						if ((line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Decoded.Operands[j].mem.base == ZYDIS_REGISTER_RIP) || IsInstructionCF(&line.Decoded.Instruction)) i64Off -= (line.NewRVA - line.OldRVA);
 
 						// Apply offset
 						if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
