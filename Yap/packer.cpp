@@ -312,10 +312,18 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 	if (::Options.Packing.bDelayedEntry) {
 		a.mov(rax, pPackedBinary->GetBaseAddress() + pPackedBinary->GetSectionHeaders()[0].VirtualAddress);
 		a.add(rax, ptr(reloc));
+		Label after = a.newLabel();
 		if (::Options.Packing.bAntiDebug) {
+			a.cmp(byte_ptr(rax), 0xCC);
+			a.mov(rcx, 0);
+			a.cmovnz(rcx, rax);
+			a.cmp(word_ptr(rax), 0x03CD);
 			a.mov(byte_ptr(rax), 0xC3);
+			a.mov(rax, rcx);
+			a.cmovz(rax, rsp);
 			a.call(rax);
 		}
+		a.bind(after);
 		a.mov(word_ptr(rax), 0xB848);
 		a.add(rax, 2);
 		a.mov(qword_ptr(rax), pPackedBinary->GetBaseAddress() + pPackedBinary->GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint + 1);
@@ -2315,12 +2323,11 @@ void ProtectedAssembler::randinst(Gp o0) {
 	if (!stack.Includes(o0) || Blacklist.Includes(o0.r64()) || Blacklist.Includes(o0) || o0.size() != 8) return;
 	HeldLocks++;
 	const BYTE sz = 26;
-	const BYTE beg = 5;
-	const BYTE beg_unsafe = 9;
-	BYTE end = bStrict ? beg_unsafe - beg : sz - beg;
+	const BYTE beg_unsafe = 10;
+	BYTE end = bStrict ? beg_unsafe : sz;
 	Mem peb = ptr(0x60);
 	peb.setSegment(gs);
-	switch (beg + rand() % end) {
+	switch (rand() % end) {
 	case 0:
 		lea(o0, ptr(rip, rand()));
 		break;
@@ -2333,9 +2340,14 @@ void ProtectedAssembler::randinst(Gp o0) {
 	case 3:
 		lea(o0, ptr(truerandreg(), truerandreg(), rand() % 3, (rand() & 1 ? 1 : -1) * rand()));
 		break;
-	case 4:
-		desync_mov(o0.r64());
+	case 4: {
+		BYTE r = 3 + rand() % (Options.Packing.MutationLevel * 2);
+		Label j2 = newLabel();
+		jmp(j2);
+		for (; r > 0; r--) db(rand() & 0xFF);
+		bind(j2);
 		break;
+	}
 	case 5:
 		mov(o0, 0);
 		break;
@@ -2348,9 +2360,21 @@ void ProtectedAssembler::randinst(Gp o0) {
 	case 8:
 		mov(o0, peb);
 		break;
+	case 9: {
+		BYTE r = 3 + rand() % (Options.Packing.MutationLevel * 2);
+		Label j2 = newLabel();
+		jbe(j2);
+		jnc(j2);
+		for (; r > 0; r--) db(rand() & 0xFF);
+		bind(j2);
+		break;
+	}
+	case 10:
+		desync_mov(o0.r64()); // This is VERY slow for some reason
+		break;
 
 	// Unsafe instructions
-	case 9:
+	/*case 9:
 		inc(randsize(o0));
 		break;
 	case 10:
@@ -2407,7 +2431,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 	case 25:
 		o0 = randsize(o0);
 		test(o0, o0);
-		break;
+		break;*/
 	}
 	HeldLocks--;
 }
@@ -2604,7 +2628,7 @@ void ProtectedAssembler::desync_jnz() {
 void ProtectedAssembler::desync_mov(Gpq o0) {
 	DEBUG_ONLY(if (Options.Debug.bDisableMutations) return);
 	HeldLocks++;
-	uint64_t dist = 3 + rand() % 125;
+	uint64_t dist = 3 + rand() % Options.Packing.MutationLevel * 2;
 	push((dist << 16) + 0xE940);
 	Label after = newLabel();
 	lea(o0, ptr(after));
