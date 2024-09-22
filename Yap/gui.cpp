@@ -214,10 +214,12 @@ void DrawGUI() {
 
 		if (ImGui::BeginTabItem("Reassembler")) {
 			IMGUI_TOGGLE("Enabled", Options.Reassembly.bEnabled);
-			ImGui::SetItemTooltip("");
+			ImGui::SetItemTooltip("Disassembles your application, modifies the assembly a ton, and then assembles the modified assembly.");
 			IMGUI_TOGGLE("Test", Options.Reassembly.bTest);
 			IMGUI_TOGGLE("Strip Debug Symbols", Options.Reassembly.bStrip);
 			ImGui::SetItemTooltip("Remove debugging information from the PE.");
+			IMGUI_TOGGLE("Instruction Substitution", Options.Reassembly.bSubstitution);
+			ImGui::SetItemTooltip("Replaces some existing instructions with other, more complicated alternatives.\n");
 			ImGui::EndTabItem();
 		}
 

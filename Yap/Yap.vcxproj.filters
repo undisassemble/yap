@@ -333,6 +333,9 @@
     <ClCompile Include="imgui\backends\imgui_impl_dx11.cpp">
       <Filter>Source Files\Vendor</Filter>
     </ClCompile>
+    <ClCompile Include="zyasm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="asm.hpp">
@@ -790,6 +793,9 @@
     </ClInclude>
     <ClInclude Include="imgui\backends\imgui_impl_dx11.h">
       <Filter>Header Files\Vendor</Filter>
+    </ClInclude>
+    <ClInclude Include="zyasm.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <winternl.h>
+typedef uint64_t QWORD;
 #ifndef UTIL_STRUCT_ONLY
 #include <asmjit.h>
 #include "Zydis/Zydis.h"
@@ -180,6 +181,24 @@ struct Vector {
 		}
 	}
 
+	// Replaces first instruction, inserts the remainder
+	void Replace(_In_ DWORD i, _In_ Vector<T> Item) {
+		if (!Item.Size() || i >= Size()) return;
+		Replace(i, Item.At(0));
+		Item.nItems--;
+		Item.raw.pBytes += sizeof(T);
+		Item.raw.u64Size -= sizeof(T);
+		Insert(i + 1, Item);
+		Item.raw.u64Size += sizeof(T);
+		Item.raw.pBytes -= sizeof(T);
+		Item.nItems++;
+	}
+
+	// Replaces instructions in order, size does not change
+	void Overwrite(_In_ DWORD i, _In_ Vector<T> Item) {
+
+	}
+
 	void Release() {
 		if (raw.pBytes && !bCannotBeReleased) free(raw.pBytes);
 		raw.pBytes = NULL;
@@ -314,6 +333,7 @@ struct Options_t {
 		bool bEnabled : 1 = false;
 		bool bTest : 1 = false;
 		bool bStrip : 1 = false;
+		bool bSubstitution : 1 = false;
 	} Reassembly;
 
 #ifdef _DEBUG

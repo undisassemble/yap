@@ -228,6 +228,7 @@
     <ClCompile Include="packer.cpp" />
     <ClCompile Include="pe.cpp" />
     <ClCompile Include="vm.cpp" />
+    <ClCompile Include="zyasm.cpp" />
     <ClCompile Include="zydis\dependencies\zycore\src\Allocator.c" />
     <ClCompile Include="zydis\dependencies\zycore\src\API\Memory.c" />
     <ClCompile Include="zydis\dependencies\zycore\src\API\Process.c" />
@@ -370,6 +371,7 @@
     <ClInclude Include="util.h" />
     <ClInclude Include="vm.hpp" />
     <ClInclude Include="vm_types.hpp" />
+    <ClInclude Include="zyasm.hpp" />
     <ClInclude Include="zydis\dependencies\zycore\include\Zycore\Allocator.h" />
     <ClInclude Include="zydis\dependencies\zycore\include\Zycore\ArgParse.h" />
     <ClInclude Include="zydis\dependencies\zycore\include\Zycore\Atomic.h" />

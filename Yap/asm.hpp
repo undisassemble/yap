@@ -10,14 +10,13 @@ enum LineType : BYTE {
 	RawInsert,
 	Padding,
 	JumpTable,
-	Pointer
+	Pointer,
+	Request
 };
 
 struct Line {
 	LineType Type : 4;
-	bool bTLSCallback : 1 = false; // Line is the entry point of a TLS callback
-	bool bEntryPoint : 1 = false; // Line is the programs OEP
-	bool bRelative : 1 = false; // Jump table is relative to first entry
+	bool bRelative : 1 = false; // Jump table is relative to first entry or request holds instruction index instead of absolute address (i.e. jmp 0 is jumping to the first instruction in the index, if doing this, make the instruction RIP-relative anyway)
 	DWORD OldRVA = 0;
 	DWORD NewRVA = 0;
 	union {
@@ -47,6 +46,7 @@ struct Line {
 			};
 			bool IsAbs;
 		} Pointer;
+		ZydisEncoderRequest Request;
 	};
 };
 
@@ -77,6 +77,8 @@ private:
 	bool CheckRuntimeFunction(_In_ RUNTIME_FUNCTION* pFunc, _In_ bool bFixAddr = false);
 	Vector<Function> FindFunctionsRecursive(_In_ DWORD dwRVA);
 	Vector<Function> _CheckRuntimeFunction2(_In_ RUNTIME_FUNCTION* pFunc);
+	DWORD GetNextOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex);
+	DWORD GetPrevOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex);
 
 protected:
 	Vector<AsmSection> Sections;
@@ -97,6 +99,8 @@ public:
 	/// </summary>
 	/// <returns>Success/failure</returns>
 	bool Strip();
+
+	bool Mutate();
 
 	DWORD TranslateOldAddress(_In_ DWORD dwRVA);
 

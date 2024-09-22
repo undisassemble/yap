@@ -1,4 +1,5 @@
 #include "asm.hpp"
+#include "zyasm.hpp"
 
 typedef struct {
 	BYTE Version_Flag;
@@ -41,8 +42,8 @@ char* ZydisErrorToString(ZyanStatus Status) {
 	}
 }
 
-bool IsInstructionCF(_In_ ZydisDecodedInstruction* pInstruction) {
-	switch (pInstruction->mnemonic) {
+bool IsInstructionCF(_In_ ZydisMnemonic mnemonic) {
+	switch (mnemonic) {
 	case ZYDIS_MNEMONIC_JB:
 	case ZYDIS_MNEMONIC_JBE:
 	case ZYDIS_MNEMONIC_JCXZ:
@@ -76,7 +77,7 @@ bool IsInstructionCF(_In_ ZydisDecodedInstruction* pInstruction) {
 }
 
 bool IsInstructionMemory(_In_ ZydisDecodedInstruction* pInstruction, _In_ ZydisDecodedOperand* pOperand) {
-	return IsInstructionCF(pInstruction) || pOperand->type == ZYDIS_OPERAND_TYPE_MEMORY;
+	return IsInstructionCF(pInstruction->mnemonic) || pOperand->type == ZYDIS_OPERAND_TYPE_MEMORY;
 }
 
 Asm::Asm() : PE(false) {}
@@ -118,6 +119,29 @@ Asm::~Asm() {
 	JumpTables.Release();
 }
 
+DWORD Asm::GetNextOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex) {
+	Vector<Line>* Lines = Sections.At(dwSec).Lines;
+	if (!Lines || Lines->Size() <= dwIndex) return _UI32_MAX;
+	
+	for (; dwIndex < Lines->Size(); dwIndex++) {
+		if (Lines->At(dwIndex).OldRVA) return dwIndex;
+	}
+
+	return _UI32_MAX;
+}
+
+DWORD Asm::GetPrevOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex) {
+	Vector<Line>* Lines = Sections.At(dwSec).Lines;
+	if (!Lines) return _UI32_MAX;
+
+	for (;; dwIndex--) {
+		if (Lines->At(dwIndex).OldRVA) return dwIndex;
+		if (!dwIndex) return _UI32_MAX;
+	}
+
+	return _UI32_MAX;
+}
+
 DWORD Asm::FindSectionIndex(_In_ DWORD dwRVA) {
 	DEBUG_ONLY(uint64_t TickCount = GetTickCount64());
 	for (DWORD i = 0; i < Sections.Size(); i++) {
@@ -139,9 +163,9 @@ DWORD Asm::FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 		return _UI32_MAX;
 
 	// Check bounds
-	if (dwRVA >= Lines->At(0).OldRVA && dwRVA < Lines->At(0).OldRVA + GetLineSize(Lines->At(0)))
+	if (Lines->At(0).OldRVA && dwRVA >= Lines->At(0).OldRVA && dwRVA < Lines->At(0).OldRVA + GetLineSize(Lines->At(0)))
 		return 0;
-	if (dwRVA >= Lines->At(Lines->Size() - 1).OldRVA && dwRVA < Lines->At(Lines->Size() - 1).OldRVA + GetLineSize(Lines->At(Lines->Size() - 1)))
+	if (Lines->At(Lines->Size() - 1).OldRVA && dwRVA >= Lines->At(Lines->Size() - 1).OldRVA && dwRVA < Lines->At(Lines->Size() - 1).OldRVA + GetLineSize(Lines->At(Lines->Size() - 1)))
 		return Lines->Size() - 1;
 
 	if (Lines->Size() == 1)
@@ -150,12 +174,16 @@ DWORD Asm::FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 	// Search
 	DEBUG_ONLY(uint64_t TickCount = GetTickCount64());
 	size_t szMin = 0, szMax = Lines->Size(), i = 0;
+	size_t PrevI = 0;
 	while (szMin < szMax) {
 		i = szMin + (szMax - szMin) * 0.5;
 
 		if (szMin + 1 == szMax) {
 			i = szMin = szMax;
 		}
+		i = GetNextOriginal(dwSec, i);
+		if (i >= szMax || i == PrevI) i = GetNextOriginal(dwSec, szMin);
+		if (i == PrevI) break;
 
 		// Check index
 		if (dwRVA >= Lines->At(i).OldRVA && dwRVA < Lines->At(i).OldRVA + GetLineSize(Lines->At(i))) {
@@ -177,6 +205,7 @@ DWORD Asm::FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 			DEBUG_ONLY(Data.TimeSpentSearching += GetTickCount64() - TickCount);
 			return _UI32_MAX;
 		}
+		PrevI = i;
 	}
 
 	DEBUG_ONLY(Data.TimeSpentSearching += GetTickCount64() - TickCount);
@@ -191,13 +220,13 @@ DWORD Asm::FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 		return 0;
 
 	// Check bounds
-	if (dwRVA < Lines->At(0).OldRVA)
+	if (Lines->At(0).OldRVA && dwRVA < Lines->At(0).OldRVA)
 		return 0;
-	else if (dwRVA == Lines->At(0).OldRVA)
+	else if (Lines->At(0).OldRVA && dwRVA == Lines->At(0).OldRVA)
 		return _UI32_MAX - 1;
-	if (dwRVA >= Lines->At(Lines->Size() - 1).OldRVA + GetLineSize(Lines->At(Lines->Size() - 1)))
+	if (Lines->At(Lines->Size() - 1).OldRVA && dwRVA >= Lines->At(Lines->Size() - 1).OldRVA + GetLineSize(Lines->At(Lines->Size() - 1)))
 		return Lines->Size();
-	else if (dwRVA == Lines->At(Lines->Size() - 1).OldRVA)
+	else if (Lines->At(Lines->Size() - 1).OldRVA && dwRVA == Lines->At(Lines->Size() - 1).OldRVA)
 		return _UI32_MAX - 1;
 
 	// Search
@@ -206,11 +235,14 @@ DWORD Asm::FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 	while (szMin < szMax) {
 		i = szMin + (szMax - szMin) * 0.5;
 
+		i = GetNextOriginal(dwSec, i);
+		if (i == _UI32_MAX) break;
+
 		if (dwRVA >= Lines->At(i).OldRVA + GetLineSize(Lines->At(i))) {
 			// In between
-			if (dwRVA < Lines->At(i + 1).OldRVA) {
+			if (dwRVA < Lines->At(GetNextOriginal(dwSec, i + 1)).OldRVA) {
 				DEBUG_ONLY(Data.TimeSpentSearching += GetTickCount64() - TickCount);
-				return i + 1;
+				return GetNextOriginal(dwSec, i + 1);
 			}
 
 			// Shift range
@@ -219,7 +251,7 @@ DWORD Asm::FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 
 		else if (dwRVA < Lines->At(i).OldRVA) {
 			// In between
-			if (dwRVA > Lines->At(i - 1).OldRVA + GetLineSize(Lines->At(i - 1))) {
+			if (dwRVA > Lines->At(GetPrevOriginal(dwSec, i - 1)).OldRVA + GetLineSize(Lines->At(GetPrevOriginal(dwSec, i - 1)))) {
 				DEBUG_ONLY(Data.TimeSpentSearching += GetTickCount64() - TickCount);
 				return i;
 			}
@@ -346,7 +378,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 				}
 			}
  
-			if (IsInstructionCF(&CraftedLine.Decoded.Instruction)) {
+			if (IsInstructionCF(CraftedLine.Decoded.Instruction.mnemonic)) {
 				// Make sure the operand is an address, dont jump to registers yet
 				if ((CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_MEMORY && CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE) || (CraftedLine.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && (CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_RIP && CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_NONE))) {
 					ZydisFormatterFormatInstruction(&Formatter, &CraftedLine.Decoded.Instruction, CraftedLine.Decoded.Operands, CraftedLine.Decoded.Instruction.operand_count_visible, FormattedBuf, 128, GetBaseAddress() + dwRVA, NULL);
@@ -785,7 +817,9 @@ bool Asm::FixAddresses() {
 			Lines->Replace(i, line);
 
 			// Update address
-			dwCurrentAddress += GetLineSize(line);
+			DWORD dwChange = GetLineSize(line);
+			if (!dwChange) return false;
+			dwCurrentAddress += dwChange;
 		}
 	}
 
@@ -802,7 +836,7 @@ bool Asm::FixAddresses() {
 			if (line.Type == Decoded) {
 				for (j = 0; j < line.Decoded.Instruction.operand_count_visible; j++) {
 					if (IsInstructionMemory(&line.Decoded.Instruction, &line.Decoded.Operands[j])) {
-						if (IsInstructionCF(&line.Decoded.Instruction) && line.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER)
+						if (IsInstructionCF(line.Decoded.Instruction.mnemonic) && line.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER)
 							continue;
 						if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && ((line.Decoded.Operands[j].mem.base != ZYDIS_REGISTER_RIP && line.Decoded.Operands[j].mem.base != ZYDIS_REGISTER_NONE) || line.Decoded.Operands[j].mem.index != ZYDIS_REGISTER_NONE))
 							continue;
@@ -826,23 +860,15 @@ bool Asm::FixAddresses() {
 							LOG(Warning, MODULE_REASSEMBLER, "Failed to translate address at %p (%s)\n", GetBaseAddress() + line.OldRVA, op);
 							continue;
 						}
-
-						_SecIndex = FindSectionIndex(u64Referencing);
-						_LineIndex = FindIndex(_SecIndex, u64Referencing);
-						if (_LineIndex == _UI32_MAX) {
-							LOG(Failed, MODULE_REASSEMBLER, "Failed to find location of RVA %#x\n", u64Referencing);
-							return false;
-						}
 						
 						// Calc offset
-						i64Off = Sections.At(_SecIndex).Lines->At(_LineIndex).NewRVA - Sections.At(_SecIndex).Lines->At(_LineIndex).OldRVA;
-						if ((line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Decoded.Operands[j].mem.base == ZYDIS_REGISTER_RIP) || IsInstructionCF(&line.Decoded.Instruction)) i64Off -= (line.NewRVA - line.OldRVA);
-
+						i64Off = (int64_t)TranslateOldAddress(u64Referencing) - (line.NewRVA + GetLineSize(line));
+						
 						// Apply offset
 						if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
-							line.Decoded.Operands[j].imm.value.s += i64Off;
+							line.Decoded.Operands[j].imm.value.s = i64Off;
 						} else if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY) {
-							line.Decoded.Operands[j].mem.disp.value += i64Off;
+							line.Decoded.Operands[j].mem.disp.value = i64Off;
 						}
 					}
 				}
@@ -879,6 +905,30 @@ bool Asm::FixAddresses() {
 					line.Pointer.Abs = GetBaseAddress() + NewValue;
 				} else {
 					line.Pointer.RVA = NewValue;
+				}
+			}
+
+			// Requests
+			else if (line.Type == Request && line.bRelative) {
+				if (IsInstructionCF(line.Request.mnemonic) && line.Request.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
+					DWORD index = line.Request.operands[0].imm.u;
+					if (index >= Lines->Size()) {
+						LOG(Failed, MODULE_REASSEMBLER, "Failed to translate relative insertion\n");
+						return false;
+					}
+					line.Request.operands[0].imm.u = Lines->At(index).NewRVA;
+				} else {
+					for (int j = 0; j < line.Request.operand_count; j++) {
+						if (line.Request.operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Request.operands[j].mem.base == ZYDIS_REGISTER_RIP) {
+							line.Request.operands[j].mem.base = ZYDIS_REGISTER_NONE;
+							DWORD index = line.Request.operands[0].mem.displacement;
+							if (index >= Lines->Size()) {
+								LOG(Failed, MODULE_REASSEMBLER, "Failed to translate relative insertion\n");
+								return false;
+							}
+							line.Request.operands[0].mem.displacement = Lines->At(index).NewRVA;
+						}
+					}
 				}
 			}
 
@@ -935,6 +985,45 @@ bool Asm::FixAddresses() {
 	return true;
 }
 
+bool Asm::Mutate() {
+	LOG(Info, MODULE_REASSEMBLER, "Beginning mutation\n");
+
+	// Vars
+	BYTE encoded[ZYDIS_MAX_INSTRUCTION_LENGTH];
+	ZyanUSize szEncoded = ZYDIS_MAX_INSTRUCTION_LENGTH;
+	ZydisEncoderRequest request;
+	Line replacement;
+	replacement.Type = Decoded;
+
+	for (WORD wSecIndex = 0; wSecIndex < Sections.Size(); wSecIndex++) {
+		Vector<Line>* Lines = Sections.At(wSecIndex).Lines;
+		Vector<Line> replacement;
+		for (DWORD i = 0; i < Lines->Size(); i++) {
+			if (Lines->At(i).Type != Decoded) continue;
+
+			if (Options.Reassembly.bSubstitution) {
+				switch (Lines->At(i).Decoded.Instruction.mnemonic) {
+				case ZYDIS_MNEMONIC_MOV:
+					if ((Lines->At(i).Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Lines->At(i).Decoded.Operands[0].mem.base == ZYDIS_REGISTER_RIP) || (Lines->At(i).Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY && Lines->At(i).Decoded.Operands[1].mem.base == ZYDIS_REGISTER_RIP)) break;
+					replacement = zyasm::mov(zyasm::Op(Lines->At(i).Decoded.Operands[0]), zyasm::Op(Lines->At(i).Decoded.Operands[1]));
+					if (replacement.Size()) {
+						Line first = replacement.At(0);
+						first.OldRVA = Lines->At(i).OldRVA;
+						replacement.Replace(0, first);
+						Lines->Replace(i, replacement);
+						i += replacement.Size() - 1;
+					}
+					replacement.Release();
+					break;
+				}
+			}
+		}
+	}
+
+	LOG(Success, MODULE_REASSEMBLER, "Finished mutation\n");
+	return true;
+}
+
 bool Asm::Assemble() {
 	// Setup
 	LOG(Info, MODULE_REASSEMBLER, "Beginning assembly\n");
@@ -951,7 +1040,22 @@ bool Asm::Assemble() {
 
 		for (size_t i = 0; i < Lines->Size(); i++) {
 			line = Lines->At(i);
-			if (line.Type != Decoded) continue;
+			
+			if (line.Type == LineType::Request) {
+				Size = ZYDIS_MAX_INSTRUCTION_LENGTH;
+				ZyanStatus status = ZydisEncoderEncodeInstructionAbsolute(&line.Request, Raw, &Size, line.NewRVA);
+				if (ZYAN_FAILED(status)) {
+					LOG(Failed, MODULE_REASSEMBLER, "Failed to assemble inserted instruction (%s)\n", ZydisErrorToString(status));
+					return false;
+				}
+				line.Type = Encoded;
+				line.Encoded.Size = Size;
+				memcpy(line.Encoded.Raw, Raw, Size);
+				Lines->Replace(i, line);
+				continue;
+			} if (line.Type != Decoded) {
+				continue;
+			}
 
 			// Translate to encoder request
 			if (ZYAN_FAILED(Status = ZydisEncoderDecodedInstructionToEncoderRequest(&line.Decoded.Instruction, line.Decoded.Operands, line.Decoded.Instruction.operand_count_visible, &Request))) {
@@ -975,7 +1079,7 @@ bool Asm::Assemble() {
 			// If the assembled size is less than the original, some modifications need to be made
 			if (Size < line.Decoded.Instruction.length) {
 				// Change immediate values if the instruction changes control flow
-				bool bCheckImm = IsInstructionCF(&line.Decoded.Instruction);
+				bool bCheckImm = IsInstructionCF(line.Decoded.Instruction.mnemonic);
 
 				// If there are any memory operations, change the relative offset
 				bool bReencode = false;
@@ -1322,7 +1426,7 @@ Vector<Function> Asm::FindFunctionsRecursive(_In_ DWORD dwRVA) {
 			}
 
 			// Handle jmp, call, etc
-			if (Instruction.mnemonic != ZYDIS_MNEMONIC_CALL && IsInstructionCF(&Instruction)) {
+			if (Instruction.mnemonic != ZYDIS_MNEMONIC_CALL && IsInstructionCF(Instruction.mnemonic)) {
 				uint64_t Address = 0;
 				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Operands[0], GetBaseAddress() + dwRVA, &Address))) {
 					ToDisasm.Push(Address - GetBaseAddress());
@@ -1511,7 +1615,29 @@ DWORD GetLineSize(_In_ Line line) {
 		return line.RawInsert.u64Size;
 	case Pointer:
 		return (line.Pointer.IsAbs ? sizeof(uint64_t) : sizeof(DWORD));
-	}
+	case Request: {
+		BYTE Raw[ZYDIS_MAX_INSTRUCTION_LENGTH];
+		ZyanUSize Size = ZYDIS_MAX_INSTRUCTION_LENGTH;
+		ZyanStatus status;
+		if (line.bRelative) {
+			if (IsInstructionCF(line.Request.mnemonic) && line.Request.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
+				line.Request.operands[0].imm.s = 0x100;
+			} else {
+				for (int j = 0; j < line.Request.operand_count; j++) {
+					if (line.Request.operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Request.operands[j].mem.base == ZYDIS_REGISTER_RIP) {
+						line.Request.operands[j].mem.base = ZYDIS_REGISTER_NONE;
+						line.Request.operands[0].mem.displacement = 0x100;
+					}
+				}
+			}
+		}
+		if (ZYAN_FAILED(status = ZydisEncoderEncodeInstructionAbsolute(&line.Request, Raw, &Size, 1))) {
+			LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate length of instruction (request) (%s)\n", ZydisErrorToString(status));
+			return 0;
+		}
+		return Size;
+	}}
+	LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate length of instruction (unknown mnemonic)\n");
 	return 0;
 }
 

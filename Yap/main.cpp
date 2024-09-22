@@ -184,15 +184,13 @@ DWORD WINAPI Begin(void* args) {
 #endif
 
 		// Modify
-		if (Options.Reassembly.bStrip) pAssembly->Strip();
-		if (Options.Reassembly.bTest) {
-			ZydisEncoderRequest Request;
-			ZeroMemory(&Request, sizeof(ZydisEncoderRequest));
-			Request.mnemonic = ZYDIS_MNEMONIC_NOP;
-			Request.operand_count = 0;
-			for (int i = 0; i < 50; i++) {
-				pAssembly->InsertNewLine(pAssembly->FindSectionIndex(pAssembly->GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint), 0, &Request);
-			}
+		if (Options.Reassembly.bStrip && !pAssembly->Strip()) {
+			LOG(Failed, MODULE_YAP, "Failed to strip PE\n");
+			goto th_exit;
+		}
+		if (!pAssembly->Mutate()) {
+			LOG(Failed, MODULE_YAP, "Failed to mutate PE\n");
+			goto th_exit;
 		}
 
 		// Fixup
