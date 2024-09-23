@@ -134,7 +134,8 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("Still run if the detected VM is only MS Hyper-V.");
 			IMGUI_TOGGLE("Anti-Sandbox", Options.Packing.bAntiSandbox);
 			ImGui::SetItemTooltip("Prevent app from running in a sandboxed environment.");
-			ImGui::Combo("Immitate Packer", (int*)&Options.Packing.Immitate, "None\0Themida\0WinLicense\0UPX\0MPRESS\0ExeStealth\0Enigma\0");
+			if (Options.Packing.bDelayedEntry && Options.Packing.Immitate == ExeStealth) Options.Packing.Immitate = YAP;
+			ImGui::Combo("Immitate Packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
 			ImGui::SetItemTooltip("Changes some details about the packed binary to make it look like another packer.");
 			if (ImGui::TreeNode("Extended Options")) {
 				IMGUI_TOGGLE("Enable Process Masquerading", Options.Packing.bEnableMasquerade);
@@ -150,8 +151,21 @@ void DrawGUI() {
 			ImGui::EndTabItem();
 		}
 
+		if (ImGui::BeginTabItem("Reassembler")) {
+			IMGUI_TOGGLE("Enabled", Options.Reassembly.bEnabled);
+			ImGui::SetItemTooltip("Disassembles your application, modifies the assembly a ton, and then assembles the modified assembly.");
+			IMGUI_TOGGLE("Test", Options.Reassembly.bTest);
+			IMGUI_TOGGLE("Strip Debug Symbols", Options.Reassembly.bStrip);
+			ImGui::SetItemTooltip("Remove debugging information from the PE.");
+			IMGUI_TOGGLE("Instruction Substitution", Options.Reassembly.bSubstitution);
+			ImGui::SetItemTooltip("Replaces some existing instructions with other, more complicated alternatives.\n");
+			ImGui::EndTabItem();
+		}
+
 		if (ImGui::BeginTabItem("VM")) {
+			if (!Options.Packing.bEnabled || !Options.Reassembly.bEnabled) ImGui::BeginDisabled();
 			IMGUI_TOGGLE("Enable VM", Options.VM.bEnabled);
+			ImGui::SetItemTooltip("Enables virtualization functionality, requires packer & reassembler to be enabled.");
 			if (ImGui::Button("Add Function (Max 256)")) {
 				if (Options.VM.VMFuncs.Size() >= 256) {
 					MessageBoxA(Data.hWnd, "Maximum number of functions selected!", NULL, MB_ICONINFORMATION | MB_OK);
@@ -209,17 +223,7 @@ void DrawGUI() {
 				}
 				ImGui::PopID();
 			}
-			ImGui::EndTabItem();
-		}
-
-		if (ImGui::BeginTabItem("Reassembler")) {
-			IMGUI_TOGGLE("Enabled", Options.Reassembly.bEnabled);
-			ImGui::SetItemTooltip("Disassembles your application, modifies the assembly a ton, and then assembles the modified assembly.");
-			IMGUI_TOGGLE("Test", Options.Reassembly.bTest);
-			IMGUI_TOGGLE("Strip Debug Symbols", Options.Reassembly.bStrip);
-			ImGui::SetItemTooltip("Remove debugging information from the PE.");
-			IMGUI_TOGGLE("Instruction Substitution", Options.Reassembly.bSubstitution);
-			ImGui::SetItemTooltip("Replaces some existing instructions with other, more complicated alternatives.\n");
+			if (!Options.Packing.bEnabled || !Options.Reassembly.bEnabled) ImGui::EndDisabled();
 			ImGui::EndTabItem();
 		}
 

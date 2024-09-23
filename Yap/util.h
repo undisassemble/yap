@@ -62,8 +62,8 @@ enum PackerTypes_t : int {
 	WinLicense,
 	UPX,
 	MPRESS,
-	ExeStealth,
-	Enigma
+	Enigma,
+	ExeStealth
 };
 #endif // UTIL_STRUCT_ONLY
 
