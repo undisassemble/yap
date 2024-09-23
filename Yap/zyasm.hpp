@@ -4,7 +4,7 @@
 
 namespace zyasm {
 	ZydisEncoderOperand Op(_In_ ZydisDecodedOperand Op);
-	ZydisEncoderOperand Imm(_In_ uint32_t Imm);
+	ZydisEncoderOperand Imm(_In_ uint64_t Imm);
 	ZydisEncoderOperand Reg(_In_ ZydisRegister Reg);
 	ZydisEncoderOperand byte_ptr(_In_ ZydisRegister Base = ZYDIS_REGISTER_NONE, _In_ ZydisRegister Index = ZYDIS_REGISTER_NONE, _In_ BYTE Scale = 0, _In_ int64_t Off = 0);
 	ZydisEncoderOperand word_ptr(_In_ ZydisRegister Base = ZYDIS_REGISTER_NONE, _In_ ZydisRegister Index = ZYDIS_REGISTER_NONE, _In_ BYTE Scale = 0, _In_ int64_t Off = 0);

@@ -175,14 +175,14 @@ DWORD Asm::FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 	DEBUG_ONLY(uint64_t TickCount = GetTickCount64());
 	size_t szMin = 0, szMax = Lines->Size(), i = 0;
 	size_t PrevI = 0;
-	while (szMin < szMax) {
+	while (szMin <= szMax) {
 		i = szMin + (szMax - szMin) * 0.5;
 
 		if (szMin + 1 == szMax) {
 			i = szMin = szMax;
 		}
 		i = GetNextOriginal(dwSec, i);
-		if (i >= szMax || i == PrevI) i = GetNextOriginal(dwSec, szMin);
+		if (i >= szMax || i == PrevI) i = GetNextOriginal(dwSec, szMin + 1);
 		if (i == PrevI) break;
 
 		// Check index
@@ -814,6 +814,26 @@ bool Asm::FixAddresses() {
 			if (line.OldRVA == NTHeaders.x64.OptionalHeader.AddressOfEntryPoint) {
 				NTHeaders.x64.OptionalHeader.AddressOfEntryPoint = line.NewRVA;
 			}
+
+			// Change short jmps into long jmps
+			if (line.Type == Decoded && IsInstructionCF(line.Decoded.Instruction.mnemonic) && line.Decoded.Instruction.mnemonic != ZYDIS_MNEMONIC_CALL && line.Decoded.Instruction.length == 2 && line.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
+				line.Type = Request;
+				line.Request.mnemonic = Lines->At(i).Decoded.Instruction.mnemonic;
+				line.Request.operand_count = 1;
+				line.Request.machine_mode = ZYDIS_MACHINE_MODE_LONG_64;
+				line.Request.address_size_hint = ZYDIS_ADDRESS_SIZE_HINT_NONE;
+				line.Request.allowed_encodings = ZYDIS_ENCODABLE_ENCODING_DEFAULT;
+				line.Request.branch_type = ZYDIS_BRANCH_TYPE_NONE;
+				line.Request.branch_width = ZYDIS_BRANCH_WIDTH_NONE;
+				line.Request.prefixes = 0;
+				line.Request.operand_size_hint = ZYDIS_OPERAND_SIZE_HINT_NONE;
+				line.Request.operands[0] = zyasm::Op(Lines->At(i).Decoded.Operands[0]);
+				line.bRelative = false;
+				line.bRelocate = true;
+				ZeroMemory(&line.Request.evex, sizeof(line.Request.evex));
+				ZeroMemory(&line.Request.mvex, sizeof(line.Request.mvex));
+				ZydisCalcAbsoluteAddress(&Lines->At(i).Decoded.Instruction, &Lines->At(i).Decoded.Operands[0], line.NewRVA, &line.Request.operands[0].imm.u);
+			}
 			Lines->Replace(i, line);
 
 			// Update address
@@ -909,24 +929,37 @@ bool Asm::FixAddresses() {
 			}
 
 			// Requests
-			else if (line.Type == Request && line.bRelative) {
-				if (IsInstructionCF(line.Request.mnemonic) && line.Request.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
-					DWORD index = line.Request.operands[0].imm.u;
-					if (index >= Lines->Size()) {
-						LOG(Failed, MODULE_REASSEMBLER, "Failed to translate relative insertion\n");
-						return false;
-					}
-					line.Request.operands[0].imm.u = Lines->At(index).NewRVA;
-				} else {
-					for (int j = 0; j < line.Request.operand_count; j++) {
-						if (line.Request.operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Request.operands[j].mem.base == ZYDIS_REGISTER_RIP) {
-							line.Request.operands[j].mem.base = ZYDIS_REGISTER_NONE;
-							DWORD index = line.Request.operands[0].mem.displacement;
-							if (index >= Lines->Size()) {
-								LOG(Failed, MODULE_REASSEMBLER, "Failed to translate relative insertion\n");
-								return false;
+			else if (line.Type == Request) {
+				if (line.bRelative) {
+					if (IsInstructionCF(line.Request.mnemonic) && line.Request.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
+						DWORD index = line.Request.operands[0].imm.u;
+						if (index >= Lines->Size()) {
+							LOG(Failed, MODULE_REASSEMBLER, "Failed to translate relative insertion\n");
+							return false;
+						}
+						line.Request.operands[0].imm.u = Lines->At(index).NewRVA;
+					} else {
+						for (int j = 0; j < line.Request.operand_count; j++) {
+							if (line.Request.operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Request.operands[j].mem.base == ZYDIS_REGISTER_RIP) {
+								line.Request.operands[j].mem.base = ZYDIS_REGISTER_NONE;
+								DWORD index = line.Request.operands[j].mem.displacement;
+								if (index >= Lines->Size()) {
+									LOG(Failed, MODULE_REASSEMBLER, "Failed to translate relative insertion\n");
+									return false;
+								}
+								line.Request.operands[j].mem.displacement = Lines->At(index).NewRVA;
 							}
-							line.Request.operands[0].mem.displacement = Lines->At(index).NewRVA;
+						}
+					}
+				} else if (line.bRelocate) {
+					if (IsInstructionCF(line.Request.mnemonic) && line.Request.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
+						line.Request.operands[0].imm.u = TranslateOldAddress(line.Request.operands[0].imm.u);
+					} else {
+						for (int j = 0; j < line.Request.operand_count; j++) {
+							if (line.Request.operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Request.operands[j].mem.base == ZYDIS_REGISTER_RIP) {
+								line.Request.operands[j].mem.base = ZYDIS_REGISTER_NONE;
+								line.Request.operands[j].mem.displacement = TranslateOldAddress(line.Request.operands[j].mem.displacement);
+							}
 						}
 					}
 				}
@@ -1631,7 +1664,7 @@ DWORD GetLineSize(_In_ Line line) {
 				}
 			}
 		}
-		if (ZYAN_FAILED(status = ZydisEncoderEncodeInstructionAbsolute(&line.Request, Raw, &Size, 1))) {
+		if (ZYAN_FAILED(status = ZydisEncoderEncodeInstructionAbsolute(&line.Request, Raw, &Size, line.NewRVA))) {
 			LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate length of instruction (request) (%s)\n", ZydisErrorToString(status));
 			return 0;
 		}

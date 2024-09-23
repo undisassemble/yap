@@ -1,6 +1,16 @@
 #include "zyasm.hpp"
 
 ZydisRegister _RegOfSize(ZydisRegister Reg, BYTE Size);
+ZydisEncoderOperand _ResizeOp(ZydisEncoderOperand o0, BYTE size) {
+	switch (o0.type) {
+	case ZYDIS_OPERAND_TYPE_MEMORY:
+		o0.mem.size = size / 8;
+		break;
+	case ZYDIS_OPERAND_TYPE_REGISTER:
+		o0.reg.value = _RegOfSize(o0.reg.value, size);
+	}
+	return o0;
+}
 BYTE _GetRegSize(ZydisRegister Reg) {
 	if (!Reg || Reg > ZYDIS_REGISTER_R15) return 0;
 	if (Reg >= ZYDIS_REGISTER_RAX) return 64;
@@ -14,7 +24,7 @@ BYTE _GetOpSize(ZydisEncoderOperand o0) {
 	case ZYDIS_OPERAND_TYPE_IMMEDIATE:
 		return 64;
 	case ZYDIS_OPERAND_TYPE_MEMORY:
-		return o0.mem.size;
+		return o0.mem.size * 8;
 	case ZYDIS_OPERAND_TYPE_REGISTER:
 		return _GetRegSize(o0.reg.value);
 	}
@@ -75,14 +85,14 @@ ZydisEncoderOperand zyasm::Op(_In_ ZydisDecodedOperand Op) {
 	return ret;
 }
 
-ZydisEncoderOperand Imm(_In_ uint64_t Imm) {
+ZydisEncoderOperand zyasm::Imm(_In_ uint64_t Imm) {
 	ZydisEncoderOperand ret;
 	ret.type = ZYDIS_OPERAND_TYPE_IMMEDIATE;
 	ret.imm.u = Imm;
 	return ret;
 }
 
-ZydisEncoderOperand Reg(_In_ ZydisRegister Reg) {
+ZydisEncoderOperand zyasm::Reg(_In_ ZydisRegister Reg) {
 	ZydisEncoderOperand ret;
 	ret.type = ZYDIS_OPERAND_TYPE_REGISTER;
 	ret.reg.is4 = ZYAN_FALSE;
@@ -121,7 +131,17 @@ ZydisEncoderOperand zyasm::qword_ptr(_In_ ZydisRegister Base, _In_ ZydisRegister
 
 Vector<Line> zyasm::push(_In_ ZydisEncoderOperand o0) {
 	Vector<Line> ret;
-	if (_GetOpSize(o0) == 8 || _GetOpSize(o0) == 32 || (o0.type == ZYDIS_OPERAND_TYPE_IMMEDIATE && o0.imm.u > 0x7FFFFFFF)) return ret;
+	if (_GetOpSize(o0) == 8 || (o0.type == ZYDIS_OPERAND_TYPE_IMMEDIATE && o0.imm.u > 0x7FFFFFFF)) return ret;
+
+	// Push DWORD
+	if (_GetOpSize(o0) == 32) {
+		ret.Merge(zyasm::push(_ResizeOp(o0, 64)));
+		ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 2)));
+		ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 2)));
+		return ret;
+	}
+
+	// Normal push
 	Line _inst = _InitLine(ZYDIS_MNEMONIC_PUSH, _GetOpSize(o0));
 	_inst.Request.operand_count = 1;
 	_inst.Request.operands[0] = o0;
@@ -131,23 +151,52 @@ Vector<Line> zyasm::push(_In_ ZydisEncoderOperand o0) {
 
 Vector<Line> zyasm::pop(_In_ ZydisEncoderOperand o0) {
 	Vector<Line> ret;
-	if (_GetOpSize(o0) == 8 || _GetOpSize(o0) == 32) LOG(Failed, MODULE_REASSEMBLER, "Attempted to pop byte\n");
+	if (_GetOpSize(o0) == 8) LOG(Failed, MODULE_REASSEMBLER, "Attempted to pop byte\n");
 
 	// rsp-relative o0
 	if (o0.type == ZYDIS_OPERAND_TYPE_MEMORY && o0.mem.base == ZYDIS_REGISTER_RSP) {
 		o0.mem.displacement -= _GetOpSize(o0) / 8;
 	}
 
-	Line line = _InitLine(ZYDIS_MNEMONIC_POP, _GetOpSize(o0));
-	line.Request.operand_count = 1;
-	line.Request.operands[0] = o0;	
-	ret.Push(line);
+	// Pop DWORD
+	if (_GetOpSize(o0) == 32) {
+		if (o0.type == ZYDIS_OPERAND_TYPE_MEMORY) {
+			if (o0.mem.base == ZYDIS_REGISTER_RSP) {
+				o0.mem.displacement += 2;
+			}
+			ret.Merge(zyasm::pop(_ResizeOp(o0, 16)));
+			if (o0.mem.base != ZYDIS_REGISTER_RSP) {
+				o0.mem.displacement += 2;
+			}
+			ret.Merge(zyasm::pop(_ResizeOp(o0, 16)));
+			return ret;
+		} else {
+			ret.Merge(zyasm::push(zyasm::Imm(0)));
+			ret.Merge(zyasm::pop(_ResizeOp(o0, 64)));
+			ret.Merge(zyasm::push(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 2)));
+			ret.Merge(zyasm::push(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 2)));
+			ret.Merge(zyasm::push(zyasm::Imm(0)));
+			ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 10)));
+			ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 10)));
+			ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 8)));
+			ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 6)));
+			ret.Merge(zyasm::pop(_ResizeOp(o0, 64)));
+			return ret;
+		}
+	}
+
+	Line _inst = _InitLine(ZYDIS_MNEMONIC_POP, _GetOpSize(o0));
+	_inst.Request.operand_count = 1;
+	_inst.Request.operands[0] = o0;
+	ret.Push(_inst);
 	return ret;
 }
 
 Vector<Line> zyasm::mov(_In_ ZydisEncoderOperand o0, _In_ ZydisEncoderOperand o1) {
 	Vector<Line> ret;
-	if (_GetOpSize(o0) != _GetOpSize(o1) || _GetOpSize(o0) == 32 || _GetOpSize(o0) == 8) return ret;
+	if (_GetOpSize(o0) != _GetOpSize(o1) || _GetOpSize(o0) == 8) return ret;
+	if (o0.type == ZYDIS_OPERAND_TYPE_MEMORY && o0.mem.base == ZYDIS_REGISTER_RSP) return ret;
+	if (o1.type == ZYDIS_OPERAND_TYPE_MEMORY && o1.mem.base == ZYDIS_REGISTER_RSP) return ret;
 	ret.Merge(zyasm::push(o1));
 	ret.Merge(zyasm::pop(o0));
 	if (ret.Size() < 2) ret.Release();
