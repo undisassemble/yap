@@ -301,7 +301,7 @@ struct Options_t {
 
 	struct {
 		bool bEnabled : 1 = true;
-		bool bEvadeDumpers : 1 = false;
+		bool bAntiDump : 1 = false;
 		bool bEnableMasquerade : 1 = false;
 		bool bNukeHeaders : 1 = false;
 		bool bMitigateSideloading : 1 = false;

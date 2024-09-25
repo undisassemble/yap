@@ -76,8 +76,6 @@ class Asm : public PE {
 private:
 	bool DisasmRecursive(_In_ DWORD dwRVA);
 	bool CheckRuntimeFunction(_In_ RUNTIME_FUNCTION* pFunc, _In_ bool bFixAddr = false);
-	Vector<Function> FindFunctionsRecursive(_In_ DWORD dwRVA);
-	Vector<Function> _CheckRuntimeFunction2(_In_ RUNTIME_FUNCTION* pFunc);
 	DWORD GetNextOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex);
 	DWORD GetPrevOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex);
 

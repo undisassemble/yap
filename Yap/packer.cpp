@@ -511,6 +511,62 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.call(rax);
 	}
 
+	// Debug
+	if (::Options.Packing.bAntiDebug) {
+		// Setup context
+		CONTEXT context = { 0 };
+		context.ContextFlags = CONTEXT_ALL;
+		//context.DebugControl = rand64();
+		//context.Dr0 = rand64();
+		//context.Dr1 = rand64();
+		
+		Label skipdata = a.newLabel();
+		a.jmp(skipdata);
+
+		a.align(AlignMode::kCode, alignof(CONTEXT));
+		Label Context = a.newLabel();
+		a.bind(Context);
+		a.embed(&context, sizeof(CONTEXT));
+		Label NTD = a.newLabel();
+		a.bind(NTD);
+		a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest));
+		Label GCT = a.newLabel();
+		a.bind(GCT);
+		a.embed(&Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest));
+		
+		a.bind(skipdata);
+		a.lea(rcx, ptr(NTD));
+		a.call(ShellcodeData.Labels.GetModuleHandleW);
+		a.mov(rcx, rax);
+		a.lea(rdx, ptr(GCT));
+		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.test(rax, rax);
+		a.strict();
+		a.jz(ret);
+		a.mov(rcx, 0xFFFFFFFFFFFFFFFE);
+		a.lea(rdx, ptr(Context));
+		a.push(rdx);
+		a.call(rax);
+		a.pop(rdx);
+		a.test(rax, rax);
+		a.strict();
+		a.jnz(ret);
+		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr7)));
+		a.and_(rax, 0x20FF);
+		a.strict();
+		a.jnz(ret);
+		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr6)));
+		a.and_(rax, 0x18F);
+		a.strict();
+		a.jnz(ret);
+		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr0)));
+		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr1)));
+		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr2)));
+		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr3)));
+		a.strict();
+		a.jnz(ret);
+	}
+
 	// VM detection (TODO)
 	if (::Options.Packing.bAntiVM) {
 		a.mov(eax, 1);
@@ -615,12 +671,12 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.jz(_loop);
 	}
 
-	if (::Options.Packing.bEvadeDumpers) {
-
+	if (::Options.Packing.bAntiDump) {
 		Label skip = a.newLabel();
 		a.jmp(skip);
 
 		Label KRN = a.newLabel();
+		a.align(AlignMode::kCode, alignof(DWORD));
 		a.bind(KRN);
 		a.embed(&Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest));
 		Label VRT = a.newLabel();
@@ -1955,6 +2011,7 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 		::Options.Packing.bAntiDebug = false;
 		::Options.Packing.bAntiSandbox = false;
 		::Options.Packing.bAntiVM = false;
+		::Options.Packing.bAntiDump = false;
 		::Options.Packing.bDelayedEntry = false;
 		::Options.Packing.bMitigateSideloading = false;
 		::Options.Packing.bOnlyLoadMicrosoft = false;

@@ -112,8 +112,6 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("How compressed the binary should be.");
 			ImGui::SliderInt("Mutation Level", &Options.Packing.MutationLevel, 1, 15);
 			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
-			//DEBUG_ONLY(IMGUI_TOGGLE("Evade Dumpers", Options.Packing.bEvadeDumpers));
-			//DEBUG_ONLY(ImGui::SetItemTooltip("Attempts to throw off PE dumpers."));
 			IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT);
 			ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT.");
 			IMGUI_TOGGLE("Generate False Info", Options.Packing.bFalseSymbols);
@@ -125,6 +123,8 @@ void DrawGUI() {
 			ImGui::SameLine();
 			IMGUI_TOGGLE("Only Load Microsoft Signed DLLs", Options.Packing.bOnlyLoadMicrosoft);
 			ImGui::SetItemTooltip("Only allows DLLs that have been signed by Microsoft to be loaded.");
+			DEBUG_ONLY(IMGUI_TOGGLE("Anti-Dump", Options.Packing.bAntiDump));
+			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent PE dumpers and reconstructors from dumping the running process."));
 			IMGUI_TOGGLE("Anti-Debug", Options.Packing.bAntiDebug);
 			ImGui::SetItemTooltip("Prevent debuggers from attaching to process.");
 			IMGUI_TOGGLE("Anti-VM", Options.Packing.bAntiVM);

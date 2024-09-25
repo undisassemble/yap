@@ -1412,219 +1412,24 @@ void Asm::RemoveData(_In_ DWORD dwRVA, _In_ DWORD dwSize) {
 	DeleteLine(sec, i);
 }
 
-Vector<Function> Asm::FindFunctionsRecursive(_In_ DWORD dwRVA) {
-	Vector<DWORD> ToDisasm;
-	Vector<Function> ret;
-	do {
-		uint64_t Me = GetBaseAddress() + dwRVA;
-
-		// Check if already disassembled
-		if (Processed.Includes(dwRVA)) {
-			return ret;
-		}
-		Processed.Push(dwRVA);
-
-		// Get section bytes
-		Buffer Bytes = GetSectionBytes(FindSectionByRVA(dwRVA));
-		if (!Bytes.pBytes || !Bytes.u64Size) return ret;
-		DWORD dwSecVA = GetSectionHeader(FindSectionByRVA(dwRVA))->VirtualAddress;
-
-		// Disassemble
-		ZydisDecodedInstruction Instruction;
-		ZydisDecodedOperand Operands[10];
-		Function Func;
-		while (dwRVA - dwSecVA < Bytes.u64Size && ZYAN_SUCCESS(ZydisDecoderDecodeFull(&Decoder, Bytes.pBytes + dwRVA - dwSecVA, Bytes.u64Size + dwRVA - dwSecVA, &Instruction, Operands))) {
-			// If function entry is immediate jump just act like were cool or smthn idk
-			if (Instruction.mnemonic == ZYDIS_MNEMONIC_JMP && Me == GetBaseAddress() + dwRVA) {
-				ZydisCalcAbsoluteAddress(&Instruction, &Operands[0], Me, &Me);
-				if (Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY || Operands[0].type == ZYDIS_OPERAND_TYPE_POINTER) {
-					Me = ReadRVA<uint64_t>(Me - GetBaseAddress());
-				}
-				ToDisasm.Push(Me);
-				break;
-			}
-			
-			// Find function bounds
-			if (Instruction.mnemonic == ZYDIS_MNEMONIC_CALL && Instruction.operand_count_visible && (Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY || Operands[0].type == ZYDIS_OPERAND_TYPE_POINTER || Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE)) {
-				ZydisCalcAbsoluteAddress(&Instruction, &Operands[0], GetBaseAddress() + dwRVA, &Func.u64Address);
-				if (Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY || Operands[0].type == ZYDIS_OPERAND_TYPE_POINTER) {
-					Func.u64Address = ReadRVA<uint64_t>(Func.u64Address - GetBaseAddress());
-				}
-				ToDisasm.Push(Func.u64Address - GetBaseAddress());
-			} else if (Instruction.mnemonic == ZYDIS_MNEMONIC_RET) {
-				// Index function
-				Func.u64Address = Me;
-				ret.Push(Func);
-				break;
-			}
-
-			// Handle jmp, call, etc
-			if (Instruction.mnemonic != ZYDIS_MNEMONIC_CALL && IsInstructionCF(Instruction.mnemonic)) {
-				uint64_t Address = 0;
-				if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&Instruction, &Operands[0], GetBaseAddress() + dwRVA, &Address))) {
-					ToDisasm.Push(Address - GetBaseAddress());
-				} else {
-					LOG(Warning, MODULE_VM, "Failed to determine function at %lu\n", dwRVA);
-				}
-			}
-
-			// Prepare for next instruction
-			dwRVA += Instruction.length;
-		}
-		
-		// Setup for next thingy doodle i cant take this shit no more man im doing this at night on a 4 hour flight man shit this is just a fix because i was getting stack overflows doing recursive shit
-		dwRVA = ToDisasm.Pop();
-	} while (ToDisasm.Size());
-
-	return ret;
-}
-
-Vector<Function> Asm::_CheckRuntimeFunction2(_In_ RUNTIME_FUNCTION* pFunc) {
-	uint64_t func = 0;
-	Vector<Function> ret;
-
-	// Disassemble
-	func = pFunc->BeginAddress;
-	ret = FindFunctionsRecursive(func);
-
-skip:
-	// Check unwind info for function
-	UNWIND_INFO_HDR UnwindInfo = ReadRVA<UNWIND_INFO_HDR>(pFunc->UnwindData);
-
-	// EHANDLER flag being set means that at the end is a RUNTIME_FUNCTION struct
-	if (UnwindInfo.Version_Flag == 0x21) {
-		RUNTIME_FUNCTION F2 = ReadRVA<RUNTIME_FUNCTION>(pFunc->UnwindData + sizeof(UNWIND_INFO_HDR) + UnwindInfo.CntUnwindCodes * 2);
-		// Unwind info addr + sizeof(UNWIND_INFO_HDR) + Num UNWIND_CODE * sizeof(UNWIND_CODE) = address of RUNTIME_FUNCTION
-		ret.Merge(_CheckRuntimeFunction2(&F2));
-	}
-	return ret;
-}
-
 Vector<Function> Asm::FindFunctions() {
 	// Ensure loaded
 	Vector<Function> ret;
 	if (Status) return ret;
 
-	// Search entry point
-	ret = FindFunctionsRecursive(NTHeaders.x64.OptionalHeader.AddressOfEntryPoint);
-
-	// Search TLS callbacks
-	uint64_t* pCallbacks = GetTLSCallbacks();
-	if (pCallbacks) {
-		for (int i = 0; pCallbacks[i]; i++) {
-			ret.Merge(FindFunctionsRecursive(pCallbacks[i] - GetBaseAddress()));
-		}
-	}
-
-	// Disassemble exception dir
-	IMAGE_DATA_DIRECTORY ExcDataDir = GetNtHeaders()->x64.OptionalHeader.DataDirectory[3];
-	if (ExcDataDir.VirtualAddress) {
-		Buffer ExcData = GetSectionBytes(FindSectionByRVA(ExcDataDir.VirtualAddress));
-		IMAGE_SECTION_HEADER* pExcSecHeader = GetSectionHeader(FindSectionByRVA(ExcDataDir.VirtualAddress));
-		if (ExcData.pBytes && pExcSecHeader) {
-			RUNTIME_FUNCTION* pArray = reinterpret_cast<RUNTIME_FUNCTION*>(ExcData.pBytes + ExcDataDir.VirtualAddress - pExcSecHeader->VirtualAddress);
-			for (uint32_t i = 0, n = ExcDataDir.Size / sizeof(RUNTIME_FUNCTION); i < n; i++) {
-				ret.Merge(_CheckRuntimeFunction2(&pArray[i]));
-			}
-		}
-	}
-	
-	// Disassemble exports
-	Vector<DWORD> Exports = GetExportedFunctionRVAs();
-	for (int i = 0, n = Exports.Size(); i < n; i++) {
-		ret.Merge(FindFunctionsRecursive(Exports.At(i)));
-	}
-
-	// Remove duplicates
-	for (int i = 0, n = ret.Size(); i < n; i++) {
-		if (ret.At(i).u64Address < GetBaseAddress()) {
-			Function temp = ret.At(i);
-			temp.u64Address += GetBaseAddress();
-			ret.Replace(i, temp);
-		}
-
-		for (int j = i + 1; j < n; j++) {
-			if (ret.At(j).u64Address < GetBaseAddress()) {
-				Function temp = ret.At(j);
-				temp.u64Address += GetBaseAddress();
-				ret.Replace(j, temp);
-			}
-
-			if (ret.At(i).u64Address == ret.At(j).u64Address) {
-				ret.Remove(j);
-				n--;
-				j--;
-			}
-		}
-	}
-
-	// Apply names
 	Vector<char*> Names = GetExportedFunctionNames();
-	uint64_t u64Entry = GetBaseAddress() + NTHeaders.x64.OptionalHeader.AddressOfEntryPoint;
-	Function current;
-	int iNamed = 0;
-	for (int i = 0, n = ret.Size(); i < n; i++) {
-		current = ret.At(i);
-		current.pName = NULL;
-		if (current.u64Address == u64Entry) {
-			current.pName = "Entry";
-		}
-		for (int j = 0, m = Names.Size(); j < m; j++) {
-			if (current.u64Address == GetBaseAddress() + Exports.At(j)) {
-				current.pName = Names.At(j);
-				break;
-			}
-		}
-		if (current.pName && i > iNamed) {
-			Function temp = ret.At(iNamed);
-			ret.Replace(iNamed, current);
-			ret.Replace(i, temp);
-			iNamed++;
-		} else {
-			ret.Replace(i, current);
+	Vector<DWORD> Exports = GetExportedFunctionRVAs();
+	Function n = { 0 };
+	// Things
+	n.u64Address = GetBaseAddress() + NTHeaders.x64.OptionalHeader.AddressOfEntryPoint;
+	n.pName = "Entry";
+	ret.Push(n);
+	if (Names.Size() && Exports.Size()) {
+		for (int i = 0; i < Names.Size() && i < Exports.Size(); i++) {
+			n.u64Address = GetBaseAddress() + Exports.At(i);
+			n.pName = Names.At(i);
 		}
 	}
-
-	// Sort
-	bool bSorted = false;
-	do {
-		bSorted = true;
-		for (int i = 0, n = ret.Size(); i < n - 1; i++) {
-			// Sort by name
-			if (ret.At(i).pName) {
-				if (ret.At(i + 1).pName && strcmp(ret.At(i).pName, ret.At(i + 1).pName) > 0) {
-					bSorted = false;
-					Function temp = ret.At(i);
-					ret.Replace(i, ret.At(i + 1));
-					ret.Replace(i + 1, temp);
-				}
-				continue;
-			}
-
-			// Sort by address
-			if (ret.At(i).u64Address > ret.At(i + 1).u64Address) {
-				bSorted = false;
-				Function temp = ret.At(i);
-				ret.Replace(i, ret.At(i + 1));
-				ret.Replace(i + 1, temp);
-			}
-		}
-	} while (!bSorted);
-
-	// Remove (some) functions that are too small
-	/*uint64_t u64Above = ret.At(ret.Size() - 1).u64Address;
-	for (int i = ret.Size() - 1; i > 2; i--) {
-		if (ret.At(i - 1).u64Address + VMMinimumSize > u64Above) {
-			ret.Remove(i - 1);
-		} else {
-			u64Above = ret.At(i - 1).u64Address;
-		}
-	}
-	DWORD dwLastRVA = ret.At(ret.Size() - 1).u64Address - GetBaseAddress();
-	IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(FindSectionByRVA(dwLastRVA));
-	if (pHeader && dwLastRVA + VMMinimumSize > pHeader->VirtualAddress + pHeader->SizeOfRawData) {
-		ret.Pop();
-	}*/
 
 	Processed.Release();
 	Names.Release();

@@ -256,11 +256,6 @@ th_exit:
 	return 0;
 }
 
-DWORD WINAPI WarningBox(void* args) {
-	MessageBox(Data.hWnd, "The disassembler has disassembled/handled more data than what exists.\nIt is likely that data has been duplicated and will cause issues.", NULL, MB_OK | MB_ICONWARNING);
-	return 0;
-}
-
 void Console::help() {
 
 }

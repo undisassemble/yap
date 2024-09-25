@@ -134,12 +134,12 @@ Vector<Line> zyasm::push(_In_ ZydisEncoderOperand o0) {
 	if (_GetOpSize(o0) == 8 || (o0.type == ZYDIS_OPERAND_TYPE_IMMEDIATE && o0.imm.u > 0x7FFFFFFF)) return ret;
 
 	// Push DWORD
-	if (_GetOpSize(o0) == 32) {
+	/*if (_GetOpSize(o0) == 32) {
 		ret.Merge(zyasm::push(_ResizeOp(o0, 64)));
 		ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 2)));
 		ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 2)));
 		return ret;
-	}
+	}*/
 
 	// Normal push
 	Line _inst = _InitLine(ZYDIS_MNEMONIC_PUSH, _GetOpSize(o0));
@@ -159,31 +159,16 @@ Vector<Line> zyasm::pop(_In_ ZydisEncoderOperand o0) {
 	}
 
 	// Pop DWORD
-	if (_GetOpSize(o0) == 32) {
-		if (o0.type == ZYDIS_OPERAND_TYPE_MEMORY) {
-			if (o0.mem.base == ZYDIS_REGISTER_RSP) {
-				o0.mem.displacement += 2;
-			}
-			ret.Merge(zyasm::pop(_ResizeOp(o0, 16)));
-			if (o0.mem.base != ZYDIS_REGISTER_RSP) {
-				o0.mem.displacement += 2;
-			}
-			ret.Merge(zyasm::pop(_ResizeOp(o0, 16)));
-			return ret;
-		} else {
-			ret.Merge(zyasm::push(zyasm::Imm(0)));
-			ret.Merge(zyasm::pop(_ResizeOp(o0, 64)));
-			ret.Merge(zyasm::push(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 2)));
-			ret.Merge(zyasm::push(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 2)));
-			ret.Merge(zyasm::push(zyasm::Imm(0)));
-			ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 10)));
-			ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 10)));
-			ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 8)));
-			ret.Merge(zyasm::pop(zyasm::word_ptr(ZYDIS_REGISTER_RSP, ZYDIS_REGISTER_NONE, 0, 6)));
-			ret.Merge(zyasm::pop(_ResizeOp(o0, 64)));
-			return ret;
+	/*if (_GetOpSize(o0) == 32) {
+		if (o0.type == ZYDIS_OPERAND_TYPE_REGISTER) {
+			zyasm::push(zyasm::Imm(0));
+			zyasm::pop(_ResizeOp(o0, 64));
 		}
-	}
+		if (o0.type == ZYDIS_OPERAND_TYPE_MEMORY) {
+			o0.mem.displacement += 2;
+			if (o0.mem.base == ZYDIS_REGISTER_RSP) o0.mem.displacement += 2;
+		}
+	}*/
 
 	Line _inst = _InitLine(ZYDIS_MNEMONIC_POP, _GetOpSize(o0));
 	_inst.Request.operand_count = 1;
@@ -194,7 +179,7 @@ Vector<Line> zyasm::pop(_In_ ZydisEncoderOperand o0) {
 
 Vector<Line> zyasm::mov(_In_ ZydisEncoderOperand o0, _In_ ZydisEncoderOperand o1) {
 	Vector<Line> ret;
-	if (_GetOpSize(o0) != _GetOpSize(o1) || _GetOpSize(o0) == 8) return ret;
+	if (_GetOpSize(o0) != _GetOpSize(o1) || _GetOpSize(o0) == 8 || _GetOpSize(o0) == 32) return ret;
 	if (o0.type == ZYDIS_OPERAND_TYPE_MEMORY && o0.mem.base == ZYDIS_REGISTER_RSP) return ret;
 	if (o1.type == ZYDIS_OPERAND_TYPE_MEMORY && o1.mem.base == ZYDIS_REGISTER_RSP) return ret;
 	ret.Merge(zyasm::push(o1));
