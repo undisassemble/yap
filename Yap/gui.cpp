@@ -123,6 +123,8 @@ void DrawGUI() {
 			ImGui::SameLine();
 			IMGUI_TOGGLE("Only Load Microsoft Signed DLLs", Options.Packing.bOnlyLoadMicrosoft);
 			ImGui::SetItemTooltip("Only allows DLLs that have been signed by Microsoft to be loaded.");
+			IMGUI_TOGGLE("Direct Syscalls", Options.Packing.bDirectSyscalls);
+			ImGui::SetItemTooltip("Skips use of some windows API functions and instead makes calls directly to the kernel, can break with future Windows updates.");
 			DEBUG_ONLY(IMGUI_TOGGLE("Anti-Dump", Options.Packing.bAntiDump));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent PE dumpers and reconstructors from dumping the running process."));
 			IMGUI_TOGGLE("Anti-Debug", Options.Packing.bAntiDebug);

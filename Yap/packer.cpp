@@ -389,6 +389,9 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	Label Sha256_Init = a.newLabel();
 	Label Sha256_Update = a.newLabel();
 	Label Sha256_Final = a.newLabel();
+	Label OnDebuggerDetected, OnVMDetected, Message;
+	if (!::Options.Messages.bDebugger) OnDebuggerDetected = ret;
+	if (!::Options.Messages.bVM) OnVMDetected = ret;
 
 	// Entry point sigs
 	if (!::Options.Packing.bDelayedEntry) {
@@ -415,12 +418,122 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	}
 
 	// Data
+	if ((::Options.Messages.bDebugger && ::Options.Packing.bAntiDebug) || (::Options.Messages.bVM && ::Options.Packing.bAntiVM)) {
+		Label KRN = a.newLabel();
+		a.bind(KRN);
+		a.embed(&Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest));
+		Label LLA = a.newLabel();
+		a.bind(LLA);
+		a.embed(&Sha256Str("LoadLibraryA"), sizeof(Sha256Digest));
+		Label MBA = a.newLabel();
+		a.bind(MBA);
+		a.embed(&Sha256Str("MessageBoxA"), sizeof(Sha256Digest));
+		Label USR = a.newLabel();
+		a.bind(USR);
+		a.embed("USER32.dll", 11);
+
+		Message = a.newLabel();
+		a.bind(Message);
+		a.mov(rsi, rsp);
+		a.push(rcx);
+		a.push(rdx);
+		a.push(r8);
+		a.push(r9);
+		a.lea(rcx, ptr(KRN));
+		a.call(ShellcodeData.Labels.GetModuleHandleW);
+		a.mov(rcx, rax);
+		a.lea(rdx, ptr(LLA));
+		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.test(rax, rax);
+		a.strict();
+		a.cmovz(rsp, rsi);
+		a.strict();
+		a.jz(ret);
+		a.lea(rcx, ptr(USR));
+		a.call(rax);
+		a.test(rax, rax);
+		a.strict();
+		a.cmovz(rsp, rsi);
+		a.strict();
+		a.jz(ret);
+		a.mov(rcx, rax);
+		a.lea(rdx, ptr(MBA));
+		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.test(rax, rax);
+		a.strict();
+		a.cmovz(rsp, rsi);
+		a.strict();
+		a.jz(ret);
+		a.pop(r9);
+		a.pop(r8);
+		a.pop(rdx);
+		a.pop(rcx);
+		a.call(rax);
+		a.jmp(ret);
+	}
+	if (::Options.Messages.bDebugger && ::Options.Packing.bAntiDebug) {
+		Label mtext = a.newLabel();
+		a.bind(mtext);
+		a.embed(::Options.Messages.DebuggerText, lstrlenA(::Options.Messages.DebuggerText) + 1);
+		Label mtitle = a.newLabel();
+		a.bind(mtitle);
+		a.embed(::Options.Messages.DebuggerTitle, lstrlenA(::Options.Messages.DebuggerTitle) + 1);
+		
+		OnDebuggerDetected = a.newLabel();
+		a.bind(OnDebuggerDetected);
+		a.mov(rcx, 0);
+		a.lea(rdx, ptr(mtext));
+		a.lea(r8, ptr(mtitle));
+		a.mov(r9, MB_OK);
+		switch (::Options.Messages.iDebugger) {
+		case 2:
+			a.or_(r9, MB_ICONWARNING);
+		case 0:
+			break;
+		case 3:
+			a.or_(r9, MB_ICONINFORMATION);
+			break;
+		case 4:
+			a.or_(r9, MB_ICONQUESTION);
+			break;
+		default:
+			a.or_(r9, MB_ICONERROR);
+		}
+		a.call(Message);
+	}
+	if (::Options.Messages.bVM && ::Options.Packing.bAntiVM) {
+		Label mtext = a.newLabel();
+		a.bind(mtext);
+		a.embed(::Options.Messages.VMText, lstrlenA(::Options.Messages.VMText) + 1);
+		Label mtitle = a.newLabel();
+		a.bind(mtitle);
+		a.embed(::Options.Messages.VMTitle, lstrlenA(::Options.Messages.VMTitle) + 1);
+
+		OnVMDetected = a.newLabel();
+		a.bind(OnVMDetected);
+		a.mov(rcx, 0);
+		a.lea(rdx, ptr(mtext));
+		a.lea(r8, ptr(mtitle));
+		a.mov(r9, MB_OK);
+		switch (::Options.Messages.iVM) {
+		case 2:
+			a.or_(r9, MB_ICONWARNING);
+		case 0:
+			break;
+		case 3:
+			a.or_(r9, MB_ICONINFORMATION);
+			break;
+		case 4:
+			a.or_(r9, MB_ICONQUESTION);
+			break;
+		default:
+			a.or_(r9, MB_ICONERROR);
+		}
+		a.call(Message);
+	}
 	if (Options.Message) {
 		a.bind(message);
-		for (int i = 0; i < 64; i++) {
-			a.db(Options.Message[i]);
-			if (!Options.Message[i]) break;
-		}
+		a.embed(Options.Message, lstrlenA(Options.Message) + 1);
 	}
 	Label hash = a.newLabel();
 	CSha256 sha = { 0 };
@@ -482,7 +595,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		Label skippolicy = a.newLabel();
 #ifdef _DEBUG
 		if (::Options.Debug.bDisableMutations) {
-			a.jmp(skippolicy);
+		a.jmp(skippolicy);
 		} else {
 			a.strict();
 			a.jnz(skippolicy);
@@ -504,11 +617,16 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.embed(&sig_policy, sizeof(PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY));
 
 		a.bind(skippolicy);
-		a.mov(rcx, 0xFFFFFFFFFFFFFFFF);
+		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFF);
 		a.mov(edx, 52);
 		a.lea(r8, ptr(policy));
 		a.mov(r9d, holder.labelOffset(skippolicy) - holder.labelOffset(policy));
-		a.call(rax);
+		if (::Options.Packing.bDirectSyscalls) {
+			a.mov(eax, ptr(rax, 4));
+			a.syscall();
+		} else {
+			a.call(rax);
+		}
 	}
 
 	// Debug
@@ -533,7 +651,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		Label GCT = a.newLabel();
 		a.bind(GCT);
 		a.embed(&Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest));
-		
+
 		a.bind(skipdata);
 		a.lea(rcx, ptr(NTD));
 		a.call(ShellcodeData.Labels.GetModuleHandleW);
@@ -543,28 +661,33 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
-		a.mov(rcx, 0xFFFFFFFFFFFFFFFE);
+		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
 		a.lea(rdx, ptr(Context));
 		a.push(rdx);
-		a.call(rax);
+		if (::Options.Packing.bDirectSyscalls) {
+			a.mov(eax, ptr(rax, 4));
+			a.syscall();
+		} else {
+			a.call(rax);
+		}
 		a.pop(rdx);
 		a.test(rax, rax);
 		a.strict();
-		a.jnz(ret);
+		a.jnz(OnDebuggerDetected);
 		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr7)));
 		a.and_(rax, 0x20FF);
 		a.strict();
-		a.jnz(ret);
+		a.jnz(OnDebuggerDetected);
 		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr6)));
 		a.and_(rax, 0x18F);
 		a.strict();
-		a.jnz(ret);
+		a.jnz(OnDebuggerDetected);
 		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr0)));
 		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr1)));
 		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr2)));
 		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr3)));
 		a.strict();
-		a.jnz(ret);
+		a.jnz(OnDebuggerDetected);
 	}
 
 	// VM detection (TODO)
@@ -574,7 +697,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.bt(ecx, 31);
 		a.strict();
 		if (!::Options.Packing.bAllowHyperV) {
-			a.jc(ret);
+			a.jc(OnVMDetected);
 		} else {
 			Label nohv = a.newLabel();
 			a.jnc(nohv);
@@ -582,13 +705,13 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 			a.cpuid();
 			a.cmp(ebx, 0x7263694D);
 			a.strict();
-			a.jne(ret);
+			a.jne(OnVMDetected);
 			a.cmp(ecx, 0x666F736F);
 			a.strict();
-			a.jne(ret);
+			a.jne(OnVMDetected);
 			a.cmp(edx, 0x76482074);
 			a.strict();
-			a.jne(ret);
+			a.jne(OnVMDetected);
 			a.bind(nohv);
 		}
 	}
@@ -1135,11 +1258,16 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
-		a.mov(rcx, 0xFFFFFFFFFFFFFFFF);
+		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFF);
 		a.mov(edx, 0x1D);
 		a.lea(r8, ptr(data));
 		a.mov(r9d, 4);
-		a.call(rax);
+		if (::Options.Packing.bDirectSyscalls) {
+			a.mov(eax, ptr(rax, 4));
+			a.syscall();
+		} else {
+			a.call(rax);
+		}
 	}
 
 	// Masquerading

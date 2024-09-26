@@ -22,6 +22,7 @@ struct _ShellcodeData {
 	uint64_t LoadedOffset = 0;
 	uint64_t VMAbs = 0;
 	uint64_t ImageBase = 0;
+	uint64_t MessageBoxAddr = 0;
 	bool bUsingTLSCallbacks = false;
 
 	struct {

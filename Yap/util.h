@@ -315,6 +315,7 @@ struct Options_t {
 		bool bDelayedEntry : 1 = false;
 		bool bDontCompressRsrc : 1 = true;
 		bool bFalseSymbols : 1 = false;
+		bool bDirectSyscalls : 1 = false;
 		int CompressionLevel = 5;
 		PackerTypes_t Immitate = YAP;
 		char Masquerade[MAX_PATH] = "C:\\Windows\\System32\\cmd.exe";
@@ -335,6 +336,17 @@ struct Options_t {
 		bool bStrip : 1 = false;
 		bool bSubstitution : 1 = false;
 	} Reassembly;
+
+	struct {
+		bool bDebugger : 1 = false;
+		bool bVM : 1 = false;
+		int iDebugger = 1; // 0 - No icon, 1 - MB_ICONERROR, 2 - MB_ICONWARNING, 3 - MB_ICONINFORMATION, 4 - MB_ICONQUESTION
+		int iVM = 1;
+		char DebuggerText[MAX_PATH] = "A debugger has been detected! Please close any debugging tools and relaunch.";
+		char VMText[MAX_PATH] = "A virtual machine has been detected! Please don\'t run me in a VM!";
+		char DebuggerTitle[26] = "Error";
+		char VMTitle[26] = "Error";
+	} Messages;
 
 #ifdef _DEBUG
 	struct {
