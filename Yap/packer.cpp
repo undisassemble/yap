@@ -622,6 +622,10 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.lea(r8, ptr(policy));
 		a.mov(r9d, holder.labelOffset(skippolicy) - holder.labelOffset(policy));
 		if (::Options.Packing.bDirectSyscalls) {
+			a.mov(ecx, dword_ptr(rax));
+			a.cmp(ecx, 0xB8D18B4C);
+			a.strict();
+			a.jnz(ret);
 			a.mov(eax, ptr(rax, 4));
 			a.syscall();
 		} else {
@@ -634,9 +638,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		// Setup context
 		CONTEXT context = { 0 };
 		context.ContextFlags = CONTEXT_ALL;
-		//context.DebugControl = rand64();
-		//context.Dr0 = rand64();
-		//context.Dr1 = rand64();
 		
 		Label skipdata = a.newLabel();
 		a.jmp(skipdata);
@@ -665,6 +666,10 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.lea(rdx, ptr(Context));
 		a.push(rdx);
 		if (::Options.Packing.bDirectSyscalls) {
+			a.mov(ecx, ptr(rax));
+			a.cmp(ecx, 0xB8D18B4C);
+			a.strict();
+			a.jnz(ret);
 			a.mov(eax, ptr(rax, 4));
 			a.syscall();
 		} else {
@@ -1263,6 +1268,10 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.lea(r8, ptr(data));
 		a.mov(r9d, 4);
 		if (::Options.Packing.bDirectSyscalls) {
+			a.mov(ecx, ptr(rax));
+			a.cmp(ecx, 0xB8D18B4C);
+			a.strict();
+			a.jnz(ret);
 			a.mov(eax, ptr(rax, 4));
 			a.syscall();
 		} else {
