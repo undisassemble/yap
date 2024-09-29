@@ -14,6 +14,12 @@ struct Sha256Digest {
 	} low;
 };
 
+struct RequestedFunction {
+	bool bRequested = false;
+	DWORD dwRVA = 0;
+	Label Func;
+};
+
 struct _ShellcodeData {
 	uint64_t BaseAddress = 0;
 	uint64_t OldPENewBaseRVA = 0;
@@ -43,12 +49,34 @@ struct _ShellcodeData {
 
 	struct {
 		int iIndex = -1;
-		bool bCheckForDebuggers : 1 = false;
-		bool bCheckThreadsAlive : 1 = false;
-		Label CheckForDebuggers;
-		Label CheckThreadsAlive;
-		DWORD dwCheckForDebuggersRVA = 0;
-		DWORD dwCheckThreadsAliveRVA = 0;
+		RequestedFunction CheckForDebuggers;
+		RequestedFunction CheckThreadsAlive;
+		RequestedFunction YAP_NtDelayExecution;
+		RequestedFunction YAP_NtFreeVirtualMemory;
+		RequestedFunction YAP_NtAllocateVirtualMemory;
+		RequestedFunction YAP_NtGetContextThread;
+		RequestedFunction YAP_NtGetNextProcess;
+		RequestedFunction YAP_NtGetNextThread;
+		RequestedFunction YAP_NtOpenProcess;
+		RequestedFunction YAP_NtOpenThread;
+		RequestedFunction YAP_NtProtectVirtualMemory;
+		RequestedFunction YAP_NtReadVirtualMemory;
+		RequestedFunction YAP_NtResumeThread;
+		RequestedFunction YAP_NtResumeProcess;
+		RequestedFunction YAP_NtSetContextThread;
+		RequestedFunction YAP_NtSetInformationProcess;
+		RequestedFunction YAP_NtSetInformationThread;
+		RequestedFunction YAP_NtSetThreadExecutionState;
+		RequestedFunction YAP_NtSuspendProcess;
+		RequestedFunction YAP_NtSuspendThread;
+		RequestedFunction YAP_NtTerminateProcess;
+		RequestedFunction YAP_NtTerminateThread;
+		RequestedFunction YAP_NtWriteVirtualMemory;
+		RequestedFunction YAP_NtClose;
+		RequestedFunction YAP_GetCurrentThread;
+		RequestedFunction YAP_GetCurrentThreadId;
+		RequestedFunction YAP_GetCurrentProcess;
+		RequestedFunction YAP_GetCurrentProcessId;
 	} RequestedFunctions;
 };
 

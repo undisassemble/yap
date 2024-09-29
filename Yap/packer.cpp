@@ -64,6 +64,15 @@ Buffer PackSection(_In_ Buffer SectionData, _In_ PackerOptions Options) {
 	data.u64Size = SectionData.u64Size;
 	data.pBytes = reinterpret_cast<BYTE*>(malloc(data.u64Size));
 
+	// Encode
+	//BYTE key = SectionData.u64Size & 0xFF;
+	//for (size_t i = 0; i < SectionData.u64Size; i++) {
+		//key++;
+		//SectionData.pBytes[i] ^= key;
+		//key -= SectionData.pBytes[i];
+		//key = ~key;
+	//}
+
 	// props
 	CLzmaEncProps props = { 0 };
 	props.level = ::Options.Packing.CompressionLevel;
@@ -205,6 +214,19 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	pA->call(LzmaDecode);
 	pA->pop(r9);
 	pA->pop(r8);
+
+	// Unencode
+	//pA->mov(cl, r9b);
+	//Label _do = pA->newLabel();
+	//pA->bind(_do);
+	//pA->inc(cl);
+	//pA->xor_(byte_ptr(r8), cl);
+	//pA->sub(cl, byte_ptr(r8));
+	//pA->not_(cl);
+	//pA->inc(r8);
+	//pA->dec(r9);
+	//pA->strict();
+	//pA->jnz(_do);
 	pA->ret();
 	
 	// LzmaDecode
@@ -304,6 +326,7 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 			a.or_(rcx, rax);
 		}
 		a.push(rcx);
+		a.mov(rcx, 0);
 		DEBUG_ONLY(if (::Options.Debug.bGenerateBreakpoints) a.int3(); a.block());
 		a.popfq();
 		a.block();
@@ -733,6 +756,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		Label LLA = a.newLabel();
 		a.jmp(_skip);
 
+		a.align(AlignMode::kCode, alignof(LPCSTR));
 		a.bind(USR);
 		a.embed("USER32.dll", 11);
 		a.bind(GCP);
@@ -885,7 +909,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	a.mov(rax, ptr(Reloc));
 	if (ShellcodeData.Relocations.Relocations.Size()) {
 		for (int i = 0, n = ShellcodeData.Relocations.Relocations.Size(); i < n; i++) {
-			a.mov(r10, ShellcodeData.Relocations.Relocations.At(i));
+			a.mov(r10, pPackedBinary->GetBaseAddress() + ShellcodeData.Relocations.Relocations.At(i));
 			a.add(r10, rax);
 			a.add(ptr(r10), rax);
 		}
@@ -1518,18 +1542,47 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 					if (ShellcodeData.RequestedFunctions.iIndex != i) {
 						a.embed(&Sha256Str(name), sizeof(Sha256Digest));
 					} else {
-						if (!lstrcmpA(name, "CheckForDebuggers")) {
-							ShellcodeData.RequestedFunctions.CheckForDebuggers = a.newLabel();
-							ShellcodeData.RequestedFunctions.bCheckForDebuggers = true;
-							ShellcodeData.RequestedFunctions.dwCheckForDebuggersRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
-							LOG(Success, MODULE_PACKER, "Importing CheckForDebuggers at %x\n", ShellcodeData.RequestedFunctions.dwCheckForDebuggersRVA);
-						} else if (!lstrcmpA(name, "CheckThreadsAlive")) {
-							ShellcodeData.RequestedFunctions.CheckThreadsAlive = a.newLabel();
-							ShellcodeData.RequestedFunctions.bCheckThreadsAlive = true;
-							ShellcodeData.RequestedFunctions.dwCheckThreadsAliveRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
-							LOG(Success, MODULE_PACKER, "Importing CheckThreadsAlive at %x\n", ShellcodeData.RequestedFunctions.dwCheckThreadsAliveRVA);
-						} else {
-							LOG(Warning, MODULE_PACKER, "Unrecognized SDK import: \'%s\'\n", name);
+						RequestedFunction* pRequest = NULL;
+						
+						// Get request name
+#define CHECK_IMPORT(_name) else if (!lstrcmpA(name, #_name)) pRequest = &ShellcodeData.RequestedFunctions._name
+						if (!lstrcmpA(name, "CheckForDebuggers")) pRequest = &ShellcodeData.RequestedFunctions.CheckForDebuggers; 
+						CHECK_IMPORT(CheckThreadsAlive);
+						CHECK_IMPORT(YAP_NtDelayExecution);
+						CHECK_IMPORT(YAP_NtFreeVirtualMemory);
+						CHECK_IMPORT(YAP_NtAllocateVirtualMemory);
+						CHECK_IMPORT(YAP_NtGetContextThread);
+						CHECK_IMPORT(YAP_NtGetNextProcess);
+						CHECK_IMPORT(YAP_NtGetNextThread);
+						CHECK_IMPORT(YAP_NtOpenProcess);
+						CHECK_IMPORT(YAP_NtOpenThread);
+						CHECK_IMPORT(YAP_NtProtectVirtualMemory);
+						CHECK_IMPORT(YAP_NtReadVirtualMemory);
+						CHECK_IMPORT(YAP_NtResumeThread);
+						CHECK_IMPORT(YAP_NtResumeProcess);
+						CHECK_IMPORT(YAP_NtSetContextThread);
+						CHECK_IMPORT(YAP_NtSetInformationProcess);
+						CHECK_IMPORT(YAP_NtSetInformationThread);
+						CHECK_IMPORT(YAP_NtSetThreadExecutionState);
+						CHECK_IMPORT(YAP_NtSuspendProcess);
+						CHECK_IMPORT(YAP_NtSuspendThread);
+						CHECK_IMPORT(YAP_NtTerminateProcess);
+						CHECK_IMPORT(YAP_NtTerminateThread);
+						CHECK_IMPORT(YAP_NtWriteVirtualMemory);
+						CHECK_IMPORT(YAP_NtClose);
+						CHECK_IMPORT(YAP_GetCurrentThread);
+						CHECK_IMPORT(YAP_GetCurrentThreadId);
+						CHECK_IMPORT(YAP_GetCurrentProcessId);
+						CHECK_IMPORT(YAP_GetCurrentProcess);
+						else LOG(Warning, MODULE_PACKER, "Unrecognized SDK import: \'%s\'\n", name);
+#undef CHECK_IMPORT
+
+						// Apply request
+						if (pRequest) {
+							pRequest->bRequested = true;
+							pRequest->dwRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
+							pRequest->Func = a.newLabel();
+							LOG(Success, MODULE_PACKER, "Imported SDK function at %#x\n", pRequest->dwRVA);
 						}
 					}
 					ZeroMemory(name, lstrlenA(name));
@@ -1672,18 +1725,36 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	}
 
 	// Load SDK
-	if (ShellcodeData.RequestedFunctions.bCheckForDebuggers) {
-		a.lea(rax, ptr(ShellcodeData.RequestedFunctions.CheckForDebuggers));
-		a.mov(rcx, pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + ShellcodeData.RequestedFunctions.dwCheckForDebuggersRVA);
-		a.add(rcx, ptr(InternalRelOff));
-		a.mov(qword_ptr(rcx), rax);
-	}
-	if (ShellcodeData.RequestedFunctions.bCheckThreadsAlive) {
-		a.lea(rax, ptr(ShellcodeData.RequestedFunctions.CheckThreadsAlive));
-		a.mov(rcx, pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + ShellcodeData.RequestedFunctions.dwCheckThreadsAliveRVA);
-		a.add(rcx, ptr(InternalRelOff));
-		a.mov(qword_ptr(rcx), rax);
-	}
+#define LOAD_IMPORT(name) if (ShellcodeData.RequestedFunctions.name.bRequested) { a.lea(rax, ptr(ShellcodeData.RequestedFunctions.name.Func)); a.mov(rcx, pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + ShellcodeData.RequestedFunctions.name.dwRVA); a.add(rcx, ptr(InternalRelOff)); a.mov(qword_ptr(rcx), rax); }
+	LOAD_IMPORT(CheckForDebuggers);
+	LOAD_IMPORT(CheckThreadsAlive);
+	LOAD_IMPORT(YAP_NtDelayExecution);
+	LOAD_IMPORT(YAP_NtFreeVirtualMemory);
+	LOAD_IMPORT(YAP_NtAllocateVirtualMemory);
+	LOAD_IMPORT(YAP_NtGetContextThread);
+	LOAD_IMPORT(YAP_NtGetNextProcess);
+	LOAD_IMPORT(YAP_NtGetNextThread);
+	LOAD_IMPORT(YAP_NtOpenProcess);
+	LOAD_IMPORT(YAP_NtOpenThread);
+	LOAD_IMPORT(YAP_NtProtectVirtualMemory);
+	LOAD_IMPORT(YAP_NtReadVirtualMemory);
+	LOAD_IMPORT(YAP_NtResumeThread);
+	LOAD_IMPORT(YAP_NtResumeProcess);
+	LOAD_IMPORT(YAP_NtSetContextThread);
+	LOAD_IMPORT(YAP_NtSetInformationProcess);
+	LOAD_IMPORT(YAP_NtSetInformationThread);
+	LOAD_IMPORT(YAP_NtSetThreadExecutionState);
+	LOAD_IMPORT(YAP_NtSuspendProcess);
+	LOAD_IMPORT(YAP_NtSuspendThread);
+	LOAD_IMPORT(YAP_NtTerminateProcess);
+	LOAD_IMPORT(YAP_NtTerminateThread);
+	LOAD_IMPORT(YAP_NtWriteVirtualMemory);
+	LOAD_IMPORT(YAP_NtClose);
+	LOAD_IMPORT(YAP_GetCurrentThread);
+	LOAD_IMPORT(YAP_GetCurrentThreadId);
+	LOAD_IMPORT(YAP_GetCurrentProcess);
+	LOAD_IMPORT(YAP_GetCurrentProcessId);
+#undef LOAD_IMPORT
 
 	// Mark as loaded
 	if (ShellcodeData.bUsingTLSCallbacks) {
@@ -2060,19 +2131,151 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	}
 
 	// CheckForDebuggers
-	if (ShellcodeData.RequestedFunctions.bCheckForDebuggers) {
-		a.bind(ShellcodeData.RequestedFunctions.CheckForDebuggers);
-		a.garbage();
+	if (ShellcodeData.RequestedFunctions.CheckForDebuggers.bRequested) {
+		CONTEXT context = { 0 };
+		context.ContextFlags = CONTEXT_ALL;
+		a.align(AlignMode::kCode, alignof(CONTEXT));
+		Label Context = a.newLabel();
+		a.bind(Context);
+		a.embed(&context, sizeof(CONTEXT));
+		Label NTD = a.newLabel();
+		a.bind(NTD);
+		a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest));
+		Label GCT = a.newLabel();
+		a.bind(GCT);
+		a.embed(&Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest));
+
+		Label ret = a.newLabel();
+
+		a.bind(ShellcodeData.RequestedFunctions.CheckForDebuggers.Func);
+		a.push(rsi);
+
+		// PEB check
+		a.mov(rax, 0);
 		a.mov(rcx, PEB);
 		a.mov(al, byte_ptr(rcx, 0x02));
+		a.mov(rdx, 0xBC);
+		a.mov(r9, 0x70);
+		a.mov(r8d, dword_ptr(rcx, rdx));
+		a.and_(r8, r9);
+		a.xor_(r8, r9);
+		a.strict();
+		a.setz(al);
+		a.strict();
+		a.jz(ret);
+
+		// HWBP check
+		a.lea(rcx, ptr(NTD));
+		a.call(ShellcodeData.Labels.GetModuleHandleW);
+		a.mov(rcx, rax);
+		a.lea(rdx, ptr(GCT));
+		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.test(rax, rax);
+		a.strict();
+		a.jz(ret);
+		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
+		a.lea(rdx, ptr(Context));
+		a.mov(rsi, rdx);
+		if (::Options.Packing.bDirectSyscalls) {
+			a.mov(ecx, ptr(rax));
+			a.cmp(ecx, 0xB8D18B4C);
+			a.strict();
+			a.mov(rcx, 1);
+			a.strict();
+			a.cmovnz(rax, rcx);
+			a.strict();
+			a.jnz(ret);
+			a.mov(eax, ptr(rax, 4));
+			a.syscall();
+		} else {
+			a.call(rax);
+		}
+		a.mov(rdx, rsi);
+		a.test(rax, rax);
+		a.strict();
+		a.jnz(ret);
+		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr7)));
+		a.and_(rax, 0x20FF);
+		a.strict();
+		a.jnz(ret);
+		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr6)));
+		a.and_(rax, 0x18F);
+		a.strict();
+		a.jnz(ret);
+		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr0)));
+		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr1)));
+		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr2)));
+		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr3)));
+		a.bind(ret);
+		a.pop(rsi);
 		a.ret();
 	}
 
 	// CheckThreadsAlive
-	if (ShellcodeData.RequestedFunctions.bCheckThreadsAlive) {
-		a.bind(ShellcodeData.RequestedFunctions.CheckThreadsAlive);
+	if (ShellcodeData.RequestedFunctions.CheckThreadsAlive.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.CheckThreadsAlive.Func);
 		a.garbage();
 		a.mov(rax, 1);
+		a.ret();
+	}
+
+	// NTDLL thingies
+#define CODE_IMPORT(name) if (ShellcodeData.RequestedFunctions.YAP_##name.bRequested) { Label NTD = a.newLabel(); a.bind(NTD); a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)); Label FNN = a.newLabel(); a.bind(FNN); a.embed(&Sha256Str(#name), sizeof(Sha256Digest)); Label RTA = a.newLabel(); a.bind(RTA); a.dq(rand64()); Label NotFound = a.newLabel(); a.bind(ShellcodeData.RequestedFunctions.YAP_##name.Func); a.pop(qword_ptr(RTA)); a.push(rcx); a.push(rdx); a.push(r8); a.push(r9); a.lea(rcx, ptr(NTD)); a.call(ShellcodeData.Labels.GetModuleHandleW); a.mov(rcx, rax); a.lea(rdx, ptr(FNN)); a.call(ShellcodeData.Labels.GetProcAddressA); a.test(rax, rax); a.strict(); a.jz(NotFound); a.pop(r9); a.pop(r8); a.pop(rdx); a.mov(ecx, ptr(rax)); a.cmp(ecx, 0xB8D18B4C); a.strict(); a.jne(0); a.mov(eax, ptr(rax, 4)); a.pop(r10); a.syscall(); a.jmp(qword_ptr(RTA)); a.bind(NotFound); a.mov(rax, 0xC0000225); a.jmp(qword_ptr(RTA)); }
+	CODE_IMPORT(NtDelayExecution);
+	CODE_IMPORT(NtFreeVirtualMemory);
+	CODE_IMPORT(NtAllocateVirtualMemory);
+	CODE_IMPORT(NtGetContextThread);
+	CODE_IMPORT(NtGetNextProcess);
+	CODE_IMPORT(NtGetNextThread);
+	CODE_IMPORT(NtOpenProcess);
+	CODE_IMPORT(NtOpenThread);
+	CODE_IMPORT(NtProtectVirtualMemory);
+	CODE_IMPORT(NtReadVirtualMemory);
+	CODE_IMPORT(NtResumeThread);
+	CODE_IMPORT(NtResumeProcess);
+	CODE_IMPORT(NtSetContextThread);
+	CODE_IMPORT(NtSetInformationProcess);
+	CODE_IMPORT(NtSetInformationThread);
+	CODE_IMPORT(NtSetThreadExecutionState);
+	CODE_IMPORT(NtSuspendProcess);
+	CODE_IMPORT(NtSuspendThread);
+	CODE_IMPORT(NtTerminateProcess);
+	CODE_IMPORT(NtTerminateThread);
+	CODE_IMPORT(NtWriteVirtualMemory);
+	CODE_IMPORT(NtClose);
+#undef CODE_IMPORT
+
+	// YAP_GetCurrentThread
+	if (ShellcodeData.RequestedFunctions.YAP_GetCurrentThread.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.YAP_GetCurrentThread.Func);
+		a.mov(rax, 0xFFFFFFFFFFFFFFFE);
+		a.ret();
+	}
+
+	// YAP_GetCurrentThreadId
+	if (ShellcodeData.RequestedFunctions.YAP_GetCurrentThreadId.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.YAP_GetCurrentThreadId.Func);
+		Mem TEB = qword_ptr(0x30);
+		TEB.setSegment(gs);
+		a.mov(rax, TEB);
+		a.mov(eax, dword_ptr(rax, 0x48));
+		a.ret();
+	}
+
+	// YAP_GetCurrentProcess
+	if (ShellcodeData.RequestedFunctions.YAP_GetCurrentProcess.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.YAP_GetCurrentProcess.Func);
+		a.mov(rax, 0xFFFFFFFFFFFFFFFF);
+		a.ret();
+	}
+	
+	// YAP_GetCurrentProcessId
+	if (ShellcodeData.RequestedFunctions.YAP_GetCurrentProcessId.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.YAP_GetCurrentProcessId.Func);
+		Mem TEB = qword_ptr(0x30);
+		TEB.setSegment(gs);
+		a.mov(rax, TEB);
+		a.mov(eax, dword_ptr(rax, 0x40));
 		a.ret();
 	}
 
@@ -2108,7 +2311,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	if (holder.hasRelocEntries()) {
 		for (int i = 0; i < holder.relocEntries().size(); i++) {
 			if (holder.relocEntries().at(i)->_relocType == RelocType::kNone) continue;
-			ShellcodeData.Relocations.Relocations.Push(holder.baseAddress() + holder.relocEntries().at(i)->_sourceOffset - pPackedBinary->GetNtHeaders()->x64.OptionalHeader.ImageBase);
+			ShellcodeData.Relocations.Relocations.Push(holder.baseAddress() + holder.relocEntries().at(i)->sourceOffset() - pPackedBinary->GetNtHeaders()->x64.OptionalHeader.ImageBase);
 		}
 	}
 

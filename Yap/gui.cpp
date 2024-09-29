@@ -31,7 +31,11 @@ void EndGUI();
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 DWORD WINAPI ParsePE(void* args) {
-	Data.PEFunctions = pAssembly->FindFunctions();
+	Data.bParsing = true;
+	Data.PEFunctions.Release();
+	Options.VM.VMFuncs.Release();
+	Data.PEFunctions = pAssembly->FindFunctions(args != NULL);
+	Data.bParsing = false;
 	return 0;
 }
 
@@ -84,7 +88,6 @@ void DrawGUI() {
 				if (pAssembly->GetStatus()) {
 					MessageBoxA(Data.hWnd, "Could not parse binary!", NULL, MB_OK | MB_ICONERROR);
 				} else {
-					Data.bParsing = true;
 					CreateThread(0, 0, ParsePE, 0, 0, 0);
 				}
 			}
@@ -92,8 +95,8 @@ void DrawGUI() {
 			Data.hDropFile = NULL;
 		}
 
-		ImGui::SetCursorPos(ImVec2((ImGui::GetWindowSize().x - ImGui::CalcTextSize(Data.bParsing ? "Analyzing..." : "Drop file here").x) / 2, (ImGui::GetWindowSize().y - ImGui::GetTextLineHeight()) / 2));
-		ImGui::Text(Data.bParsing ? "Analyzing..." : "Drop file here");
+		ImGui::SetCursorPos(ImVec2((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Drop file here").x) / 2, (ImGui::GetWindowSize().y - ImGui::GetTextLineHeight()) / 2));
+		ImGui::Text("Drop file here");
 	}
 
 	// Configuration menu
@@ -165,14 +168,21 @@ void DrawGUI() {
 		}
 
 		if (ImGui::BeginTabItem("VM")) {
-			if (!Options.Packing.bEnabled || !Options.Reassembly.bEnabled) ImGui::BeginDisabled();
-			IMGUI_TOGGLE("Enable VM", Options.VM.bEnabled);
+			if (!Options.Packing.bEnabled || !Options.Reassembly.bEnabled) {
+				ImGui::BeginDisabled();
+				bool bDisabled = false;
+				ImGui::Checkbox("Enable VM", &bDisabled);
+			} else {
+				IMGUI_TOGGLE("Enable VM", Options.VM.bEnabled);
+			}
 			ImGui::SetItemTooltip("Enables virtualization functionality, requires packer & reassembler to be enabled.");
+			if (ImGui::Button(Data.bParsing ? "Analyzing..." : "Analyze") && !Data.bParsing) {
+				CreateThread(0, 0, ParsePE, (LPVOID)1, 0, 0);
+			}
 			if (ImGui::Button("Add Function (Max 256)")) {
 				if (Options.VM.VMFuncs.Size() >= 256) {
 					MessageBoxA(Data.hWnd, "Maximum number of functions selected!", NULL, MB_ICONINFORMATION | MB_OK);
-				}
-				else {
+				} else {
 					Options.VM.VMFuncs.Push(0);
 				}
 			}
@@ -188,12 +198,10 @@ void DrawGUI() {
 				if (Options.VM.VMFuncs.At(i)) {
 					if (Data.PEFunctions.At(Options.VM.VMFuncs.At(i) - 1).pName) {
 						strcpy_s(buf, Data.PEFunctions.At(Options.VM.VMFuncs.At(i) - 1).pName);
-					}
-					else {
+					} else {
 						wsprintfA(buf, "sub_%p", Data.PEFunctions.At(Options.VM.VMFuncs.At(i) - 1).u64Address);
 					}
-				}
-				else {
+				} else {
 					memcpy(buf, "Select Function", 16);
 				}
 				ImGui::SameLine();
@@ -252,8 +260,7 @@ void DrawGUI() {
 		}
 
 		ImGui::EndTabBar();
-		//ImGui::SetCursorPos(ImVec2(800 - ImGui::GetWindowScrollbarRect(ImGui::GetCurrentWindow(), ImGuiAxis_Y).GetWidth(), 532 + ImGui::GetScrollY()));
-		ImGui::SetCursorPos(ImVec2(800, 530));
+		ImGui::SetCursorPos(ImVec2(800 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetWindowScrollbarRect(ImGui::GetCurrentWindow(), ImGuiAxis_Y).GetWidth() : 0), 530 + ImGui::GetScrollY()));
 		if (ImGui::Button("Begin")) {
 			CreateThread(0, 0, Begin, 0, 0, 0);
 		}

@@ -1412,7 +1412,7 @@ void Asm::RemoveData(_In_ DWORD dwRVA, _In_ DWORD dwSize) {
 	DeleteLine(sec, i);
 }
 
-Vector<Function> Asm::FindFunctions() {
+Vector<Function> Asm::FindFunctions(bool bDeep) {
 	// Ensure loaded
 	Vector<Function> ret;
 	if (Status) return ret;
@@ -1428,6 +1428,7 @@ Vector<Function> Asm::FindFunctions() {
 		for (int i = 0; i < Names.Size() && i < Exports.Size(); i++) {
 			n.u64Address = GetBaseAddress() + Exports.At(i);
 			n.pName = Names.At(i);
+			ret.Push(n);
 		}
 	}
 

@@ -86,7 +86,7 @@ protected:
 	Vector<DWORD> Processed;
 
 public:
-	Vector<Function> FindFunctions();
+	Vector<Function> FindFunctions(bool bDeep = false);
 
 	Asm();
 	Asm(_In_ char* sFileName);
