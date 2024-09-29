@@ -256,6 +256,8 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 	PEB.setSegment(gs);
 
 	// Check if its process start TLS
+	Label hidethread;
+	if (::Options.Packing.bAntiDebug) hidethread = a.newLabel();
 	Label _do = a.newLabel();
 	a.desync();
 	Label reloc = a.newLabel();
@@ -265,6 +267,14 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 
 	// If it's not, call packed binaries TLS callbacks (if unpacked)
 	if (TLSCallbacks.Size()) {
+		if (::Options.Packing.bAntiDebug) {
+			Label donthide = a.newLabel();
+			a.cmp(rdx, 2);
+			a.strict();
+			a.jne(donthide);
+			a.call(hidethread);
+			a.bind(donthide);
+		}
 		Label isloaded = a.newLabel();
 		a.mov(rax, ShellcodeData.LoadedOffset);
 		a.add(rax, ptr(reloc));
@@ -296,6 +306,7 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 	a.bind(reloc);
 	a.dq(ShellcodeData.BaseAddress + pPackedBinary->GetBaseAddress() + a.offset());
 	a.bind(_do);
+	if (::Options.Packing.bAntiDebug) a.call(hidethread);
 	a.push(r12);
 	a.push(r13);
 	a.push(r14);
@@ -377,6 +388,36 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 		a.pop(r13);
 		a.pop(r12);
 		a.mov(rax, 1);
+		a.ret();
+	}
+
+	if (::Options.Packing.bAntiDebug) {
+		Label NTD = a.newLabel();
+		a.bind(NTD);
+		a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest));
+		Label STI = a.newLabel();
+		a.bind(STI);
+		a.embed(&Sha256Str("NtSetInformationThread"), sizeof(Sha256Digest));
+		a.bind(hidethread);
+		a.lea(rcx, ptr(NTD));
+		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.GetModuleHandleWOff);
+		a.mov(rcx, rax);
+		a.lea(rdx, ptr(STI));
+		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.GetProcAddressAOff);
+		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
+		a.mov(rdx, 17);
+		a.mov(r8, 0);
+		a.mov(r9, 0);
+		if (::Options.Packing.bDirectSyscalls) {
+			a.mov(ecx, ptr(rax));
+			a.cmp(ecx, 0xB8D18B4C);
+			a.strict();
+			a.jnz(0);
+			a.mov(eax, ptr(rax, 4));
+			a.syscall();
+		} else {
+			a.call(rax);
+		}
 		a.ret();
 	}
 
@@ -675,9 +716,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		Label GCT = a.newLabel();
 		a.bind(GCT);
 		a.embed(&Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest));
-		Label STI = a.newLabel();
-		a.bind(STI);
-		a.embed(&Sha256Str("NtSetInformationThread"), sizeof(Sha256Digest));
 
 		a.bind(skipdata);
 		a.lea(rcx, ptr(NTD));
@@ -719,30 +757,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr3)));
 		a.strict();
 		a.jnz(OnDebuggerDetected);
-
-		// Hide current thread
-		a.lea(rcx, ptr(NTD));
-		a.call(ShellcodeData.Labels.GetModuleHandleW);
-		a.mov(rcx, rax);
-		a.lea(rdx, ptr(STI));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
-		a.mov(rdx, 17);
-		a.mov(r8, 0);
-		a.mov(r9, 0);
-		if (::Options.Packing.bDirectSyscalls) {
-			a.mov(ecx, ptr(rax));
-			a.cmp(ecx, 0xB8D18B4C);
-			a.strict();
-			a.jnz(OnDebuggerDetected);
-			a.mov(eax, ptr(rax, 4));
-			a.syscall();
-		} else {
-			a.call(rax);
-		}
 	}
 
 	// VM detection (TODO)
@@ -1228,6 +1242,8 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	// Return data
 	holder.flatten();
 	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
+	ShellcodeData.GetModuleHandleWOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(ShellcodeData.Labels.GetModuleHandleW);
+	ShellcodeData.GetProcAddressAOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(ShellcodeData.Labels.GetProcAddressA);
 	LOG(Info, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	ShellcodeData.TrueEntryOffset = holder.labelOffsetFromBase(_entry);
 	buf.u64Size = holder.textSection()->buffer().size();

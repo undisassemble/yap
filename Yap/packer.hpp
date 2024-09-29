@@ -29,6 +29,8 @@ struct _ShellcodeData {
 	uint64_t VMAbs = 0;
 	uint64_t ImageBase = 0;
 	uint64_t MessageBoxAddr = 0;
+	DWORD GetProcAddressAOff = 0;
+	DWORD GetModuleHandleWOff = 0;
 	bool bUsingTLSCallbacks = false;
 
 	struct {
