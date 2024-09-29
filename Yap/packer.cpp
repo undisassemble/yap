@@ -522,7 +522,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		default:
 			a.or_(r9, MB_ICONERROR);
 		}
-		a.call(Message);
+		a.jmp(Message);
 	}
 	if (::Options.Messages.bVM && ::Options.Packing.bAntiVM) {
 		Label mtext = a.newLabel();
@@ -552,7 +552,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		default:
 			a.or_(r9, MB_ICONERROR);
 		}
-		a.call(Message);
+		a.jmp(Message);
 	}
 	if (Options.Message) {
 		a.bind(message);
@@ -675,6 +675,9 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		Label GCT = a.newLabel();
 		a.bind(GCT);
 		a.embed(&Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest));
+		Label STI = a.newLabel();
+		a.bind(STI);
+		a.embed(&Sha256Str("NtSetInformationThread"), sizeof(Sha256Digest));
 
 		a.bind(skipdata);
 		a.lea(rcx, ptr(NTD));
@@ -687,18 +690,18 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.jz(ret);
 		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
 		a.lea(rdx, ptr(Context));
-		a.push(rdx);
+		a.mov(rsi, rdx);
 		if (::Options.Packing.bDirectSyscalls) {
 			a.mov(ecx, ptr(rax));
 			a.cmp(ecx, 0xB8D18B4C);
 			a.strict();
-			a.jnz(ret);
+			a.jnz(OnDebuggerDetected);
 			a.mov(eax, ptr(rax, 4));
 			a.syscall();
 		} else {
 			a.call(rax);
 		}
-		a.pop(rdx);
+		a.mov(rdx, rsi);
 		a.test(rax, rax);
 		a.strict();
 		a.jnz(OnDebuggerDetected);
@@ -716,6 +719,30 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr3)));
 		a.strict();
 		a.jnz(OnDebuggerDetected);
+
+		// Hide current thread
+		a.lea(rcx, ptr(NTD));
+		a.call(ShellcodeData.Labels.GetModuleHandleW);
+		a.mov(rcx, rax);
+		a.lea(rdx, ptr(STI));
+		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.test(rax, rax);
+		a.strict();
+		a.jz(ret);
+		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
+		a.mov(rdx, 17);
+		a.mov(r8, 0);
+		a.mov(r9, 0);
+		if (::Options.Packing.bDirectSyscalls) {
+			a.mov(ecx, ptr(rax));
+			a.cmp(ecx, 0xB8D18B4C);
+			a.strict();
+			a.jnz(OnDebuggerDetected);
+			a.mov(eax, ptr(rax, 4));
+			a.syscall();
+		} else {
+			a.call(rax);
+		}
 	}
 
 	// VM detection (TODO)
