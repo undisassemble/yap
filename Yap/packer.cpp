@@ -834,7 +834,10 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.strict();
 		a.jz(ret);
 		a.lea(rcx, ptr(USR));
-		a.call(rax);
+		a.push(rsi);
+		a.push(rbx);
+		a.call(rax); // I actually just don't understand why LoadLibraryA crashes here and it's confusing me
+		a.add(rsp, 0x10);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);

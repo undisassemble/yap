@@ -30,6 +30,13 @@ int main(int argc, char** argv) {
 	// General setup
 	srand(time(NULL));
 
+	// Load settings
+	HANDLE hSettings = CreateFileA("yap.config", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hSettings != INVALID_HANDLE_VALUE) {
+		ReadFile(hSettings, &Options.Settings, sizeof(Options.Settings), NULL, NULL);
+	}
+	CloseHandle(hSettings);
+
 	// Find out if parent process is cmd.exe
 	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 	PROCESSENTRY32 peEntry = { 0 };

@@ -137,8 +137,8 @@ void DrawGUI() {
 			ImGui::SameLine();
 			IMGUI_TOGGLE("Allow Hyper-V", Options.Packing.bAllowHyperV);
 			ImGui::SetItemTooltip("Still run if the detected VM is only MS Hyper-V.");
-			IMGUI_TOGGLE("Anti-Sandbox", Options.Packing.bAntiSandbox);
-			ImGui::SetItemTooltip("Prevent app from running in a sandboxed environment.");
+			DEBUG_ONLY(IMGUI_TOGGLE("Anti-Sandbox", Options.Packing.bAntiSandbox));
+			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a sandboxed environment."));
 			if (Options.Packing.bDelayedEntry && Options.Packing.Immitate == ExeStealth) Options.Packing.Immitate = YAP;
 			ImGui::Combo("Immitate Packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
 			ImGui::SetItemTooltip("Changes some details about the packed binary to make it look like another packer.");
@@ -248,6 +248,19 @@ void DrawGUI() {
 			ImGui::EndTabItem();
 		}
 #endif
+
+		if (ImGui::BeginTabItem("Settings")) {
+			if (
+				ImGui::Checkbox("Check For Updates", &Options.Settings.bCheckForUpdates) ||
+				ImGui::Combo("Reassembler Priority", (int*)&Options.Settings.Opt, "Automatic\0Prioritize Speed\0Prioritize Memory\0") ||
+				ImGui::Combo("Logging Level", (int*)&Options.Settings.Logging, "Nothing\0Errors\0Successes\0Warnings\0Info\0Extended Info\0")
+			) {
+				HANDLE hFile = CreateFileA("yap.config", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+				WriteFile(hFile, &Options.Settings, sizeof(Options.Settings), NULL, NULL);
+				CloseHandle(hFile);
+			}
+			ImGui::EndTabItem();
+		}
 
 		if (ImGui::BeginTabItem("Version")) {
 			ImGui::Text("Yap Version: " __YAP_VERSION__);
