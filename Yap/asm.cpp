@@ -1168,9 +1168,6 @@ bool Asm::Assemble() {
 					LOG(Info_Extended, MODULE_REASSEMBLER, "In section %.8s\n", GetSectionHeader(i)->Name);
 					return false;
 				}
-				AsmSection sec = Sections.At(SecIndex);
-				sec.NewSize += Lines->At(i).Padding.Size;
-				Sections.Replace(SecIndex, sec);
 				continue;
 			}
 

@@ -1,4 +1,5 @@
 #include "gui.hpp"
+#include "font.hpp"
 #include <d3d11.h>
 #include <dxgi.h>
 #include <stdlib.h>
@@ -20,6 +21,7 @@ const int width = 850;
 const int height = 560;
 ImGuiWindow* pWindow = NULL;
 extern Asm* pAssembly;
+ImWchar range[] = { 0x20, 0xFF, 0 };
 
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 DWORD WINAPI WindowThread(void* args);
@@ -29,6 +31,15 @@ void CleanupDeviceD3D();
 bool CreateDeviceD3D(HWND hWnd);
 void EndGUI();
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+void InitGUI() {
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO();
+	io.ConfigFlags = ImGuiConfigFlags_NavEnableKeyboard;
+	io.IniFilename = NULL;
+	ApplyImGuiTheme();
+	io.FontDefault = io.Fonts->AddFontFromMemoryCompressedTTF(font_compressed_data, font_compressed_size, 16.f, NULL, range);
+}
 
 DWORD WINAPI ParsePE(void* args) {
 	Data.bParsing = true;
@@ -245,6 +256,23 @@ void DrawGUI() {
 			IMGUI_TOGGLE("Dump Individual Sections", Options.Debug.bDumpSections);
 			IMGUI_TOGGLE("Disable Mutation", Options.Debug.bDisableMutations);
 			IMGUI_TOGGLE("Disable Relocations", Options.Debug.bDisableRelocations);
+			if (ImGui::TreeNode("Icon Tests")) {
+				/*ImGui::Text("ICON_BARS: " ICON_BARS);
+				ImGui::Text("ICON_DEBUG: " ICON_DEBUG);
+				ImGui::Text("ICON_INFO: " ICON_INFO);
+				ImGui::Text("ICON_REASM: " ICON_REASM);
+				ImGui::Text("ICON_PROTECT: " ICON_PROTECT);
+				ImGui::Text("ICON_SAVE_CONFIG: " ICON_SAVE_CONFIG);
+				ImGui::Text("ICON_OPEN_FILE: " ICON_OPEN_FILE);
+				ImGui::Text("ICON_SETTINGS: " ICON_SETTINGS);
+				ImGui::Text("ICON_DARKMODE: " ICON_DARKMODE);
+				ImGui::Text("ICON_PROTECTION: " ICON_PROTECTION);
+				ImGui::Text("ICON_WARNING: " ICON_WARNING);
+				ImGui::Text("RANDOM: \xEF");*/
+				ImGui::DebugTextEncoding(ICON_BARS ICON_DEBUG ICON_INFO ICON_REASM ICON_PROTECT ICON_SAVE_CONFIG ICON_OPEN_FILE ICON_SETTINGS ICON_DARKMODE ICON_PROTECTION ICON_WARNING);
+				ImGui::TreePop();
+			}
+			ImGui::ShowMetricsWindow();
 			ImGui::EndTabItem();
 		}
 #endif

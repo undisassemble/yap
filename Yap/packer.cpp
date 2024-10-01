@@ -2408,6 +2408,7 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 			delete dupe;
 			return false;
 		}
+		ZeroMemory(&ShellcodeData, sizeof(_ShellcodeData));
 		LOG(Success, MODULE_PACKER, "Packed at depth %i\n", ::Options.Packing.EncodingCounts);
 		Options.bVM = false;
 		Options.sMasqueradeAs = NULL;
@@ -2766,7 +2767,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 	if (!stack.Includes(o0) || Blacklist.Includes(o0.r64()) || Blacklist.Includes(o0) || o0.size() != 8) return;
 	HeldLocks++;
 	const BYTE sz = 26;
-	const BYTE beg_unsafe = 10;
+	const BYTE beg_unsafe = 11;
 	BYTE end = bStrict ? beg_unsafe : sz;
 	Mem peb = ptr(0x60);
 	peb.setSegment(gs);
@@ -2813,6 +2814,10 @@ void ProtectedAssembler::randinst(Gp o0) {
 		break;
 	}
 	case 10:
+		db(0x66, 1 + rand() % 13);
+		db(0x90);
+		break;
+	case 11:
 		desync_mov(o0.r64()); // This is VERY slow for some reason
 		break;
 
