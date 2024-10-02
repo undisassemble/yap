@@ -260,6 +260,7 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 	if (::Options.Packing.bAntiDebug) hidethread = a.newLabel();
 	Label _do = a.newLabel();
 	a.desync();
+	a.desync_mov(rax);
 	Label reloc = a.newLabel();
 	a.cmp(rdx, 1);
 	a.strict();
@@ -306,6 +307,7 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 	a.bind(reloc);
 	a.dq(ShellcodeData.BaseAddress + pPackedBinary->GetBaseAddress() + a.offset());
 	a.bind(_do);
+	a.desync_mov(rdx);
 	if (::Options.Packing.bAntiDebug) a.call(hidethread);
 	a.push(r12);
 	a.push(r13);
@@ -346,7 +348,6 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 	if (::Options.Packing.bDelayedEntry) {
 		a.mov(rax, pPackedBinary->GetBaseAddress() + pPackedBinary->GetSectionHeaders()[0].VirtualAddress);
 		a.add(rax, ptr(reloc));
-		Label after = a.newLabel();
 		if (::Options.Packing.bAntiDebug) {
 			a.cmp(byte_ptr(rax), 0xCC);
 			a.mov(rcx, 0);
@@ -356,40 +357,28 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 			a.mov(rax, rcx);
 			a.cmovz(rax, rsp);
 			a.call(rax);
+			a.mov(byte_ptr(rax), 0x00);
 		}
-		a.bind(after);
+		a.add(rax, 2 * (rand64() % (pPackedBinary->GetSectionHeaders()[0].Misc.VirtualSize / 2)));
 		a.mov(word_ptr(rax), 0xB848);
 		a.add(rax, 2);
-		a.mov(qword_ptr(rax), pPackedBinary->GetBaseAddress() + pPackedBinary->GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint + 1);
-		a.mov(rsi, ptr(reloc));
-		a.add(ptr(rax), rsi);
+		a.mov(rcx, pPackedBinary->GetBaseAddress() + pPackedBinary->GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint + ShellcodeData.EntryOff);
+		a.add(rcx, ptr(reloc));
+		a.mov(qword_ptr(rax), rcx);
 		a.add(rax, 8);
 		a.mov(word_ptr(rax), 0xE0FF);
 	}
-	if (DEBUG_ONLY(!::Options.Debug.bDisableMutations) RELEASE_ONLY(true)) {
-		a.garbage();
-		a.pop(rbp);
-		a.pop(rbx);
-		a.pop(rsi);
-		a.pop(rdi);
-		a.pop(r15);
-		a.pop(r14);
-		a.pop(r13);
-		a.pop(r12);
-		a.mov(rax, 1);
-		a.ret();
-	} else {
-		a.pop(rbp);
-		a.pop(rbx);
-		a.pop(rsi);
-		a.pop(rdi);
-		a.pop(r15);
-		a.pop(r14);
-		a.pop(r13);
-		a.pop(r12);
-		a.mov(rax, 1);
-		a.ret();
-	}
+	a.garbage();
+	a.pop(rbp);
+	a.pop(rbx);
+	a.pop(rsi);
+	a.pop(rdi);
+	a.pop(r15);
+	a.pop(r14);
+	a.pop(r13);
+	a.pop(r12);
+	a.mov(rax, 1);
+	a.ret();
 
 	if (::Options.Packing.bAntiDebug) {
 		Label NTD = a.newLabel();
@@ -469,7 +458,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 			break;
 		}
 	} else {
-		a.db(rand() & 255);
+		for (int i = 0; i < ShellcodeData.EntryOff; i++) a.db(rand() & 255);
 	}
 
 	// Entry point
@@ -621,6 +610,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	}
 	a.desync_mov(rax);
 	a.garbage();
+	a.desync_mov(rdx);
 	
 	// Get base offset
 	Label SkipReloc = a.newLabel();
@@ -2351,7 +2341,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 
 	// Return data
 	holder.flatten();
-	holder.relocateToBase(pPackedBinary->GetNtHeaders()->x64.OptionalHeader.ImageBase + ShellcodeData.BaseAddress);
+	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
 	LOG(Info, MODULE_PACKER, "Internal code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	ShellcodeData.LoadedOffset = holder.labelOffsetFromBase(entrypt) + holder.baseAddress();
 	if (holder.hasRelocEntries()) {
@@ -2380,6 +2370,7 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 	}
 
 	srand(GetTickCount64());
+	ShellcodeData.EntryOff = 0x30 + rand() & 0xCF;
 
 	if (::Options.Packing.EncodingCounts > 1) {
 #ifdef _DEBUG
@@ -2455,7 +2446,7 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 	pNT->OptionalHeader.Magic = 0x20B;
 	pNT->OptionalHeader.SectionAlignment = 0x1000;
 	pNT->OptionalHeader.FileAlignment = 0x200;
-	ShellcodeData.ImageBase = pNT->OptionalHeader.ImageBase = bIsDLL ? 0x10000000 : 0x00400000;
+	ShellcodeData.ImageBase = pNT->OptionalHeader.ImageBase = bIsDLL ? 0x10000000 : 0x140000000;
 	pNT->OptionalHeader.MajorOperatingSystemVersion = 4;
 	pNT->OptionalHeader.MajorSubsystemVersion = 6;
 	pNT->OptionalHeader.SizeOfHeaders = pPackedBinary->GetDosHeader()->e_lfanew + sizeof(IMAGE_NT_HEADERS64) + sizeof(IMAGE_SECTION_HEADER);
@@ -2541,24 +2532,49 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 
 	// TLS callback
 	IMAGE_TLS_DIRECTORY64 TLSDataDir = { 0 };
+	int nTLSEntries = 0;
 	if (ShellcodeData.bUsingTLSCallbacks) {
+		// Gen num of TLS
+		int nFalseEntries = 0;
+		int iTrueEntry = 0;
+		nTLSEntries = 1;
+		if (::Options.Packing.bAntiDebug) {
+			nFalseEntries = 3 + rand() % 5;
+			nTLSEntries = nFalseEntries + 1;
+			iTrueEntry = 1 + rand() % (nTLSEntries - 2);
+		}
+		if (::Options.Packing.bDelayedEntry) {
+			LOG(Warning, MODULE_PACKER, "Anti-Debug and Delayed Entry are both enabled, the real TLS callback will be the first in the index.\n");
+			LOG(Warning, MODULE_PACKER, "This defeats the purpose of broken TLS callbacks, but they will remain in the protected app.\n");
+			LOG(Warning, MODULE_PACKER, "This is just a bandaid fix that can be ignored, I will try to fix this at some point in the future.\n");
+			iTrueEntry = 0;
+		}
+
 		pNT->OptionalHeader.DataDirectory[9].Size = sizeof(IMAGE_TLS_DIRECTORY64);
 		pNT->OptionalHeader.DataDirectory[9].VirtualAddress = SecHeader.VirtualAddress + shell.u64Size;
-		ShellcodeData.BaseAddress = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_TLS_DIRECTORY64) + sizeof(uint64_t) * 2;
+		ShellcodeData.BaseAddress = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_TLS_DIRECTORY64) + sizeof(uint64_t) * (nTLSEntries + 1);
 		Buffer TLSCode = GenerateTLSShellcode(Options, pPackedBinary, pOriginal);
 		if (!TLSCode.u64Size || !TLSCode.pBytes) {
 			LOG(Failed, MODULE_PACKER, "Failed to generate TLS shellcode!\n");
 			return false;
 		}
 		TLSDataDir.AddressOfCallBacks = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_TLS_DIRECTORY64) + pPackedBinary->GetBaseAddress();
-		TLSDataDir.AddressOfIndex = TLSDataDir.StartAddressOfRawData = TLSDataDir.AddressOfCallBacks + sizeof(uint64_t);
-		TLSDataDir.EndAddressOfRawData = TLSDataDir.StartAddressOfRawData + sizeof(uint64_t);
-		shell.u64Size += sizeof(uint64_t) * 2 + sizeof(IMAGE_TLS_DIRECTORY64) + TLSCode.u64Size;
+		TLSDataDir.AddressOfIndex = TLSDataDir.StartAddressOfRawData = TLSDataDir.AddressOfCallBacks + sizeof(uint64_t) * nTLSEntries;
+		TLSDataDir.EndAddressOfRawData = TLSDataDir.StartAddressOfRawData + sizeof(uint64_t) * nTLSEntries;
+		shell.u64Size += sizeof(uint64_t) * (nTLSEntries + 1) + sizeof(IMAGE_TLS_DIRECTORY64) + TLSCode.u64Size;
 		shell.pBytes = reinterpret_cast<BYTE*>(realloc(shell.pBytes, shell.u64Size));
-		memcpy(shell.pBytes + shell.u64Size - (sizeof(uint64_t) * 2 + sizeof(IMAGE_TLS_DIRECTORY64) + TLSCode.u64Size), &TLSDataDir, sizeof(IMAGE_TLS_DIRECTORY64));
+		memcpy(shell.pBytes + shell.u64Size - (sizeof(uint64_t) * (nFalseEntries + 2) + sizeof(IMAGE_TLS_DIRECTORY64) + TLSCode.u64Size), &TLSDataDir, sizeof(IMAGE_TLS_DIRECTORY64));
 		memcpy(shell.pBytes + shell.u64Size - TLSCode.u64Size, TLSCode.pBytes, TLSCode.u64Size);
-		*reinterpret_cast<uint64_t*>(shell.pBytes + shell.u64Size - (sizeof(uint64_t) * 2 + TLSCode.u64Size)) = SecHeader.VirtualAddress + shell.u64Size - TLSCode.u64Size + pPackedBinary->GetBaseAddress();
-		*reinterpret_cast<uint64_t*>(shell.pBytes + shell.u64Size - (sizeof(uint64_t) + TLSCode.u64Size)) = 0;
+		uint64_t* pEntries = reinterpret_cast<uint64_t*>(shell.pBytes + shell.u64Size - (sizeof(uint64_t) * (nTLSEntries + 1) + TLSCode.u64Size));
+		pEntries[1 + nFalseEntries] = 0;
+		for (int i = 0; i < nTLSEntries; i++) {
+			if (i == iTrueEntry) {
+				pEntries[i] = SecHeader.VirtualAddress + shell.u64Size - TLSCode.u64Size + pPackedBinary->GetBaseAddress();
+			} else {
+				pEntries[i] = pPackedBinary->GetBaseAddress() + SecHeader.VirtualAddress + shell.u64Size + resources.u64Size + pOriginal->GetNtHeaders()->x64.OptionalHeader.DataDirectory[0].Size + 0x10000 + rand();
+			}
+		}
+
 		free(TLSCode.pBytes);
 	}
 
@@ -2572,7 +2588,9 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 			Relocations.Push(pNT->OptionalHeader.DataDirectory[9].VirtualAddress + 0x08);
 			Relocations.Push(pNT->OptionalHeader.DataDirectory[9].VirtualAddress + 0x10);
 			Relocations.Push(pNT->OptionalHeader.DataDirectory[9].VirtualAddress + 0x18);
-			Relocations.Push(TLSDataDir.AddressOfCallBacks - pPackedBinary->GetBaseAddress());
+			for (int i = 0; i < nTLSEntries; i++) {
+				Relocations.Push(TLSDataDir.AddressOfCallBacks - pPackedBinary->GetBaseAddress() + sizeof(uint64_t) * i);
+			}
 		}
 		Buffer reloc = GenerateRelocSection(Relocations);
 		pNT->OptionalHeader.DataDirectory[5].Size = reloc.u64Size;
@@ -2767,7 +2785,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 	if (!stack.Includes(o0) || Blacklist.Includes(o0.r64()) || Blacklist.Includes(o0) || o0.size() != 8) return;
 	HeldLocks++;
 	const BYTE sz = 26;
-	const BYTE beg_unsafe = 11;
+	const BYTE beg_unsafe = 12;
 	BYTE end = bStrict ? beg_unsafe : sz;
 	Mem peb = ptr(0x60);
 	peb.setSegment(gs);
@@ -2813,13 +2831,40 @@ void ProtectedAssembler::randinst(Gp o0) {
 		bind(j2);
 		break;
 	}
-	case 10:
-		db(0x66, 1 + rand() % 13);
+	case 10: {
+		bool bNeedsValid = false;
+		BYTE valid[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x64, 0x65, 0x66, 0x67, 0x2E, 0x3E, 0xF2, 0xF3 };
+		for (int i = 0, n = 1 + rand() % 14; i < n; i++) {
+			BYTE selected = valid[rand() % sizeof(valid)];
+			if (selected == 0x41 || selected == 0x43 || selected == 0x45 || selected == 0x47 || selected == 0x49 || selected == 0x4B || selected == 0x4D) {
+				// Try again
+				if (i == 13) { i--; continue; }
+				
+				// Make room for validating prefix
+				if (!bNeedsValid) n--;
+				bNeedsValid = true;
+			}
+			db(selected);
+		}
+		if (bNeedsValid) {
+			BYTE validators[] = { 0x40, 0x42, 0x44, 0x46, 0x48, 0x4A, 0x4C, 0x4E };
+			db(validators[rand() % sizeof(validators)]);
+		}
 		db(0x90);
 		break;
-	case 11:
-		desync_mov(o0.r64()); // This is VERY slow for some reason
+	}
+	case 11: // In IDA these disassemble as the same instruction, but function differently ;)
+		if (o0.r64() == rax.r64()) {
+			block();
+			xchg(eax, eax);
+		} else {
+			db(0x46);
+			db(0x90);
+		}
 		break;
+	//case 11:
+		//desync_mov(o0.r64()); // This is VERY slow for some reason
+		//break;
 
 	// Unsafe instructions
 	/*case 9:
@@ -3075,7 +3120,6 @@ void ProtectedAssembler::desync_jnz() {
 
 void ProtectedAssembler::desync_mov(Gpq o0) {
 	DEBUG_ONLY(if (Options.Debug.bDisableMutations) return);
-	HeldLocks++;
 	uint64_t dist = 3 + rand() % Options.Packing.MutationLevel * 2;
 	push((dist << 16) + 0xE940);
 	Label after = newLabel();
@@ -3083,7 +3127,6 @@ void ProtectedAssembler::desync_mov(Gpq o0) {
 	pop(qword_ptr(o0));
 	bind(after);
 	for (int i = 0; i < dist + 6; i++) db(rand() & 0xFF);
-	HeldLocks--;
 }
 
 Error ProtectedAssembler::call(Gp o0) {
