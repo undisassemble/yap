@@ -1161,9 +1161,10 @@ bool Asm::Assemble() {
 		// Finally, construct the output buffer
 		Buffer Buf = { 0 };
 		IMAGE_SECTION_HEADER* pCurrentSection = NULL;
-		for (size_t i = 0; i < Lines->Size(); i++) {
-			if (Lines->At(i).Type == Padding) {
-				if (i < Lines->Size() - 1) {
+		for (size_t i = 0, n = Lines->Size(); i < n; i++) {
+			line = Lines->At(i);
+			if (line.Type == Padding) {
+				if (i < n - 1) {
 					LOG(Failed, MODULE_REASSEMBLER, "Encountered code beyond the end of the section.\n");
 					LOG(Info_Extended, MODULE_REASSEMBLER, "In section %.8s\n", GetSectionHeader(i)->Name);
 					return false;
@@ -1172,32 +1173,32 @@ bool Asm::Assemble() {
 			}
 
 			// Insert data
-			if (Lines->At(i).Type != RawInsert) {
-				Buf.u64Size += GetLineSize(Lines->At(i));
+			if (line.Type != RawInsert) {
+				Buf.u64Size += GetLineSize(line);
 				Buf.pBytes = reinterpret_cast<BYTE*>(realloc(Buf.pBytes, Buf.u64Size));
 			}
-			switch (Lines->At(i).Type) {
+			switch (line.Type) {
 			case Encoded:
-				memcpy(Buf.pBytes + Buf.u64Size - Lines->At(i).Encoded.Size, Lines->At(i).Encoded.Raw, Lines->At(i).Encoded.Size);
+				memcpy(Buf.pBytes + Buf.u64Size - line.Encoded.Size, line.Encoded.Raw, line.Encoded.Size);
 				break;
 			case Embed:
-				ReadRVA(Lines->At(i).OldRVA, Buf.pBytes + Buf.u64Size - Lines->At(i).Embed.Size, Lines->At(i).Embed.Size);
+				ReadRVA(line.OldRVA, Buf.pBytes + Buf.u64Size - line.Embed.Size, line.Embed.Size);
 				break;
 			case JumpTable:
-				memcpy(Buf.pBytes + Buf.u64Size - sizeof(DWORD), &line.JumpTable.Value, sizeof(DWORD));
+				*reinterpret_cast<DWORD*>(Buf.pBytes + Buf.u64Size - sizeof(DWORD)) = line.JumpTable.Value;
 				break;
 			case RawInsert:
 				Buf.Merge(line.RawInsert);
 				break;
 			case Pointer:
-				if (Lines->At(i).Pointer.IsAbs) {
-					*reinterpret_cast<uint64_t*>(Buf.pBytes + Buf.u64Size - sizeof(uint64_t)) = Lines->At(i).Pointer.Abs;
+				if (line.Pointer.IsAbs) {
+					*reinterpret_cast<QWORD*>(Buf.pBytes + Buf.u64Size - sizeof(QWORD)) = line.Pointer.Abs;
 				} else {
-					*reinterpret_cast<DWORD*>(Buf.pBytes + Buf.u64Size - sizeof(DWORD)) = Lines->At(i).Pointer.RVA;
+					*reinterpret_cast<DWORD*>(Buf.pBytes + Buf.u64Size - sizeof(DWORD)) = line.Pointer.RVA;
 				}
 				break;
 			default:
-				LOG(Warning, MODULE_REASSEMBLER, "No data inserted at %#x!\n", Lines->At(i).NewRVA);
+				LOG(Warning, MODULE_REASSEMBLER, "No data inserted at %#x!\n", line.NewRVA);
 			}
 		}
 
