@@ -180,8 +180,8 @@ Vector<Line> zyasm::pop(_In_ ZydisEncoderOperand o0) {
 Vector<Line> zyasm::mov(_In_ ZydisEncoderOperand o0, _In_ ZydisEncoderOperand o1) {
 	Vector<Line> ret;
 	if (_GetOpSize(o0) != _GetOpSize(o1) || _GetOpSize(o0) == 8 || _GetOpSize(o0) == 32) return ret;
-	if (o0.type == ZYDIS_OPERAND_TYPE_MEMORY && o0.mem.base == ZYDIS_REGISTER_RSP) return ret;
-	if (o1.type == ZYDIS_OPERAND_TYPE_MEMORY && o1.mem.base == ZYDIS_REGISTER_RSP) return ret;
+	if (o0.type == ZYDIS_OPERAND_TYPE_MEMORY && (o0.mem.base == ZYDIS_REGISTER_RSP || o0.mem.base == ZYDIS_REGISTER_RIP)) return ret;
+	if (o1.type == ZYDIS_OPERAND_TYPE_MEMORY && (o1.mem.base == ZYDIS_REGISTER_RSP || o1.mem.base == ZYDIS_REGISTER_RIP)) return ret;
 	ret.Merge(zyasm::push(o1));
 	ret.Merge(zyasm::pop(o0));
 	if (ret.Size() < 2) ret.Release();

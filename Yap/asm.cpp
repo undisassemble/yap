@@ -1029,27 +1029,49 @@ bool Asm::Mutate() {
 	replacement.Type = Decoded;
 
 	for (WORD wSecIndex = 0; wSecIndex < Sections.Size(); wSecIndex++) {
+		Vector<Line> Overwrite;
+		Overwrite.bExponentialGrowth = true;
 		Vector<Line>* Lines = Sections.At(wSecIndex).Lines;
 		Vector<Line> replacement;
 		for (DWORD i = 0; i < Lines->Size(); i++) {
 			if (Lines->At(i).Type != Decoded) continue;
 
+			bool bAppend = true;
+
 			if (Options.Reassembly.bSubstitution) {
+				// Substitute instruction
 				switch (Lines->At(i).Decoded.Instruction.mnemonic) {
 				case ZYDIS_MNEMONIC_MOV:
-					if ((Lines->At(i).Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && Lines->At(i).Decoded.Operands[0].mem.base == ZYDIS_REGISTER_RIP) || (Lines->At(i).Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY && Lines->At(i).Decoded.Operands[1].mem.base == ZYDIS_REGISTER_RIP)) break;
 					replacement = zyasm::mov(zyasm::Op(Lines->At(i).Decoded.Operands[0]), zyasm::Op(Lines->At(i).Decoded.Operands[1]));
-					if (replacement.Size()) {
-						Line first = replacement.At(0);
-						first.OldRVA = Lines->At(i).OldRVA;
-						replacement.Replace(0, first);
-						Lines->Replace(i, replacement);
-						i += replacement.Size() - 1;
-					}
-					replacement.Release();
 					break;
 				}
+				
+				// Replace instruction
+				if (replacement.Size()) {
+					Line first = replacement.At(0);
+					first.OldRVA = Lines->At(i).OldRVA;
+					replacement.Replace(0, first);
+					if (Options.Settings.Opt == PrioMem) {
+						Lines->Replace(i, replacement);
+						i += replacement.Size() - 1;
+					} else {
+						Overwrite.Merge(replacement);
+					}
+					bAppend = false;
+				}
+				replacement.Release();
 			}
+
+			if (Options.Settings.Opt == PrioSpeed && bAppend) {
+				Overwrite.Push(Lines->At(i));
+			}
+		}
+
+		// Replace buffer for PrioSpeed
+		if (Options.Settings.Opt == PrioSpeed) {
+			Lines->Release();
+			Lines->nItems = Overwrite.nItems;
+			Lines->raw = Overwrite.raw;
 		}
 	}
 
@@ -1202,6 +1224,7 @@ bool Asm::Assemble() {
 			}
 		}
 
+		// Dump section data
 #ifdef _DEBUG
 		if (Options.Debug.bDumpSections) {
 			char sname[12] = { 0 };

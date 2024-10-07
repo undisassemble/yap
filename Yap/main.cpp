@@ -130,6 +130,14 @@ DWORD WINAPI Begin(void* args) {
 	hLogFile = CreateFile("Yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	LOG(Info, MODULE_YAP, "Starting Yap\n");
 
+	// Select optimization mode
+	bool bResetOptimizations = false;
+	if (Options.Settings.Opt == PrioAuto) {
+		bResetOptimizations = true;
+		LOG(Info, MODULE_YAP, "Prioritizing speed\n");
+		Options.Settings.Opt = PrioSpeed;
+	}
+
 	// Reassembler
 	if (Options.Reassembly.bEnabled) {
 		LOG(Info, MODULE_YAP, "Starting reassembler\n");
@@ -249,6 +257,7 @@ DWORD WINAPI Begin(void* args) {
 	}
 
 th_exit:
+	if (bResetOptimizations) Options.Settings.Opt = PrioAuto;
 	LOG(Info, MODULE_YAP, "Ending Yap\n");
 	CloseHandle(hLogFile);
 	Data.bRunning = false;

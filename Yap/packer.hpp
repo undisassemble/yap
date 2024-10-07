@@ -53,7 +53,6 @@ struct _ShellcodeData {
 	struct {
 		int iIndex = -1;
 		RequestedFunction CheckForDebuggers;
-		RequestedFunction CheckThreadsAlive;
 		RequestedFunction YAP_NtDelayExecution;
 		RequestedFunction YAP_NtFreeVirtualMemory;
 		RequestedFunction YAP_NtAllocateVirtualMemory;
@@ -76,6 +75,7 @@ struct _ShellcodeData {
 		RequestedFunction YAP_NtTerminateThread;
 		RequestedFunction YAP_NtWriteVirtualMemory;
 		RequestedFunction YAP_NtClose;
+		RequestedFunction YAP_NtCreateThread;
 		RequestedFunction YAP_GetCurrentThread;
 		RequestedFunction YAP_GetCurrentThreadId;
 		RequestedFunction YAP_GetCurrentProcess;

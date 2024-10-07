@@ -954,6 +954,12 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	a.desync();
 	a.mov(rax, pPackedBinary->GetNtHeaders()->x64.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA + pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfImage - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders);
 	a.add(rax, rcx);
+	Label szshell = a.newLabel();
+	if (::Options.Packing.bAntiDump) {
+		a.lea(rcx, ptr(rip));
+		a.sub(rcx, a.offset());
+		a.mov(rdx, ptr(szshell));
+	}
 	DEBUG_ONLY(if (::Options.Debug.bGenerateBreakpoints) a.int3(); a.block());
 	a.call(rax);
 	a.garbage();
@@ -964,6 +970,12 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.bind(pLabels[i]);
 		Buffer buf = Copied.GetSectionBytes(i);
 		for (int j = 0; j < buf.u64Size; j++) a.db(buf.pBytes[j]);
+	}
+	size_t szOffSzShell = 0;
+	if (::Options.Packing.bAntiDump) {
+		a.bind(szshell);
+		szOffSzShell = a.offset();
+		a.dq(0);
 	}
 	a.bind(InternalShell);
 	for (int i = 0; i < CompressedInternal.u64Size; i++) a.db(CompressedInternal.pBytes[i]);
@@ -1242,6 +1254,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	buf.u64Size = holder.textSection()->buffer().size();
 	buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
 	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
+	if (::Options.Packing.bAntiDump) *reinterpret_cast<QWORD*>(buf.pBytes + szOffSzShell) = buf.u64Size;
 	free(pLabels);
 	free(CompressedInternal.pBytes);
 	LOG(Success, MODULE_PACKER, "Generated loader shellcode\n");
@@ -1582,8 +1595,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 						
 						// Get request name
 #define CHECK_IMPORT(_name) else if (!lstrcmpA(name, #_name)) pRequest = &ShellcodeData.RequestedFunctions._name
-						if (!lstrcmpA(name, "CheckForDebuggers")) pRequest = &ShellcodeData.RequestedFunctions.CheckForDebuggers; 
-						CHECK_IMPORT(CheckThreadsAlive);
+						if (!lstrcmpA(name, "CheckForDebuggers")) pRequest = &ShellcodeData.RequestedFunctions.CheckForDebuggers;
 						CHECK_IMPORT(YAP_NtDelayExecution);
 						CHECK_IMPORT(YAP_NtFreeVirtualMemory);
 						CHECK_IMPORT(YAP_NtAllocateVirtualMemory);
@@ -1606,6 +1618,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 						CHECK_IMPORT(YAP_NtTerminateThread);
 						CHECK_IMPORT(YAP_NtWriteVirtualMemory);
 						CHECK_IMPORT(YAP_NtClose);
+						CHECK_IMPORT(YAP_NtCreateThread);
 						CHECK_IMPORT(YAP_GetCurrentThread);
 						CHECK_IMPORT(YAP_GetCurrentThreadId);
 						CHECK_IMPORT(YAP_GetCurrentProcessId);
@@ -1763,7 +1776,6 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	// Load SDK
 #define LOAD_IMPORT(name) if (ShellcodeData.RequestedFunctions.name.bRequested) { a.lea(rax, ptr(ShellcodeData.RequestedFunctions.name.Func)); a.mov(rcx, pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + ShellcodeData.RequestedFunctions.name.dwRVA); a.add(rcx, ptr(InternalRelOff)); a.mov(qword_ptr(rcx), rax); }
 	LOAD_IMPORT(CheckForDebuggers);
-	LOAD_IMPORT(CheckThreadsAlive);
 	LOAD_IMPORT(YAP_NtDelayExecution);
 	LOAD_IMPORT(YAP_NtFreeVirtualMemory);
 	LOAD_IMPORT(YAP_NtAllocateVirtualMemory);
@@ -1786,6 +1798,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	LOAD_IMPORT(YAP_NtTerminateThread);
 	LOAD_IMPORT(YAP_NtWriteVirtualMemory);
 	LOAD_IMPORT(YAP_NtClose);
+	LOAD_IMPORT(YAP_NtCreateThread);
 	LOAD_IMPORT(YAP_GetCurrentThread);
 	LOAD_IMPORT(YAP_GetCurrentThreadId);
 	LOAD_IMPORT(YAP_GetCurrentProcess);
@@ -2247,16 +2260,8 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.ret();
 	}
 
-	// CheckThreadsAlive
-	if (ShellcodeData.RequestedFunctions.CheckThreadsAlive.bRequested) {
-		a.bind(ShellcodeData.RequestedFunctions.CheckThreadsAlive.Func);
-		a.garbage();
-		a.mov(rax, 1);
-		a.ret();
-	}
-
 	// NTDLL thingies
-#define CODE_IMPORT(name) if (ShellcodeData.RequestedFunctions.YAP_##name.bRequested) { Label NTD = a.newLabel(); a.bind(NTD); a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)); Label FNN = a.newLabel(); a.bind(FNN); a.embed(&Sha256Str(#name), sizeof(Sha256Digest)); Label RTA = a.newLabel(); a.bind(RTA); a.dq(rand64()); Label NotFound = a.newLabel(); a.bind(ShellcodeData.RequestedFunctions.YAP_##name.Func); a.pop(qword_ptr(RTA)); a.push(rcx); a.push(rdx); a.push(r8); a.push(r9); a.lea(rcx, ptr(NTD)); a.call(ShellcodeData.Labels.GetModuleHandleW); a.mov(rcx, rax); a.lea(rdx, ptr(FNN)); a.call(ShellcodeData.Labels.GetProcAddressA); a.test(rax, rax); a.strict(); a.jz(NotFound); a.pop(r9); a.pop(r8); a.pop(rdx); a.mov(ecx, ptr(rax)); a.cmp(ecx, 0xB8D18B4C); a.strict(); a.jne(0); a.mov(eax, ptr(rax, 4)); a.pop(r10); a.syscall(); a.jmp(qword_ptr(RTA)); a.bind(NotFound); a.mov(rax, 0xC0000225); a.jmp(qword_ptr(RTA)); }
+#define CODE_IMPORT(name) if (ShellcodeData.RequestedFunctions.YAP_##name.bRequested) { Label next = a.newLabel(); Label NTD = a.newLabel(); a.bind(NTD); a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)); Label FNN = a.newLabel(); a.bind(FNN); a.embed(&Sha256Str(#name), sizeof(Sha256Digest)); Label RTA = a.newLabel(); a.bind(RTA); a.dq(rand64()); Label NotFound = a.newLabel(); a.bind(ShellcodeData.RequestedFunctions.YAP_##name.Func); a.pop(qword_ptr(RTA)); a.push(rcx); a.push(rdx); a.push(r8); a.push(r9); a.lea(rcx, ptr(NTD)); a.call(ShellcodeData.Labels.GetModuleHandleW); a.mov(rcx, rax); a.lea(rdx, ptr(FNN)); a.call(ShellcodeData.Labels.GetProcAddressA); a.test(rax, rax); a.strict(); a.jz(NotFound); a.pop(r9); a.pop(r8); a.pop(rdx); a.mov(ecx, ptr(rax)); a.mov(r11, 0); a.cmp(ecx, 0xB8D18B4C); a.strict(); a.lea(rcx, ptr(next)); a.strict(); a.cmovne(rcx, r11); a.jmp(rcx); a.bind(next); a.mov(eax, ptr(rax, 4)); a.pop(r10); a.syscall(); a.jmp(qword_ptr(RTA)); a.bind(NotFound); a.mov(rax, 0xC0000225); a.jmp(qword_ptr(RTA)); }
 	CODE_IMPORT(NtDelayExecution);
 	CODE_IMPORT(NtFreeVirtualMemory);
 	CODE_IMPORT(NtAllocateVirtualMemory);
@@ -2279,6 +2284,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	CODE_IMPORT(NtTerminateThread);
 	CODE_IMPORT(NtWriteVirtualMemory);
 	CODE_IMPORT(NtClose);
+	CODE_IMPORT(NtCreateThread);
 #undef CODE_IMPORT
 
 	// YAP_GetCurrentThread

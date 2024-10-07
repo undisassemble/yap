@@ -10,7 +10,6 @@ BOOL WINAPI DllMain(_In_ HINSTANCE hInstDll, _In_ DWORD dwReason, _In_ LPVOID pR
 #define YAP_EXPORT(type) extern "C" __declspec(dllexport) type __stdcall
 
 YAP_EXPORT(bool) CheckForDebuggers() { return false; }
-YAP_EXPORT(bool) CheckThreadsAlive() { return true; }
 YAP_EXPORT(LONG) YAP_NtDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval) { return STATUS_NOT_IMPLEMENTED; }
 YAP_EXPORT(LONG) YAP_NtFreeVirtualMemory(HANDLE ProcessHandle, PVOID* BaseAddress, PSIZE_T RegionSize, ULONG FreeType) { return STATUS_NOT_IMPLEMENTED; }
 YAP_EXPORT(LONG) YAP_NtAllocateVirtualMemory(HANDLE ProcessHandle, PVOID* BaseAddress, ULONG_PTR ZeroBits, PSIZE_T RegionSize, ULONG AllocationType, ULONG Protect) { return STATUS_NOT_IMPLEMENTED; }
@@ -33,6 +32,7 @@ YAP_EXPORT(LONG) YAP_NtTerminateProcess(HANDLE ProcessHandle, LONG ExitStatus) {
 YAP_EXPORT(LONG) YAP_NtTerminateThread(HANDLE ThreadHandle, LONG ExitStatus) { return STATUS_NOT_IMPLEMENTED; }
 YAP_EXPORT(LONG) YAP_NtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, SIZE_T BufferSize, PSIZE_T NumberOfBytesWritten) { return STATUS_NOT_IMPLEMENTED; }
 YAP_EXPORT(LONG) YAP_NtClose(HANDLE Handle) { return STATUS_NOT_IMPLEMENTED; }
+YAP_EXPORT(LONG) YAP_NtCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, void* ObjectAttributes, HANDLE ProcessHandle, void* ClientId, PCONTEXT ThreadContext, void* InitialTeb, BOOLEAN CreateSuspended) { return STATUS_NOT_IMPLEMENTED; }
 YAP_EXPORT(HANDLE) YAP_GetCurrentThread() { return NULL; }
 YAP_EXPORT(DWORD) YAP_GetCurrentThreadId() { return 0; }
 YAP_EXPORT(HANDLE) YAP_GetCurrentProcess() { return NULL; }

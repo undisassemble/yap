@@ -27,16 +27,11 @@ extern "C" {
 #endif
 
 /// <summary>
-/// Manually check for attached debuggers
+/// Manually check for attached debuggers.
+/// It is highly recommended that you use this in your main thread, as no protective threads are spawned by the packer.
 /// </summary>
 /// <returns>true if debugger is found, false otherwise</returns>
 YAP_IMPORT(bool) CheckForDebuggers();
-
-/// <summary>
-/// Check to ensure protection threads are running
-/// </summary>
-/// <returns>true if still running or disabled when packed, false if threads died/were killed</returns>
-YAP_IMPORT(bool) CheckThreadsAlive();
 
 // These all return STATUS_NOT_IMPLEMENTED if not packed and STATUS_NOT_FOUND if the function cannot be found
 // If the NTDLL function is hooked, it will terminate the process
@@ -64,6 +59,7 @@ YAP_IMPORT(LONG) YAP_NtSuspendThread(HANDLE ThreadHandle, PULONG PreviousSuspend
 YAP_IMPORT(LONG) YAP_NtTerminateProcess(HANDLE ProcessHandle, LONG ExitStatus);
 YAP_IMPORT(LONG) YAP_NtTerminateThread(HANDLE ThreadHandle, LONG ExitStatus);
 YAP_IMPORT(LONG) YAP_NtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, SIZE_T BufferSize, PSIZE_T NumberOfBytesWritten);
+YAP_IMPORT(LONG) YAP_NtCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, void* ObjectAttributes, HANDLE ProcessHandle, void* ClientId, PCONTEXT ThreadContext, void* InitialTeb, BOOLEAN CreateSuspended);
 YAP_IMPORT(LONG) YAP_NtClose(HANDLE Handle);
 YAP_IMPORT(HANDLE) YAP_GetCurrentThread();
 YAP_IMPORT(DWORD) YAP_GetCurrentThreadId();
