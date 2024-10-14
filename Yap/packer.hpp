@@ -53,6 +53,7 @@ struct _ShellcodeData {
 	struct {
 		int iIndex = -1;
 		RequestedFunction CheckForDebuggers;
+		RequestedFunction GetSelf;
 		RequestedFunction YAP_NtDelayExecution;
 		RequestedFunction YAP_NtFreeVirtualMemory;
 		RequestedFunction YAP_NtAllocateVirtualMemory;

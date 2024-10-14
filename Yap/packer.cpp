@@ -452,9 +452,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		case ExeStealth:
 			a.db(0xEB);
 			a.db(sizeof("ExeStealth V2 Shareware "));
-			for (int i = 0; i < sizeof("ExeStealth V2 Shareware "); i++) {
-				a.db("ExeStealth V2 Shareware "[i]);
-			}
+			a.embed("ExeStealth V2 Shareware ", sizeof("ExeStealth V2 Shareware "));
 			break;
 		}
 	} else {
@@ -870,6 +868,8 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.embed(&Sha256Str("VirtualProtect"), sizeof(Sha256Digest));
 		
 		a.bind(skip);
+		a.mov(rax, PEB);
+		a.mov(qword_ptr(rax, 0x10), 0);
 		a.lea(rcx, ptr(KRN));
 		a.call(ShellcodeData.Labels.GetModuleHandleW);
 		a.test(rax, rax);
@@ -883,27 +883,20 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.jz(ret);
 		a.mov(rcx, pPackedBinary->GetBaseAddress());
 		a.add(rcx, ptr(Reloc));
-		a.mov(r10d, ptr(rcx, offsetof(IMAGE_DOS_HEADER, e_lfanew)));
-		a.add(r10, rcx);
-		a.mov(edx, ptr(r10, offsetof(IMAGE_NT_HEADERS64, OptionalHeader.SizeOfHeaders)));
+		a.mov(edx, ptr(rcx, offsetof(IMAGE_DOS_HEADER, e_lfanew)));
+		a.add(rdx, rcx);
+		a.mov(edx, ptr(rdx, offsetof(IMAGE_NT_HEADERS64, OptionalHeader.SizeOfHeaders)));
+		a.push(rdx);
+		a.push(rcx);
 		a.mov(r8, 0x40);
 		a.lea(r9, ptr(KRN));
 		a.mov(rsi, rax);
+		a.sub(rsp, 0x18);
 		a.call(rax);
-		a.mov(rcx, pPackedBinary->GetBaseAddress());
-		a.add(rcx, ptr(Reloc));
-		a.mov(r10d, ptr(rcx, offsetof(IMAGE_DOS_HEADER, e_lfanew)));
-		a.add(r10, rcx);
-		a.movzx(eax, word_ptr(r10, offsetof(IMAGE_NT_HEADERS64, FileHeader.NumberOfSections)));
-		a.mov(rcx, sizeof(IMAGE_SECTION_HEADER));
-		a.mul(rcx);
-		a.mov(rdx, rax);
-		a.lea(rcx, ptr(r10, sizeof(IMAGE_NT_HEADERS64)));
+		a.add(rsp, 0x18);
+		a.pop(rcx);
+		a.pop(rdx);
 		a.call(ShellcodeData.Labels.RtlZeroMemory);
-		a.mov(word_ptr(r10, offsetof(IMAGE_NT_HEADERS64, FileHeader.NumberOfSections)), 0);
-		a.sub(dword_ptr(r10, offsetof(IMAGE_NT_HEADERS64, OptionalHeader.SizeOfHeaders)), eax);
-		a.mov(ecx, dword_ptr(r10, offsetof(IMAGE_NT_HEADERS64, OptionalHeader.SizeOfHeaders)));
-		a.mov(dword_ptr(r10, offsetof(IMAGE_NT_HEADERS64, OptionalHeader.SizeOfImage)), ecx);
 	}
 
 	// Load each section
@@ -920,6 +913,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		Copied.OverwriteSection(i, compressed.pBytes, compressed.u64Size);
 		
 		// Decompress data
+		
 		pLabels[i] = a.newLabel();
 		a.lea(rcx, ptr(pLabels[i]));
 		a.mov(rdx, compressed.u64Size);
@@ -1306,6 +1300,10 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	a.embed(&_digest, sizeof(_digest));
 	a.bind(skiphash);
 
+	if (::Options.Packing.bAntiDump) {
+		a.call(ShellcodeData.Labels.RtlZeroMemory);
+	}
+
 	// Critical marking
 	if (::Options.Packing.bMarkCritical) {
 		Label data = a.newLabel();
@@ -1596,6 +1594,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 						// Get request name
 #define CHECK_IMPORT(_name) else if (!lstrcmpA(name, #_name)) pRequest = &ShellcodeData.RequestedFunctions._name
 						if (!lstrcmpA(name, "CheckForDebuggers")) pRequest = &ShellcodeData.RequestedFunctions.CheckForDebuggers;
+						CHECK_IMPORT(GetSelf);
 						CHECK_IMPORT(YAP_NtDelayExecution);
 						CHECK_IMPORT(YAP_NtFreeVirtualMemory);
 						CHECK_IMPORT(YAP_NtAllocateVirtualMemory);
@@ -1776,6 +1775,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	// Load SDK
 #define LOAD_IMPORT(name) if (ShellcodeData.RequestedFunctions.name.bRequested) { a.lea(rax, ptr(ShellcodeData.RequestedFunctions.name.Func)); a.mov(rcx, pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + ShellcodeData.RequestedFunctions.name.dwRVA); a.add(rcx, ptr(InternalRelOff)); a.mov(qword_ptr(rcx), rax); }
 	LOAD_IMPORT(CheckForDebuggers);
+	LOAD_IMPORT(GetSelf);
 	LOAD_IMPORT(YAP_NtDelayExecution);
 	LOAD_IMPORT(YAP_NtFreeVirtualMemory);
 	LOAD_IMPORT(YAP_NtAllocateVirtualMemory);
@@ -1845,6 +1845,14 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		}
 		a.call(rax);
 		a.garbage();
+		a.ret();
+	}
+
+	// GetSelf
+	if (ShellcodeData.RequestedFunctions.GetSelf.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.GetSelf.Func);
+		a.mov(rax, pPackedBinary->GetBaseAddress());
+		a.add(rax, ptr(InternalRelOff));
 		a.ret();
 	}
 

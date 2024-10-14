@@ -33,11 +33,16 @@ extern "C" {
 /// <returns>true if debugger is found, false otherwise</returns>
 YAP_IMPORT(bool) CheckForDebuggers();
 
+/// <summary>
+/// If using anti-dump, GetModuleHandle(NULL) will return NULL, use this instead.
+/// </summary>
+/// <returns>Program base address</returns>
+YAP_IMPORT(HMODULE) GetSelf();
+
 // These all return STATUS_NOT_IMPLEMENTED if not packed and STATUS_NOT_FOUND if the function cannot be found
 // If the NTDLL function is hooked, it will terminate the process
 #ifdef YAP_EDR
 #define STATUS_NOT_IMPLEMENTED 0xC0000002
-
 YAP_IMPORT(LONG) YAP_NtDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval);
 YAP_IMPORT(LONG) YAP_NtFreeVirtualMemory(HANDLE ProcessHandle, PVOID* BaseAddress, PSIZE_T RegionSize, ULONG FreeType);
 YAP_IMPORT(LONG) YAP_NtAllocateVirtualMemory(HANDLE ProcessHandle, PVOID* BaseAddress, ULONG_PTR ZeroBits, PSIZE_T RegionSize, ULONG AllocationType, ULONG Protect);
@@ -67,6 +72,7 @@ YAP_IMPORT(HANDLE) YAP_GetCurrentProcess();
 YAP_IMPORT(DWORD) YAP_GetCurrentProcessId();
 #endif
 
+YAP_IMPORT(BYTE) ExtractSyscallID(void* pFunc);
 #ifdef __cplusplus
 }
 #endif
