@@ -2414,6 +2414,7 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 			return false;
 		}
 		ZeroMemory(&ShellcodeData, sizeof(_ShellcodeData));
+		ShellcodeData.RequestedFunctions.iIndex = -1;
 		LOG(Success, MODULE_PACKER, "Packed at depth %i\n", ::Options.Packing.EncodingCounts);
 		Options.bVM = false;
 		Options.sMasqueradeAs = NULL;

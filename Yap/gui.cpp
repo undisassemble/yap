@@ -126,8 +126,8 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("How compressed the binary should be.");
 			ImGui::SliderInt("Mutation Level", &Options.Packing.MutationLevel, 1, 15);
 			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
-			IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT);
-			ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT.");
+			DEBUG_ONLY(IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT));
+			DEBUG_ONLY(ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT."));
 			IMGUI_TOGGLE("Generate False Info", Options.Packing.bFalseSymbols);
 			ImGui::SetItemTooltip("Creates fake data directories and tables (doesn\'t affect size)");
 			IMGUI_TOGGLE("Delayed Entry Point", Options.Packing.bDelayedEntry);
