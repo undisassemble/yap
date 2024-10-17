@@ -64,15 +64,6 @@ Buffer PackSection(_In_ Buffer SectionData, _In_ PackerOptions Options) {
 	data.u64Size = SectionData.u64Size;
 	data.pBytes = reinterpret_cast<BYTE*>(malloc(data.u64Size));
 
-	// Encode
-	//BYTE key = SectionData.u64Size & 0xFF;
-	//for (size_t i = 0; i < SectionData.u64Size; i++) {
-		//key++;
-		//SectionData.pBytes[i] ^= key;
-		//key -= SectionData.pBytes[i];
-		//key = ~key;
-	//}
-
 	// props
 	CLzmaEncProps props = { 0 };
 	props.level = ::Options.Packing.CompressionLevel;
@@ -121,7 +112,7 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	pA->dq(0);
 	Label propData = pA->newLabel();
 	pA->bind(propData);
-	for (int i = 0; i < sizeof(ShellcodeData.UnpackData.EncodedProp); i++) pA->db(ShellcodeData.UnpackData.EncodedProp[i]);
+	pA->embed(ShellcodeData.UnpackData.EncodedProp, sizeof(ShellcodeData.UnpackData.EncodedProp));
 	Label alloc = pA->newLabel();
 	pA->bind(alloc);
 	pA->dq(rand64());
@@ -214,19 +205,6 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	pA->call(LzmaDecode);
 	pA->pop(r9);
 	pA->pop(r8);
-
-	// Unencode
-	//pA->mov(cl, r9b);
-	//Label _do = pA->newLabel();
-	//pA->bind(_do);
-	//pA->inc(cl);
-	//pA->xor_(byte_ptr(r8), cl);
-	//pA->sub(cl, byte_ptr(r8));
-	//pA->not_(cl);
-	//pA->inc(r8);
-	//pA->dec(r9);
-	//pA->strict();
-	//pA->jnz(_do);
 	pA->ret();
 	
 	// LzmaDecode
@@ -396,15 +374,22 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
 		a.mov(rdx, 17);
 		a.mov(r8, 0);
-		a.mov(r9, 0);
 		if (::Options.Packing.bDirectSyscalls) {
+			Label thingy = a.newLabel();
+			a.lea(r9, ptr(thingy));
 			a.mov(ecx, ptr(rax));
 			a.cmp(ecx, 0xB8D18B4C);
 			a.strict();
-			a.jnz(0);
+			a.mov(rcx, 0);
+			a.strict();
+			a.cmovnz(r9, rcx);
+			a.jmp(r9);
+			a.bind(thingy);
 			a.mov(eax, ptr(rax, 4));
+			a.mov(r9, 0);
 			a.syscall();
 		} else {
+			a.mov(r9, 0);
 			a.call(rax);
 		}
 		a.ret();
@@ -442,9 +427,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	Label Sha256_Init = a.newLabel();
 	Label Sha256_Update = a.newLabel();
 	Label Sha256_Final = a.newLabel();
-	Label OnDebuggerDetected, OnVMDetected, Message;
-	if (!::Options.Messages.bDebugger) OnDebuggerDetected = ret;
-	if (!::Options.Messages.bVM) OnVMDetected = ret;
 
 	// Entry point sigs
 	if (!::Options.Packing.bDelayedEntry) {
@@ -469,119 +451,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	}
 
 	// Data
-	if ((::Options.Messages.bDebugger && ::Options.Packing.bAntiDebug) || (::Options.Messages.bVM && ::Options.Packing.bAntiVM)) {
-		Label KRN = a.newLabel();
-		a.bind(KRN);
-		a.embed(&Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest));
-		Label LLA = a.newLabel();
-		a.bind(LLA);
-		a.embed(&Sha256Str("LoadLibraryA"), sizeof(Sha256Digest));
-		Label MBA = a.newLabel();
-		a.bind(MBA);
-		a.embed(&Sha256Str("MessageBoxA"), sizeof(Sha256Digest));
-		Label USR = a.newLabel();
-		a.bind(USR);
-		a.embed("USER32.dll", 11);
-
-		Message = a.newLabel();
-		a.bind(Message);
-		a.mov(rsi, rsp);
-		a.push(rcx);
-		a.push(rdx);
-		a.push(r8);
-		a.push(r9);
-		a.lea(rcx, ptr(KRN));
-		a.call(ShellcodeData.Labels.GetModuleHandleW);
-		a.mov(rcx, rax);
-		a.lea(rdx, ptr(LLA));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
-		a.test(rax, rax);
-		a.strict();
-		a.cmovz(rsp, rsi);
-		a.strict();
-		a.jz(ret);
-		a.lea(rcx, ptr(USR));
-		a.call(rax);
-		a.test(rax, rax);
-		a.strict();
-		a.cmovz(rsp, rsi);
-		a.strict();
-		a.jz(ret);
-		a.mov(rcx, rax);
-		a.lea(rdx, ptr(MBA));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
-		a.test(rax, rax);
-		a.strict();
-		a.cmovz(rsp, rsi);
-		a.strict();
-		a.jz(ret);
-		a.pop(r9);
-		a.pop(r8);
-		a.pop(rdx);
-		a.pop(rcx);
-		a.call(rax);
-		a.jmp(ret);
-	}
-	if (::Options.Messages.bDebugger && ::Options.Packing.bAntiDebug) {
-		Label mtext = a.newLabel();
-		a.bind(mtext);
-		a.embed(::Options.Messages.DebuggerText, lstrlenA(::Options.Messages.DebuggerText) + 1);
-		Label mtitle = a.newLabel();
-		a.bind(mtitle);
-		a.embed(::Options.Messages.DebuggerTitle, lstrlenA(::Options.Messages.DebuggerTitle) + 1);
-		
-		OnDebuggerDetected = a.newLabel();
-		a.bind(OnDebuggerDetected);
-		a.mov(rcx, 0);
-		a.lea(rdx, ptr(mtext));
-		a.lea(r8, ptr(mtitle));
-		a.mov(r9, MB_OK);
-		switch (::Options.Messages.iDebugger) {
-		case 2:
-			a.or_(r9, MB_ICONWARNING);
-		case 0:
-			break;
-		case 3:
-			a.or_(r9, MB_ICONINFORMATION);
-			break;
-		case 4:
-			a.or_(r9, MB_ICONQUESTION);
-			break;
-		default:
-			a.or_(r9, MB_ICONERROR);
-		}
-		a.jmp(Message);
-	}
-	if (::Options.Messages.bVM && ::Options.Packing.bAntiVM) {
-		Label mtext = a.newLabel();
-		a.bind(mtext);
-		a.embed(::Options.Messages.VMText, lstrlenA(::Options.Messages.VMText) + 1);
-		Label mtitle = a.newLabel();
-		a.bind(mtitle);
-		a.embed(::Options.Messages.VMTitle, lstrlenA(::Options.Messages.VMTitle) + 1);
-
-		OnVMDetected = a.newLabel();
-		a.bind(OnVMDetected);
-		a.mov(rcx, 0);
-		a.lea(rdx, ptr(mtext));
-		a.lea(r8, ptr(mtitle));
-		a.mov(r9, MB_OK);
-		switch (::Options.Messages.iVM) {
-		case 2:
-			a.or_(r9, MB_ICONWARNING);
-		case 0:
-			break;
-		case 3:
-			a.or_(r9, MB_ICONINFORMATION);
-			break;
-		case 4:
-			a.or_(r9, MB_ICONQUESTION);
-			break;
-		default:
-			a.or_(r9, MB_ICONERROR);
-		}
-		a.jmp(Message);
-	}
 	if (Options.Message) {
 		a.bind(message);
 		a.embed(Options.Message, lstrlenA(Options.Message) + 1);
@@ -721,7 +590,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 			a.mov(ecx, ptr(rax));
 			a.cmp(ecx, 0xB8D18B4C);
 			a.strict();
-			a.jnz(OnDebuggerDetected);
+			a.jnz(ret);
 			a.mov(eax, ptr(rax, 4));
 			a.syscall();
 		} else {
@@ -730,21 +599,21 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.mov(rdx, rsi);
 		a.test(rax, rax);
 		a.strict();
-		a.jnz(OnDebuggerDetected);
+		a.jnz(ret);
 		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr7)));
 		a.and_(rax, 0x20FF);
 		a.strict();
-		a.jnz(OnDebuggerDetected);
+		a.jnz(ret);
 		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr6)));
 		a.and_(rax, 0x18F);
 		a.strict();
-		a.jnz(OnDebuggerDetected);
+		a.jnz(ret);
 		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr0)));
 		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr1)));
 		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr2)));
 		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr3)));
 		a.strict();
-		a.jnz(OnDebuggerDetected);
+		a.jnz(ret);
 	}
 
 	// VM detection (TODO)
@@ -754,7 +623,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.bt(ecx, 31);
 		a.strict();
 		if (!::Options.Packing.bAllowHyperV) {
-			a.jc(OnVMDetected);
+			a.jc(ret);
 		} else {
 			Label nohv = a.newLabel();
 			a.jnc(nohv);
@@ -762,13 +631,13 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 			a.cpuid();
 			a.cmp(ebx, 0x7263694D);
 			a.strict();
-			a.jne(OnVMDetected);
+			a.jne(ret);
 			a.cmp(ecx, 0x666F736F);
 			a.strict();
-			a.jne(OnVMDetected);
+			a.jne(ret);
 			a.cmp(edx, 0x76482074);
 			a.strict();
-			a.jne(OnVMDetected);
+			a.jne(ret);
 			a.bind(nohv);
 		}
 	}
@@ -1283,6 +1152,9 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 
 	Label entrypt = a.newLabel();
 	a.bind(entrypt);
+	if (::Options.Packing.bAntiDump) {
+		a.call(ShellcodeData.Labels.RtlZeroMemory);
+	}
 	a.garbage();
 
 	// Hashing data
@@ -1299,10 +1171,6 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	a.bind(digest);
 	a.embed(&_digest, sizeof(_digest));
 	a.bind(skiphash);
-
-	if (::Options.Packing.bAntiDump) {
-		a.call(ShellcodeData.Labels.RtlZeroMemory);
-	}
 
 	// Critical marking
 	if (::Options.Packing.bMarkCritical) {
@@ -2551,18 +2419,10 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 	if (ShellcodeData.bUsingTLSCallbacks) {
 		// Gen num of TLS
 		int nFalseEntries = 0;
-		int iTrueEntry = 0;
 		nTLSEntries = 1;
 		if (::Options.Packing.bAntiDebug) {
 			nFalseEntries = 3 + rand() % 5;
 			nTLSEntries = nFalseEntries + 1;
-			iTrueEntry = 1 + rand() % (nTLSEntries - 2);
-		}
-		if (::Options.Packing.bDelayedEntry) {
-			LOG(Warning, MODULE_PACKER, "Anti-Debug and Delayed Entry are both enabled, the real TLS callback will be the first in the index.\n");
-			LOG(Warning, MODULE_PACKER, "This defeats the purpose of broken TLS callbacks, but they will remain in the protected app.\n");
-			LOG(Warning, MODULE_PACKER, "This is just a bandaid fix that can be ignored, I will try to fix this at some point in the future.\n");
-			iTrueEntry = 0;
 		}
 
 		pNT->OptionalHeader.DataDirectory[9].Size = sizeof(IMAGE_TLS_DIRECTORY64);
@@ -2582,12 +2442,9 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 		memcpy(shell.pBytes + shell.u64Size - TLSCode.u64Size, TLSCode.pBytes, TLSCode.u64Size);
 		uint64_t* pEntries = reinterpret_cast<uint64_t*>(shell.pBytes + shell.u64Size - (sizeof(uint64_t) * (nTLSEntries + 1) + TLSCode.u64Size));
 		pEntries[1 + nFalseEntries] = 0;
-		for (int i = 0; i < nTLSEntries; i++) {
-			if (i == iTrueEntry) {
-				pEntries[i] = SecHeader.VirtualAddress + shell.u64Size - TLSCode.u64Size + pPackedBinary->GetBaseAddress();
-			} else {
-				pEntries[i] = pPackedBinary->GetBaseAddress() + SecHeader.VirtualAddress + shell.u64Size + resources.u64Size + pOriginal->GetNtHeaders()->x64.OptionalHeader.DataDirectory[0].Size + 0x10000 + rand();
-			}
+		pEntries[0] = SecHeader.VirtualAddress + shell.u64Size - TLSCode.u64Size + pPackedBinary->GetBaseAddress();
+		for (int i = 1; i < nTLSEntries; i++) {
+			pEntries[i] = pPackedBinary->GetBaseAddress() + SecHeader.VirtualAddress + shell.u64Size + resources.u64Size + pOriginal->GetNtHeaders()->x64.OptionalHeader.DataDirectory[0].Size + 0x10000 + rand();
 		}
 
 		free(TLSCode.pBytes);
