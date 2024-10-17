@@ -71,8 +71,6 @@ YAP_IMPORT(DWORD) YAP_GetCurrentThreadId();
 YAP_IMPORT(HANDLE) YAP_GetCurrentProcess();
 YAP_IMPORT(DWORD) YAP_GetCurrentProcessId();
 #endif
-
-YAP_IMPORT(BYTE) ExtractSyscallID(void* pFunc);
 #ifdef __cplusplus
 }
 #endif

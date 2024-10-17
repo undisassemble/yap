@@ -38,4 +38,3 @@ YAP_EXPORT(HANDLE) YAP_GetCurrentThread() { return NULL; }
 YAP_EXPORT(DWORD) YAP_GetCurrentThreadId() { return 0; }
 YAP_EXPORT(HANDLE) YAP_GetCurrentProcess() { return NULL; }
 YAP_EXPORT(DWORD) YAP_GetCurrentProcessId() { return 0; }
-YAP_EXPORT(BYTE) ExtractSyscallID(void* pFunc) { return NULL; }
