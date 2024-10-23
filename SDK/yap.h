@@ -70,6 +70,7 @@ YAP_IMPORT(HANDLE) YAP_GetCurrentThread();
 YAP_IMPORT(DWORD) YAP_GetCurrentThreadId();
 YAP_IMPORT(HANDLE) YAP_GetCurrentProcess();
 YAP_IMPORT(DWORD) YAP_GetCurrentProcessId();
+YAP_IMPORT(ULONGLONG) YAP_GetTickCount64();
 #endif
 #ifdef __cplusplus
 }

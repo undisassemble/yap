@@ -81,6 +81,7 @@ struct _ShellcodeData {
 		RequestedFunction YAP_GetCurrentThreadId;
 		RequestedFunction YAP_GetCurrentProcess;
 		RequestedFunction YAP_GetCurrentProcessId;
+		RequestedFunction YAP_GetTickCount64;
 	} RequestedFunctions;
 };
 

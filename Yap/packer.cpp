@@ -2,6 +2,24 @@
 #include "lzma/Aes.h"
 #include "lzma/Sha256.h"
 
+enum DecoderInstMnemonic : BYTE {
+	DI_XOR,
+	DI_NOT,
+	DI_NEG,
+	//DI_ROR,
+	//DI_ROL,
+	DI_ADD,
+	DI_SUB,
+	DI_START
+};
+
+struct DecoderInst {
+	DecoderInstMnemonic Mnemonic : 3;
+	BYTE value;
+};
+
+Vector<DecoderInst> DecoderProc;
+Vector<uint64_t> TLSCallbacks;
 _ShellcodeData ShellcodeData;
 
 // Commonly seen section names
@@ -18,8 +36,6 @@ char ValidSectionNames[] =
 	".bss\0\0\0\0"
 	".rdata\0\0"
 	".xdata\0";
-
-Vector<uint64_t> TLSCallbacks;
 
 // Handle AsmJit errors
 class AsmJitErrorHandler : public ErrorHandler {
@@ -64,7 +80,20 @@ Buffer PackSection(_In_ Buffer SectionData, _In_ PackerOptions Options) {
 	data.u64Size = SectionData.u64Size;
 	data.pBytes = reinterpret_cast<BYTE*>(malloc(data.u64Size));
 
-	// props
+	// Gen algorithm
+	if (!DecoderProc.Size()) {
+		DecoderInst inst;
+		inst.Mnemonic = DI_START;
+		inst.value = rand() & 0xFF;
+		DecoderProc.Push(inst);
+		for (int i = 0, n = 10 + (rand() & 15); i < n; i++) {
+			inst.Mnemonic = (DecoderInstMnemonic)(rand() % DI_SUB);
+			inst.value = rand() & 0xFF;
+			DecoderProc.Push(inst);
+		}
+	}
+
+	// Compress
 	CLzmaEncProps props = { 0 };
 	props.level = ::Options.Packing.CompressionLevel;
 	props.numThreads = 1;
@@ -76,7 +105,6 @@ Buffer PackSection(_In_ Buffer SectionData, _In_ PackerOptions Options) {
 	props.btMode = 1;
 	props.numHashBytes = 4;
 	props.mc = 1 + 0x1C71C71C71C7 * ::Options.Packing.CompressionLevel;
-		
 	ICompressProgress progress = { 0 };
 	progress.Progress = PackingProgress;
 	ISzAlloc alloc = { 0 };
@@ -85,6 +113,34 @@ Buffer PackSection(_In_ Buffer SectionData, _In_ PackerOptions Options) {
 	size_t propssz = LZMA_PROPS_SIZE;
 	LzmaEncode(data.pBytes, &data.u64Size, SectionData.pBytes, SectionData.u64Size, &props, ShellcodeData.UnpackData.EncodedProp, &propssz, 0, &progress, &alloc, &alloc);
 	data.pBytes = reinterpret_cast<BYTE*>(realloc(data.pBytes, data.u64Size));
+
+	// Encode (inverse cause yeah)
+	BYTE key = DecoderProc.At(0).value;
+	BYTE nextkey = 0;
+	for (int i = 0; i < data.u64Size; i++) {
+		nextkey = key + data.pBytes[i];
+		nextkey ^= data.pBytes[i];
+		for (int j = DecoderProc.Size() - 1; j > 0; j--) {
+			switch (DecoderProc.At(j).Mnemonic) {
+			case DI_XOR:
+				data.pBytes[i] ^= key;
+				break;
+			case DI_NOT:
+				data.pBytes[i] = ~data.pBytes[i];
+				break;
+			case DI_NEG:
+				data.pBytes[i] = ~data.pBytes[i] + 1;
+				break;
+			case DI_ADD:
+				data.pBytes[i] -= key;
+				break;
+			case DI_SUB:
+				data.pBytes[i] += key;
+			}
+		}
+		key = nextkey;
+	}
+
 	return data;
 }
 
@@ -166,7 +222,43 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	pA->bind(HA);
 	pA->embed(&Sha256Str("RtlAllocateHeap"), sizeof(Sha256Digest));
 
+	// Do the thingy
 	pA->bind(_skipdata);
+
+	// Decode
+	Label dcd_loop = pA->newLabel();
+	pA->push(rcx);
+	pA->push(rdx);
+	pA->mov(al, DecoderProc.At(0).value);
+	pA->bind(dcd_loop);
+	for (int i = 1, n = DecoderProc.Size(); i < n; i++) {
+		switch (DecoderProc.At(i).Mnemonic) {
+		case DI_XOR:
+			pA->xor_(byte_ptr(rcx), al);
+			break;
+		case DI_NOT:
+			pA->not_(byte_ptr(rcx));
+			break;
+		case DI_NEG:
+			pA->neg(byte_ptr(rcx));
+			break;
+		case DI_ADD:
+			pA->add(byte_ptr(rcx), al);
+			break;
+		case DI_SUB:
+			pA->sub(byte_ptr(rcx), al);
+		}
+	}
+	pA->add(al, byte_ptr(rcx));
+	pA->xor_(al, byte_ptr(rcx));
+	pA->inc(rcx);
+	pA->dec(rdx);
+	pA->strict();
+	pA->jnz(dcd_loop);
+	pA->pop(rdx);
+	pA->pop(rcx);
+
+	// Load stuff
 	pA->push(r8);
 	pA->push(r9);
 	pA->push(rdx);
@@ -186,6 +278,8 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	pA->pop(rcx);
 	pA->pop(r8);
 	pA->pop(rdx);
+
+	// Decompress
 	pA->mov(ptr(srcLen), rdx);
 	pA->mov(ptr(destLen), r9);
 	pA->lea(rdx, ptr(alloc));
@@ -311,6 +405,7 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 		a.xor_(r8, rsi);
 		a.strict();
 		a.setz(al);
+		a.or_(al, byte_ptr(0x7FFE02D4));
 		a.mov(rcx, rax);
 		for (int i = 0; i < 32; i++) {
 			a.shl(rcx, 1);
@@ -1490,6 +1585,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 						CHECK_IMPORT(YAP_GetCurrentThreadId);
 						CHECK_IMPORT(YAP_GetCurrentProcessId);
 						CHECK_IMPORT(YAP_GetCurrentProcess);
+						CHECK_IMPORT(YAP_GetTickCount64);
 						else LOG(Warning, MODULE_PACKER, "Unrecognized SDK import: \'%s\'\n", name);
 #undef CHECK_IMPORT
 
@@ -1671,6 +1767,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	LOAD_IMPORT(YAP_GetCurrentThreadId);
 	LOAD_IMPORT(YAP_GetCurrentProcess);
 	LOAD_IMPORT(YAP_GetCurrentProcessId);
+	LOAD_IMPORT(YAP_GetTickCount64);
 #undef LOAD_IMPORT
 
 	// Mark as loaded
@@ -2055,6 +2152,18 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.jmp(ret);
 	}
 
+	// GetTickCount64
+	if (ShellcodeData.RequestedFunctions.YAP_GetTickCount64.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.YAP_GetTickCount64.Func);
+		a.mov(ecx, ptr(0x7FFE0004));
+		a.shl(rcx, 0x20);
+		a.mov(rax, ptr(0x7FFE0320));
+		a.shl(rax, 8);
+		a.mul(rcx);
+		a.mov(rax, rdx);
+		a.ret();
+	}
+
 	// CheckForDebuggers
 	if (ShellcodeData.RequestedFunctions.CheckForDebuggers.bRequested) {
 		CONTEXT context = { 0 };
@@ -2086,6 +2195,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.xor_(r8, r9);
 		a.strict();
 		a.setz(al);
+		a.or_(al, byte_ptr(0x7FFE02D4));
 		a.strict();
 		a.jz(ret);
 
@@ -2610,12 +2720,10 @@ int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {
 		if (rand() & 1) {
 			for (int j = 0, m = 5; j < m; j++) {
 				temp = randreg();
-				if (temp.size() == 8) {
-					stack.Push(temp);
-					ret++;
-					push((rand() & 1) ? 0 : rand());
-					break;
-				}
+				stack.Push(temp);
+				ret++;
+				push((rand() & 1) ? 0 : rand());
+				break;
 			}
 		}
 
@@ -2657,7 +2765,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 	if (!stack.Includes(o0) || Blacklist.Includes(o0.r64()) || Blacklist.Includes(o0) || o0.size() != 8) return;
 	HeldLocks++;
 	const BYTE sz = 26;
-	const BYTE beg_unsafe = 12;
+	const BYTE beg_unsafe = 13;
 	BYTE end = bStrict ? beg_unsafe : sz;
 	Mem peb = ptr(0x60);
 	peb.setSegment(gs);
@@ -2725,7 +2833,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 		db(0x90);
 		break;
 	}
-	case 11: // In IDA these disassemble as the same instruction, but function differently ;)
+	case 11: { // In IDA these disassemble as the same instruction, but function differently ;)
 		if (o0.r64() == rax.r64()) {
 			block();
 			xchg(eax, eax);
@@ -2734,6 +2842,13 @@ void ProtectedAssembler::randinst(Gp o0) {
 			db(0x90);
 		}
 		break;
+	}
+	case 12: {
+		push(truerandreg());
+		xchg(o0, ptr(rsp));
+		pop(o0);
+		break;
+	}
 	//case 11:
 		//desync_mov(o0.r64()); // This is VERY slow for some reason
 		//break;
