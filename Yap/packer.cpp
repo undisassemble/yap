@@ -2765,7 +2765,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 	if (!stack.Includes(o0) || Blacklist.Includes(o0.r64()) || Blacklist.Includes(o0) || o0.size() != 8) return;
 	HeldLocks++;
 	const BYTE sz = 26;
-	const BYTE beg_unsafe = 13;
+	const BYTE beg_unsafe = 17;
 	BYTE end = bStrict ? beg_unsafe : sz;
 	Mem peb = ptr(0x60);
 	peb.setSegment(gs);
@@ -2811,7 +2811,26 @@ void ProtectedAssembler::randinst(Gp o0) {
 		bind(j2);
 		break;
 	}
-	case 10: {
+	case 10: { // In IDA these disassemble as the same instruction, but function differently ;)
+		if (o0.r64() == rax.r64()) {
+			block();
+			xchg(eax, eax);
+		} else {
+			db(0x46);
+			db(0x90);
+		}
+		break;
+	}
+	case 11: {
+		push(truerandreg());
+		xchg(o0, ptr(rsp));
+		pop(o0);
+		break;
+	}
+	case 12:
+		not_(o0);
+		break;
+	case 13: {
 		bool bNeedsValid = false;
 		BYTE valid[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x64, 0x65, 0x66, 0x67, 0x2E, 0x3E, 0xF2, 0xF3 };
 		for (int i = 0, n = 1 + rand() % 14; i < n; i++) {
@@ -2819,7 +2838,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 			if (selected == 0x41 || selected == 0x43 || selected == 0x45 || selected == 0x47 || selected == 0x49 || selected == 0x4B || selected == 0x4D) {
 				// Try again
 				if (i == 13) { i--; continue; }
-				
+
 				// Make room for validating prefix
 				if (!bNeedsValid) n--;
 				bNeedsValid = true;
@@ -2833,85 +2852,59 @@ void ProtectedAssembler::randinst(Gp o0) {
 		db(0x90);
 		break;
 	}
-	case 11: { // In IDA these disassemble as the same instruction, but function differently ;)
-		if (o0.r64() == rax.r64()) {
-			block();
-			xchg(eax, eax);
-		} else {
-			db(0x46);
-			db(0x90);
+	case 14: {
+		BYTE valid[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x64, 0x65, 0x66, 0x67, 0x2E, 0x3E, 0xF2, 0xF3 };
+		for (int i = 0, n = 1 + rand() % 12; i < n; i++) {
+			BYTE selected = valid[rand() % sizeof(valid)];
+			db(selected);
 		}
+		not_(o0);
 		break;
 	}
-	case 12: {
-		push(truerandreg());
-		xchg(o0, ptr(rsp));
-		pop(o0);
-		break;
-	}
-	//case 11:
-		//desync_mov(o0.r64()); // This is VERY slow for some reason
-		//break;
+	case 15: {
+		bool bNeedsValid = false;
+		BYTE valid[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x64, 0x65, 0x66, 0x67, 0x2E, 0x3E, 0xF2, 0xF3 };
+		for (int i = 0, n = 1 + rand() % 11; i < n; i++) {
+			BYTE selected = valid[rand() % sizeof(valid)];
+			if (selected == 0x41 || selected == 0x43 || selected == 0x45 || selected == 0x47 || selected == 0x49 || selected == 0x4B || selected == 0x4D) {
+				// Try again
+				if (i == 10) { i--; continue; }
 
-	// Unsafe instructions
-	/*case 9:
-		inc(randsize(o0));
+				// Make room for validating prefix
+				if (!bNeedsValid) n--;
+				bNeedsValid = true;
+			}
+			db(selected);
+		}
+		if (bNeedsValid) {
+			BYTE validators[] = { 0x40, 0x42, 0x44, 0x46, 0x48, 0x4A, 0x4C, 0x4E };
+			db(validators[rand() % sizeof(validators)]);
+		}
+		setz(o0.r8());
 		break;
-	case 10:
-		dec(randsize(o0));
+	}
+	case 16: {
+		bool bNeedsValid = false;
+		BYTE valid[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x64, 0x65, 0x66, 0x67, 0x2E, 0x3E, 0xF2, 0xF3 };
+		for (int i = 0, n = 1 + rand() % 11; i < n; i++) {
+			BYTE selected = valid[rand() % sizeof(valid)];
+			if (selected == 0x41 || selected == 0x43 || selected == 0x45 || selected == 0x47 || selected == 0x49 || selected == 0x4B || selected == 0x4D) {
+				// Try again
+				if (i == 10) { i--; continue; }
+
+				// Make room for validating prefix
+				if (!bNeedsValid) n--;
+				bNeedsValid = true;
+			}
+			db(selected);
+		}
+		if (bNeedsValid) {
+			BYTE validators[] = { 0x40, 0x42, 0x44, 0x46, 0x48, 0x4A, 0x4C, 0x4E };
+			db(validators[rand() % sizeof(validators)]);
+		}
+		setnz(o0.r8());
 		break;
-	case 11:
-		add(randsize(o0), rand());
-		break;
-	case 12:
-		o0 = randsize(o0);
-		add(o0, randregofsamesize(o0));
-		break;
-	case 13:
-		sub(randsize(o0), rand());
-		break;
-	case 14:
-		o0 = randsize(o0);
-		sub(o0, randregofsamesize(o0));
-		break;
-	case 15:
-		xor_(randsize(o0), rand());
-		break;
-	case 16:
-		o0 = randsize(o0);
-		xor_(o0, randregofsamesize(o0));
-		break;
-	case 17:
-		or_(randsize(o0), rand());
-		break;
-	case 18:
-		o0 = randsize(o0);
-		or_(o0, randregofsamesize(o0));
-		break;
-	case 19:
-		if (stack.Includes(rax)) desync();
-		break;
-	case 20:
-		not_(randsize(o0));
-		break;
-	case 21:
-		and_(randsize(o0), rand());
-		break;
-	case 22:
-		o0 = randsize(o0);
-		and_(o0, randregofsamesize(o0));
-		break;
-	case 23:
-		cmp(randsize(o0), rand());
-		break;
-	case 24:
-		o0 = randsize(o0);
-		cmp(o0, randregofsamesize(o0));
-		break;
-	case 25:
-		o0 = randsize(o0);
-		test(o0, o0);
-		break;*/
+	}
 	}
 	HeldLocks--;
 }
