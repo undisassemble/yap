@@ -15,7 +15,7 @@ enum DecoderInstMnemonic : BYTE {
 
 struct DecoderInst {
 	DecoderInstMnemonic Mnemonic : 3;
-	BYTE value;
+	DWORD value;
 };
 
 Vector<DecoderInst> DecoderProc;
@@ -1057,6 +1057,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	#include "SHA256.raw"
 
 	GenerateUnpackingAlgorithm(&a, unpack);
+	DecoderProc.Release();
 
 	// GetProcAddressA
 	{
@@ -1469,12 +1470,28 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.bind(KERNEL32DLL);
 		a.embed(&Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest));
 
-		// jmp qword ptr [rip] for every import
-		Label import_jumpers;
+		// Encoded imports
 		Vector<size_t> Offsets;
+		Label import_array;
+		Label jumper_array;
+		Label import_handler;
+		int nImports = 0;
 		if (::Options.Packing.bHideIAT) {
-			import_jumpers = a.newLabel();
-			a.bind(import_jumpers);
+			// Labels
+			jumper_array = a.newLabel();
+			import_array = a.newLabel();
+			import_handler = a.newLabel();
+			
+			// Generate pointer decoding algorithm
+			DecoderProc.Release();
+			DecoderInst inst;
+			for (int i = 0, n = 10 + (rand() & 15); i < n; i++) {
+				inst.Mnemonic = (DecoderInstMnemonic)(rand() % DI_SUB);
+				inst.value = rand64() & 0xFFFFFFFF;
+				DecoderProc.Push(inst);
+			}
+
+			// Do jumpers
 			for (int j, i = 0; i < Imports.Size(); i++) {
 				char* name = pOriginal->ReadRVAString(Imports.At(i).Name);
 				if (!lstrcmpA(name, "yap.dll")) {
@@ -1484,13 +1501,52 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 				}
 				j = 0;
 				while (pOriginal->ReadRVA<uint64_t>(Imports.At(i).OriginalFirstThunk + sizeof(uint64_t) * j)) {
-					a.block();
-					a.jmp(qword_ptr(rip));
 					Offsets.Push(a.offset());
-					a.dq(rand64());
+					a.push(nImports);
+					a.jmp(import_handler);
 					j++;
+					nImports++;
 				}
 			}
+
+			// Jumpers
+			a.bind(jumper_array);
+			for (int i = 0; i < nImports; i++) {
+				a.dq(a.offset() - Offsets.At(i));
+			}
+
+			// Pointers
+			a.bind(import_array);
+			a.dq(0, nImports);
+
+			// Import handler
+			a.bind(import_handler);
+			a.xchg(rax, ptr(rsp));
+			a.push(rbx);
+			a.lea(rbx, ptr(import_array));
+			a.lea(rbx, ptr(rbx, rax, 3));
+			a.mov(rax, ptr(rbx));
+			a.pop(rbx);
+			for (int i = 1, n = DecoderProc.Size(); i < n; i++) {
+				switch (DecoderProc.At(i).Mnemonic) {
+				case DI_XOR:
+					a.xor_(rax, DecoderProc.At(i).value);
+					break;
+				case DI_NOT:
+					a.not_(rax);
+					break;
+				case DI_NEG:
+					a.neg(rax);
+					break;
+				case DI_ADD:
+					a.add(rax, DecoderProc.At(i).value);
+					break;
+				case DI_SUB:
+					a.sub(rax, DecoderProc.At(i).value);
+				}
+			}
+			a.xchg(ptr(rsp), rax);
+			a.ret();
 		}
 
 		InternalRelOff = a.newLabel();
@@ -1623,7 +1679,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.mov(rsi, rax);
 		a.lea(rdi, ptr(import_offsets));
 		if (!::Options.Packing.bHideIAT) a.mov(r13, rdi);
-		else a.lea(r13, ptr(import_jumpers));
+		else a.lea(r13, ptr(import_array));
 		a.lea(r12, ptr(import_names));
 		a.mov(r14, 0);
 
@@ -1654,11 +1710,34 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 			a.sub(r8, r15);
 			a.mov(qword_ptr(r8), rax);
 		} else {
-			a.mov(qword_ptr(r13, 6), rax);
+			// Encodes ptr
+			for (int i = DecoderProc.Size() - 1; i > 0; i--) {
+				switch (DecoderProc.At(i).Mnemonic) {
+				case DI_XOR:
+					a.xor_(rax, DecoderProc.At(i).value);
+					break;
+				case DI_NOT:
+					a.not_(rax);
+					break;
+				case DI_NEG:
+					a.neg(rax);
+					break;
+				case DI_ADD:
+					a.sub(rax, DecoderProc.At(i).value);
+					break;
+				case DI_SUB:
+					a.add(rax, DecoderProc.At(i).value);
+				}
+			}
+			DecoderProc.Release();
+			a.mov(qword_ptr(r13), rax);
+			a.mov(rax, r13);
+			a.sub(rax, holder.labelOffset(import_array) - holder.labelOffset(jumper_array));
+			a.sub(rax, ptr(rax));
 			a.lea(r8, ptr(import_offsets));
 			a.sub(r8, r15);
-			a.mov(qword_ptr(r8), r13);
-			a.add(r13, 14);
+			a.mov(qword_ptr(r8), rax);
+			a.add(r13, 8);
 		}
 		a.add(r12, sizeof(Sha256Digest));
 		a.jmp(next);
