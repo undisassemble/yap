@@ -1564,6 +1564,8 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 				ShellcodeData.RequestedFunctions.iIndex = i;
 				continue;
 			}
+			if (i == ShellcodeData.RequestedFunctions.iIndex)
+				continue;
 			j = 0;
 			a.dd(0);
 			while (pOriginal->ReadRVA<uint64_t>(Imports.At(i).OriginalFirstThunk + sizeof(uint64_t) * j)) {
@@ -2264,19 +2266,27 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.push(rsi);
 
 		// PEB check
-		a.mov(rax, 0);
 		a.mov(rcx, PEB);
-		a.mov(al, byte_ptr(rcx, 0x02));
+		a.mov(rax, 0);
+		if (ShellcodeData.CarryData.bWasAntiDump) {
+			a.or_(al, ptr(rcx, 0x10));
+			a.or_(al, ptr(rcx, 0x11));
+			a.or_(al, ptr(rcx, 0x12));
+			a.or_(al, ptr(rcx, 0x13));
+			a.or_(al, ptr(rcx, 0x14));
+			a.or_(al, ptr(rcx, 0x15));
+			a.or_(al, ptr(rcx, 0x16));
+			a.or_(al, ptr(rcx, 0x17));
+		}
+		a.or_(al, byte_ptr(rcx, 0x02));
 		a.mov(rdx, 0xBC);
 		a.mov(r9, 0x70);
 		a.mov(r8d, dword_ptr(rcx, rdx));
 		a.and_(r8, r9);
-		a.xor_(r8, r9);
-		a.strict();
-		a.setz(al);
+		a.or_(al, r8b);
 		a.or_(al, byte_ptr(0x7FFE02D4));
 		a.strict();
-		a.jz(ret);
+		a.jnz(ret);
 
 		// HWBP check
 		a.lea(rcx, ptr(NTD));
@@ -2313,7 +2323,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.strict();
 		a.jnz(ret);
 		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr6)));
-		a.and_(rax, 0x18F);
+		a.and_(rax, 0x0F);
 		a.strict();
 		a.jnz(ret);
 		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr0)));
@@ -2442,6 +2452,10 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 
 	srand(GetTickCount64());
 	ShellcodeData.EntryOff = 0x30 + rand() & 0xCF;
+
+	if (::Options.Packing.bAntiDump) {
+		ShellcodeData.CarryData.bWasAntiDump = true;
+	}
 
 	if (::Options.Packing.EncodingCounts > 1) {
 #ifdef _DEBUG

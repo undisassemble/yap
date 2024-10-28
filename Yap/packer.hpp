@@ -83,6 +83,10 @@ struct _ShellcodeData {
 		RequestedFunction YAP_GetCurrentProcessId;
 		RequestedFunction YAP_GetTickCount64;
 	} RequestedFunctions;
+
+	struct {
+		bool bWasAntiDump : 1 = false;
+	} CarryData;
 };
 
 struct PackerOptions {
