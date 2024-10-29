@@ -2253,6 +2253,12 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		Label Context = a.newLabel();
 		a.bind(Context);
 		a.embed(&context, sizeof(CONTEXT));
+		Label ID;
+		if (::Options.Packing.bDirectSyscalls) {
+			ID = a.newLabel();
+			a.bind(ID);
+			a.dd(0);
+		}
 		Label NTD = a.newLabel();
 		a.bind(NTD);
 		a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest));
@@ -2289,6 +2295,14 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.jnz(ret);
 
 		// HWBP check
+		Label hasid;
+		if (::Options.Packing.bDirectSyscalls) {
+			hasid = a.newLabel();
+			a.mov(eax, ptr(ID));
+			a.test(eax, eax);
+			a.strict();
+			a.jnz(hasid);
+		}
 		a.lea(rcx, ptr(NTD));
 		a.call(ShellcodeData.Labels.GetModuleHandleW);
 		a.mov(rcx, rax);
@@ -2297,9 +2311,6 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
-		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
-		a.lea(rdx, ptr(Context));
-		a.mov(rsi, rdx);
 		if (::Options.Packing.bDirectSyscalls) {
 			a.mov(ecx, ptr(rax));
 			a.cmp(ecx, 0xB8D18B4C);
@@ -2310,6 +2321,13 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 			a.strict();
 			a.jnz(ret);
 			a.mov(eax, ptr(rax, 4));
+			a.mov(ptr(ID), eax);
+			a.bind(hasid);
+		}
+		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
+		a.lea(rdx, ptr(Context));
+		a.mov(rsi, rdx);
+		if (::Options.Packing.bDirectSyscalls) {
 			a.syscall();
 		} else {
 			a.call(rax);
@@ -2336,7 +2354,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	}
 
 	// NTDLL thingies
-#define CODE_IMPORT(name) if (ShellcodeData.RequestedFunctions.YAP_##name.bRequested) { Label next = a.newLabel(); Label NTD = a.newLabel(); a.bind(NTD); a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)); Label FNN = a.newLabel(); a.bind(FNN); a.embed(&Sha256Str(#name), sizeof(Sha256Digest)); Label RTA = a.newLabel(); a.bind(RTA); a.dq(rand64()); Label NotFound = a.newLabel(); a.bind(ShellcodeData.RequestedFunctions.YAP_##name.Func); a.pop(qword_ptr(RTA)); a.push(rcx); a.push(rdx); a.push(r8); a.push(r9); a.lea(rcx, ptr(NTD)); a.call(ShellcodeData.Labels.GetModuleHandleW); a.mov(rcx, rax); a.lea(rdx, ptr(FNN)); a.call(ShellcodeData.Labels.GetProcAddressA); a.test(rax, rax); a.strict(); a.jz(NotFound); a.pop(r9); a.pop(r8); a.pop(rdx); a.mov(ecx, ptr(rax)); a.mov(r11, 0); a.cmp(ecx, 0xB8D18B4C); a.strict(); a.lea(rcx, ptr(next)); a.strict(); a.cmovne(rcx, r11); a.jmp(rcx); a.bind(next); a.mov(eax, ptr(rax, 4)); a.pop(r10); a.syscall(); a.jmp(qword_ptr(RTA)); a.bind(NotFound); a.mov(rax, 0xC0000225); a.jmp(qword_ptr(RTA)); }
+#define CODE_IMPORT(name) if (ShellcodeData.RequestedFunctions.YAP_##name.bRequested) { Label next = a.newLabel(); Label NTD = a.newLabel(); a.bind(NTD); a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)); Label ID = a.newLabel(); a.bind(ID); a.dd(0); Label FNN = a.newLabel(); a.bind(FNN); a.embed(&Sha256Str(#name), sizeof(Sha256Digest)); Label RTA = a.newLabel(); a.bind(RTA); a.dq(rand64()); Label NotFound = a.newLabel(); a.bind(ShellcodeData.RequestedFunctions.YAP_##name.Func); a.pop(qword_ptr(RTA)); a.push(rcx); Label skipresolve = a.newLabel(); a.mov(eax, ptr(ID)); a.test(eax, eax); a.strict(); a.jnz(skipresolve); a.push(rdx); a.push(r8); a.push(r9); a.lea(rcx, ptr(NTD)); a.call(ShellcodeData.Labels.GetModuleHandleW); a.mov(rcx, rax); a.lea(rdx, ptr(FNN)); a.call(ShellcodeData.Labels.GetProcAddressA); a.test(rax, rax); a.strict(); a.jz(NotFound); a.pop(r9); a.pop(r8); a.pop(rdx); a.mov(ecx, ptr(rax)); a.mov(r11, 0); a.cmp(ecx, 0xB8D18B4C);  a.strict(); a.lea(rcx, ptr(next)); a.strict(); a.cmovne(rcx, r11); a.jmp(rcx); a.bind(next); a.mov(eax, ptr(rax, 4)); a.mov(ptr(ID), eax); a.bind(skipresolve); a.pop(r10); a.syscall(); a.jmp(qword_ptr(RTA)); a.bind(NotFound); a.mov(rax, 0xC0000225); a.jmp(qword_ptr(RTA)); }
 	CODE_IMPORT(NtDelayExecution);
 	CODE_IMPORT(NtFreeVirtualMemory);
 	CODE_IMPORT(NtAllocateVirtualMemory);
