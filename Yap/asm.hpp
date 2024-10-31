@@ -60,6 +60,12 @@ struct AsmSection {
 	Vector<Line>* Lines;
 };
 
+struct FunctionRange {
+	DWORD dwEntry;
+	DWORD dwStart;
+	DWORD dwSize;
+};
+
 DWORD GetLineSize(_In_ Line line);
 
 /// <summary>
@@ -83,15 +89,18 @@ protected:
 	Vector<AsmSection> Sections;
 	Vector<DWORD> JumpTables;
 	ZydisDecoder Decoder;
-	Vector<DWORD> Processed;
+	Vector<DWORD> Functions;
+	Vector<FunctionRange> FunctionRanges;
 
 public:
-	Vector<Function> FindFunctions(bool bDeep = false);
+	Vector<FunctionRange> GetDisassembledFunctionRanges();
 
 	Asm();
 	Asm(_In_ char* sFileName);
 	Asm(_In_ HANDLE hFile);
 	~Asm();
+
+	bool Analyze();
 
 	/// <summary>
 	/// Strips debug info & symbols.
@@ -104,19 +113,19 @@ public:
 	DWORD TranslateOldAddress(_In_ DWORD dwRVA);
 
 	/// <summary>
-	/// Finds line with given RVA.
-	/// </summary>
-	/// <param name="dwSec">Section index</param>
-	/// <param name="dwRVA">RVA</param>
-	/// <returns>Index of line, or _UI32_MAX if not found</returns>
-	DWORD FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA);
-	
-	/// <summary>
 	/// Finds position where line with given RVA should be inserted.
 	/// </summary>
 	/// <param name="dwSec">Section index</param>
 	/// <param name="dwRVA">RVA</param>
 	/// <returns>Index to insert at, or _UI32_MAX - 1 if already exists</returns>
+	DWORD FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA);
+	
+	/// <summary>
+	/// Finds line with given RVA.
+	/// </summary>
+	/// <param name="dwSec">Section index</param>
+	/// <param name="dwRVA">RVA</param>
+	/// <returns>Index of line, or _UI32_MAX if not found</returns>
 	DWORD FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA);
 	
 	DWORD FindSectionIndex(_In_ DWORD dwRVA);

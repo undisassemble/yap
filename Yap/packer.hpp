@@ -96,7 +96,7 @@ struct PackerOptions {
 	Vector<DWORD> VMFuncs;
 };
 
-bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinary);
+bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBinary);
 
 class ProtectedAssembler : public Assembler {
 private:

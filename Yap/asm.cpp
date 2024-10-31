@@ -117,6 +117,7 @@ Asm::~Asm() {
 	}
 	Sections.Release();
 	JumpTables.Release();
+	FunctionRanges.Release();
 }
 
 DWORD Asm::GetNextOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex) {
@@ -273,6 +274,16 @@ DWORD Asm::FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 	Vector<DWORD> ToDisasm; // To prevent stack overflows on big programs, this function is a lie and is not actually recursive, sue me
 	ToDisasm.Push(dwRVA);
+	//Vector<DWORD> Funcs; // Vector of indexes
+	//Funcs.Push(0);
+	//Vector<FunctionRange> ranges;
+	//Vector<bool> verified;
+	//FunctionRange range;
+	//range.dwStart = dwRVA;
+	//range.dwSize = 0;
+	//ranges.Push(range);
+	//verified.Push(false);
+	//DWORD CurrentFunc = 0;
 	ZydisDecodedOperand Operands[ZYDIS_MAX_OPERAND_COUNT];
 	Vector<Line>* Lines;
 	Vector<Line> TempLines;
@@ -282,8 +293,12 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 	ZydisFormatterInit(&Formatter, ZYDIS_FORMATTER_STYLE_INTEL);
 
 	do {
+		//ranges.Replace(CurrentFunc, range);
+
 		// Setup
 		dwRVA = ToDisasm.Pop();
+		//CurrentFunc = Funcs.Pop();
+		//range = ranges.At(CurrentFunc);
 		TempLines.Release();
 		if (!dwRVA) {
 			LOG(Warning, MODULE_REASSEMBLER, "Skipping NULL RVA\n");
@@ -325,6 +340,10 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 			TempLines.Push(CraftedLine);
 
 			if (CraftedLine.Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_RET) {
+				//verified.Replace(CurrentFunc, true); // verify if function returns
+				//if (dwRVA + CraftedLine.Decoded.Instruction.length > range.dwSize + range.dwStart) {
+					//range.dwSize = dwRVA - range.dwStart + CraftedLine.Decoded.Instruction.length;
+				//}
 				break;
 			}
 
@@ -444,7 +463,20 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 						// Disassemble the address (if good)
 						IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(FindSectionByRVA(u64Referencing));
 						if (pHeader && pHeader->Characteristics & IMAGE_SCN_MEM_EXECUTE && pHeader->SizeOfRawData > u64Referencing - pHeader->VirtualAddress) {
-							if (!ToDisasm.Includes(u64Referencing)) ToDisasm.Push(u64Referencing);
+							if (!ToDisasm.Includes(u64Referencing)) {
+								ToDisasm.Push(u64Referencing);
+								if (CraftedLine.Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_CALL && !Functions.Includes(u64Referencing)) {
+									Functions.Push(u64Referencing);
+									//Funcs.Push(verified.Size());
+									//verified.Push(false);
+									//FunctionRange temp;
+									//temp.dwStart = u64Referencing;
+									//temp.dwSize = 0;
+									//ranges.Push(temp);
+								} else {
+									//Funcs.Push(CurrentFunc);
+								}
+							}
 						}
 
 						// Exit if unconditional
@@ -456,9 +488,15 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 			}
 
 			// Adjust vars
+			//if (dwRVA < range.dwStart) {
+				//range.dwStart = dwRVA;
+			//}
 			dwRVA += CraftedLine.Decoded.Instruction.length;
 			RawBytes.u64Size -= CraftedLine.Decoded.Instruction.length;
 			RawBytes.pBytes += CraftedLine.Decoded.Instruction.length;
+			//if (dwRVA > range.dwSize + range.dwStart) {
+				//range.dwSize = dwRVA - range.dwStart;
+			//}
 
 			// Stop disassembly if the next instruction has already been disassembled
 			if (i < Lines->Size() && Lines->At(i).OldRVA == dwRVA) {
@@ -469,6 +507,17 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 		// Insert lines
 		Lines->Insert(i, TempLines);
 	} while (ToDisasm.Size());
+	//ranges.Replace(CurrentFunc, range);
+
+	// Store verified functions
+	//for (int i = 0; i < verified.Size(); i++) if (verified.At(i)) {
+		//FunctionRanges.Push(ranges.At(i));
+	//}
+
+	ToDisasm.Release();
+	//Funcs.Release();
+	//verified.Release();
+	//ranges.Release();
 	return true;
 }
 
@@ -712,6 +761,7 @@ bool Asm::Disassemble() {
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent searching: %llu\n", Data.TimeSpentSearching));
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent inserting: %llu\n", Data.TimeSpentInserting));
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Number of instructions: %llu\n", GetNumLines()));
+	//LOG(Info, MODULE_REASSEMBLER, "Discovered %d functions\n", FunctionRanges.Size());
 	LOG(Success, MODULE_REASSEMBLER, "Finished disassembly\n");
 
 	// Insert missing data + padding
@@ -779,6 +829,131 @@ bool Asm::Disassemble() {
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent inserting: %llu\n", Data.TimeSpentInserting));
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent filling gaps: %llu\n", Data.TimeSpentFilling));
 	LOG(Success, MODULE_REASSEMBLER, "Finished disassembly\n");
+	return true;
+}
+
+bool Asm::Analyze() {
+	// Function ranges
+	if (Options.Packing.bPartialUnpacking) {
+		FunctionRange range = { 0 };
+		FunctionRanges.Release();
+		Vector<DWORD> Done;
+		Vector<DWORD> ToDo;
+		Vector<Line>* pLines = NULL;
+		DWORD dwRVA;
+		DWORD index;
+		IMAGE_DATA_DIRECTORY IAT = GetNtHeaders()->x64.OptionalHeader.DataDirectory[1];
+
+		// Add entries
+		if (!Functions.Includes(GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint)) Functions.Push(GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint);
+		for (uint64_t* pTLS = GetTLSCallbacks(); pTLS && *pTLS; pTLS++) {
+			if (!Functions.Includes(*pTLS - GetBaseAddress())) Functions.Push(*pTLS - GetBaseAddress());
+		}
+
+		// Do the things
+		for (int i = 0; i < Functions.Size(); i++) {
+			// Setup
+			ToDo.Release();
+			Done.Release();
+			dwRVA = Functions.At(i);
+			ToDo.Push(dwRVA);
+			range.dwEntry = dwRVA;
+			range.dwStart = dwRVA;
+			range.dwSize = 0;
+
+			// Walk through function
+			do {
+				// Setup
+				dwRVA = ToDo.Pop();
+				pLines = NULL;
+				{
+					DWORD secIndex = FindSectionIndex(dwRVA);
+					pLines = Sections.At(secIndex).Lines;
+					if (!pLines) {
+						LOG(Warning, MODULE_REASSEMBLER, "Line not found for RVA 0x%08x\n", dwRVA);
+						continue;
+					}
+					index = FindIndex(secIndex, dwRVA);
+					if (index == _UI32_MAX) {
+						LOG(Warning, MODULE_REASSEMBLER, "Section not found for RVA 0x%08x\n", dwRVA);
+						continue;
+					}
+				}
+
+				while (1) {
+					bool bExit = false;
+					// Find end cases
+					if (Done.Includes(pLines->At(index).OldRVA) || (range.dwEntry != pLines->At(index).OldRVA && Functions.Includes(pLines->At(index).OldRVA)) || pLines->At(index).Type != Decoded) {
+						if (dwRVA != pLines->At(index).OldRVA && pLines->At(index).OldRVA + pLines->At(index).Decoded.Instruction.length > range.dwStart + range.dwSize) {
+							range.dwSize = (pLines->At(index).OldRVA + pLines->At(index).Decoded.Instruction.length) - range.dwStart;
+						}
+						break;
+					}
+
+					// CF stuff
+					if (IsInstructionCF(pLines->At(index).Decoded.Instruction.mnemonic) && pLines->At(index).Decoded.Instruction.mnemonic != ZYDIS_MNEMONIC_CALL) {
+						if (pLines->At(index).Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_JMP) {
+							bExit = true;
+						}
+						uint64_t r = 0;
+						ZydisCalcAbsoluteAddress(&pLines->At(index).Decoded.Instruction, &pLines->At(index).Decoded.Operands[0], pLines->At(index).OldRVA, &r);
+						if (!r) {
+							LOG(Warning, MODULE_REASSEMBLER, "Failed to calculate jump-to address at 0x%08x\n", pLines->At(index).OldRVA);
+						} else if (!Done.Includes(r) && !Functions.Includes(r) && !(IAT.VirtualAddress && IAT.Size && r >= IAT.VirtualAddress && r < IAT.VirtualAddress + IAT.Size)) {
+							ToDo.Push(r);
+						}
+					}
+
+					// Adjust shtuff
+					if (pLines->At(index).OldRVA < range.dwStart) {
+						range.dwSize += range.dwStart - pLines->At(index).OldRVA;
+						range.dwStart = pLines->At(index).OldRVA;
+					}
+					if (pLines->At(index).OldRVA + pLines->At(index).Decoded.Instruction.length > range.dwStart + range.dwSize) {
+						range.dwSize = (pLines->At(index).OldRVA + pLines->At(index).Decoded.Instruction.length) - range.dwStart;
+					}
+					if (bExit || pLines->At(index).Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_RET) {
+						break;
+					}
+					index++;
+				}
+				Done.Push(dwRVA);
+			} while (ToDo.Size());
+
+			if (range.dwSize > 17) FunctionRanges.Push(range);
+		}
+
+		// Cleanup
+		Done.Release();
+		ToDo.Release();
+		Functions.Release();
+
+		// Check for invalid functions
+		for (int i = 0; i < FunctionRanges.Size(); i++) {
+			range = FunctionRanges.At(i);
+			if (range.dwEntry < range.dwStart || range.dwEntry > range.dwSize + range.dwStart) {
+				FunctionRanges.Remove(i);
+				i--;
+				continue;
+			}
+
+			// Combined functions (improve this)
+			for (int j = 0; j < FunctionRanges.Size() && j != i; j++) {
+				if (FunctionRanges.At(j).dwStart > range.dwStart && FunctionRanges.At(j).dwStart < range.dwStart + range.dwSize) {
+					FunctionRanges.Remove(i);
+					i--;
+					j--;
+					continue;
+				}
+			}
+		}
+
+		LOG(Info, MODULE_REASSEMBLER, "Found %d compatible functions\n", FunctionRanges.Size());
+	} else {
+		LOG(Info, MODULE_REASSEMBLER, "Skipping function range discovery as results are unused\n");
+	}
+
+	LOG(Success, MODULE_REASSEMBLER, "Finished analysis\n");
 	return true;
 }
 
@@ -1433,30 +1608,10 @@ void Asm::RemoveData(_In_ DWORD dwRVA, _In_ DWORD dwSize) {
 	DeleteLine(sec, i);
 }
 
-Vector<Function> Asm::FindFunctions(bool bDeep) {
-	// Ensure loaded
-	Vector<Function> ret;
-	if (Status) return ret;
-
-	Vector<char*> Names = GetExportedFunctionNames();
-	Vector<DWORD> Exports = GetExportedFunctionRVAs();
-	Function n = { 0 };
-	// Things
-	n.u64Address = GetBaseAddress() + NTHeaders.x64.OptionalHeader.AddressOfEntryPoint;
-	n.pName = "Entry";
-	ret.Push(n);
-	if (Names.Size() && Exports.Size()) {
-		for (int i = 0; i < Names.Size() && i < Exports.Size(); i++) {
-			n.u64Address = GetBaseAddress() + Exports.At(i);
-			n.pName = Names.At(i);
-			ret.Push(n);
-		}
-	}
-
-	Processed.Release();
-	Names.Release();
-	Exports.Release();
-	return ret;
+Vector<FunctionRange> Asm::GetDisassembledFunctionRanges() {
+	Vector<FunctionRange> clone = FunctionRanges;
+	//clone.bCannotBeReleased = true;
+	return clone;
 }
 
 DWORD GetLineSize(_In_ Line line) {
@@ -1510,7 +1665,9 @@ size_t Asm::GetNumLines() {
 }
 
 Vector<AsmSection> Asm::GetSections() {
-	return Sections;
+	Vector<AsmSection> clone = Sections;
+	//clone.bCannotBeReleased = true;
+	return clone;
 }
 
 Buffer GenerateRelocSection(Vector<DWORD> Relocations) {

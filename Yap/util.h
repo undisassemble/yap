@@ -80,14 +80,16 @@ struct Buffer {
 	void Merge(_In_ Buffer Other, _In_ bool bDontFree = false) {
 		if (!Other.pBytes || !Other.u64Size) {
 			return;
-		}
-		else if (!pBytes || !u64Size) {
+		} else if (!pBytes || !u64Size) {
 			pBytes = Other.pBytes;
 			u64Size = Other.u64Size;
-		}
-		else {
+		} else {
 			u64Size += Other.u64Size;
 			pBytes = reinterpret_cast<BYTE*>(realloc(pBytes, u64Size));
+			if (!pBytes) {
+				DebugBreak();
+				exit(1);
+			}
 			memcpy(pBytes + u64Size - Other.u64Size, Other.pBytes, Other.u64Size);
 			if (!bDontFree) {
 				free(Other.pBytes);
@@ -126,6 +128,10 @@ struct Vector {
 		if (raw.u64Size < sizeof(T) || !raw.pBytes || !raw.u64Size) {
 			raw.u64Size = sizeof(T) * (bExponentialGrowth ? 10 : 1);
 			raw.pBytes = reinterpret_cast<BYTE*>(realloc(raw.pBytes, raw.u64Size));
+			if (!raw.pBytes) {
+				DebugBreak();
+				exit(1);
+			}
 			ZeroMemory(raw.pBytes, raw.u64Size);
 		}
 		
@@ -140,6 +146,10 @@ struct Vector {
 				raw.u64Size = nItems * sizeof(T);
 			}
 			raw.pBytes = reinterpret_cast<BYTE*>(realloc(raw.pBytes, raw.u64Size));
+			if (!raw.pBytes) {
+				DebugBreak();
+				exit(1);
+			}
 			ZeroMemory(raw.pBytes + OldSize, raw.u64Size - OldSize);
 		}
 	}
@@ -270,14 +280,8 @@ struct Vector {
 	//}
 };
 
-struct Function {
-	uint64_t u64Address = 0;
-	char* pName = NULL;
-};
-
 struct Data_t {
 	HDROP hDropFile = NULL;
-	Vector<Function> PEFunctions = { 0 };
 	char SaveFileName[MAX_PATH];
 	HWND hWnd = NULL;
 	bool bParsing : 1 = false;
@@ -320,6 +324,7 @@ struct Options_t {
 		bool bDontCompressRsrc : 1 = true;
 		bool bFalseSymbols : 1 = false;
 		bool bDirectSyscalls : 1 = false;
+		bool bPartialUnpacking : 1 = false;
 		int CompressionLevel = 5;
 		PackerTypes_t Immitate = YAP;
 		char Masquerade[MAX_PATH] = "C:\\Windows\\System32\\cmd.exe";
@@ -354,12 +359,14 @@ struct Options_t {
 
 #ifdef _DEBUG
 	struct {
-		bool bGenerateBreakpoints : 1 = false;
-		bool bGenerateMarks : 1 = false;
 		bool bDumpAsm : 1 = false;
 		bool bDumpSections : 1 = false;
+		bool bDumpFunctions : 1 = false;
+		bool bGenerateBreakpoints : 1 = false;
+		bool bGenerateMarks : 1 = false;
 		bool bDisableMutations : 1 = false;
 		bool bDisableRelocations : 1 = false;
+
 	} Debug;
 #endif
 

@@ -2,6 +2,13 @@
 #include "lzma/Aes.h"
 #include "lzma/Sha256.h"
 
+BYTE PartialUnpackingHook[] = {
+	0x50,
+	0x68, 0x00, 0x00, 0x00, 0x00,
+	0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0xFF, 0xE0
+};
+
 enum DecoderInstMnemonic : BYTE {
 	DI_XOR,
 	DI_NOT,
@@ -2457,7 +2464,7 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	return buf;
 }
 
-bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinary) {
+bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBinary) {
 	// Argument validation
 	if (!pOriginal || !pPackedBinary) {
 		LOG(Failed, MODULE_PACKER, "Invalid arguments\n");
@@ -2509,6 +2516,7 @@ bool Pack(_In_ PE* pOriginal, _In_ PackerOptions Options, _Out_ PE* pPackedBinar
 		Options.sMasqueradeAs = NULL;
 		Options.Message = MessageBackup;
 		::Options = OptionsBackup;
+		::Options.Packing.bPartialUnpacking = false;
 		pOriginal = dupe;
 	} else {
 		AesGenTables();

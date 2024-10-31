@@ -12,7 +12,6 @@
 
 // Forward declares
 DWORD WINAPI Begin(void* args);
-DWORD WINAPI ParsePE(void* args);
 bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo);
 namespace Console {
 	void help();
@@ -70,9 +69,6 @@ int main(int argc, char** argv) {
 			pAssembly = new Asm(argv[1]);
 			if (pAssembly->GetStatus()) {
 				MessageBoxA(NULL, "Could not parse binary!", NULL, MB_OK | MB_ICONERROR);
-			} else {
-				Data.bParsing = true;
-				CreateThread(0, 0, ParsePE, 0, 0, 0);
 			}
 		}
 
@@ -148,6 +144,12 @@ DWORD WINAPI Begin(void* args) {
 			goto th_exit;
 		}
 
+		// Analyze
+		if (!pAssembly->Analyze()) {
+			LOG(Failed, MODULE_YAP, "Asm analysis failed!\n");
+			goto th_exit;
+		}
+
 		// Dump disassembly
 #ifdef _DEBUG
 		if (Options.Debug.bDumpAsm) {
@@ -189,6 +191,16 @@ DWORD WINAPI Begin(void* args) {
 			}
 			CloseHandle(hDumped);
 		}
+
+		if (Options.Debug.bDumpFunctions) {
+			HANDLE hDumped = CreateFile("Yap.functions.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			char buf[512];
+			for (int i = 0; i < pAssembly->GetDisassembledFunctionRanges().Size(); i++) {
+				int n = snprintf(buf, 512, "%08x: %08x -> %08x\n", pAssembly->GetDisassembledFunctionRanges().At(i).dwEntry, pAssembly->GetDisassembledFunctionRanges().At(i).dwStart, pAssembly->GetDisassembledFunctionRanges().At(i).dwStart + pAssembly->GetDisassembledFunctionRanges().At(i).dwSize);
+				WriteFile(hDumped, buf, n, NULL, NULL);
+			}
+			CloseHandle(hDumped);
+		}
 #endif
 
 		// Modify
@@ -221,7 +233,7 @@ DWORD WINAPI Begin(void* args) {
 		PackOpt.Message = Options.Packing.Message[0] ? Options.Packing.Message : NULL;
 		PackOpt.bVM = Options.VM.bEnabled;
 		for (int i = 0, n = Options.VM.VMFuncs.Size(); i < n; i++) {
-			PackOpt.VMFuncs.Push(Data.PEFunctions.At(Options.VM.VMFuncs.At(i) - 1).u64Address - pAssembly->GetBaseAddress());
+			PackOpt.VMFuncs.Push(0);
 		}
 		if (Options.Packing.bEnableMasquerade) {
 			PackOpt.sMasqueradeAs = Options.Packing.Masquerade;

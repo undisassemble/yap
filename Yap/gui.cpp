@@ -21,7 +21,7 @@ const int width = 850;
 const int height = 560;
 ImGuiWindow* pWindow = NULL;
 extern Asm* pAssembly;
-ImWchar range[] = { 0x20, 0xFF, 0 };
+ImWchar range[] = { 0x20, 0x8A, 0 };
 
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 DWORD WINAPI WindowThread(void* args);
@@ -38,16 +38,8 @@ void InitGUI() {
 	io.ConfigFlags = ImGuiConfigFlags_NavEnableKeyboard;
 	io.IniFilename = NULL;
 	ApplyImGuiTheme();
+	io.Fonts->Clear();
 	io.FontDefault = io.Fonts->AddFontFromMemoryCompressedTTF(font_compressed_data, font_compressed_size, 16.f, NULL, range);
-}
-
-DWORD WINAPI ParsePE(void* args) {
-	Data.bParsing = true;
-	Data.PEFunctions.Release();
-	Options.VM.VMFuncs.Release();
-	Data.PEFunctions = pAssembly->FindFunctions(args != NULL);
-	Data.bParsing = false;
-	return 0;
 }
 
 // Opens file dialogue
@@ -90,7 +82,7 @@ void DrawGUI() {
 	ImGui::Begin("Yap (Yet Another Packer)", &bOpen, ImGuiWindowFlags_NoResize);
 	
 	// Drag-n-drop menu
-	if (!Data.PEFunctions.raw.pBytes && !Data.PEFunctions.raw.u64Size) {
+	if (!pAssembly) {
 		// Handle dropped file
 		if (Data.hDropFile) {
 			char File[MAX_PATH];
@@ -98,8 +90,6 @@ void DrawGUI() {
 				pAssembly = new Asm(File);
 				if (pAssembly->GetStatus()) {
 					MessageBoxA(Data.hWnd, "Could not parse binary!", NULL, MB_OK | MB_ICONERROR);
-				} else {
-					CreateThread(0, 0, ParsePE, 0, 0, 0);
 				}
 			}
 			DragFinish(Data.hDropFile);
@@ -151,6 +141,10 @@ void DrawGUI() {
 			DEBUG_ONLY(IMGUI_TOGGLE("Anti-Sandbox", Options.Packing.bAntiSandbox));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a sandboxed environment."));
 			if (Options.Packing.bDelayedEntry && Options.Packing.Immitate == ExeStealth) Options.Packing.Immitate = YAP;
+			if (!Options.Reassembly.bEnabled) ImGui::BeginDisabled();
+			IMGUI_TOGGLE("Partial Unpacking", Options.Packing.bPartialUnpacking);
+			ImGui::SetItemTooltip(Options.Reassembly.bEnabled ? "Only allows one function to be loaded at a time, preventing the whole program from being dumped at once." : "Requires reassembler to be enabled");
+			if (!Options.Reassembly.bEnabled) ImGui::EndDisabled();
 			ImGui::Combo("Immitate Packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
 			ImGui::SetItemTooltip("Changes some details about the packed binary to make it look like another packer.");
 			if (ImGui::TreeNode("Extended Options")) {
@@ -187,9 +181,6 @@ void DrawGUI() {
 				IMGUI_TOGGLE("Enable VM", Options.VM.bEnabled);
 			}
 			ImGui::SetItemTooltip("Enables virtualization functionality, requires packer & reassembler to be enabled.");
-			if (ImGui::Button(Data.bParsing ? "Analyzing..." : "Analyze") && !Data.bParsing) {
-				CreateThread(0, 0, ParsePE, (LPVOID)1, 0, 0);
-			}
 			if (ImGui::Button("Add Function (Max 256)")) {
 				if (Options.VM.VMFuncs.Size() >= 256) {
 					MessageBoxA(Data.hWnd, "Maximum number of functions selected!", NULL, MB_ICONINFORMATION | MB_OK);
@@ -207,19 +198,14 @@ void DrawGUI() {
 				wsprintfA(buf, "BtnFn%d", i);
 				ImGui::PushID(buf);
 				if (Options.VM.VMFuncs.At(i)) {
-					if (Data.PEFunctions.At(Options.VM.VMFuncs.At(i) - 1).pName) {
-						strcpy_s(buf, Data.PEFunctions.At(Options.VM.VMFuncs.At(i) - 1).pName);
-					} else {
-						wsprintfA(buf, "sub_%p", Data.PEFunctions.At(Options.VM.VMFuncs.At(i) - 1).u64Address);
-					}
+					strncpy_s(buf, "NOT IMPLIMENTED", 16);
 				} else {
 					memcpy(buf, "Select Function", 16);
 				}
 				ImGui::SameLine();
 				if (ImGui::BeginCombo("Function", buf)) {
-					for (int j = 0, m = Data.PEFunctions.Size(); j < m; j++) {
-						if (!Data.PEFunctions.At(j).pName) wsprintfA(buf, "sub_%p", Data.PEFunctions.At(j).u64Address);
-						else strcpy_s(buf, Data.PEFunctions.At(j).pName);
+					for (int j = 0, m = 0; j < m; j++) {
+						strncpy_s(buf, "NOT IMPLIMENTED", 16);
 						if (ImGui::Selectable(buf)) {
 							Options.VM.VMFuncs.Replace(i, j + 1);
 						}
@@ -250,14 +236,15 @@ void DrawGUI() {
 
 #ifdef _DEBUG
 		if (ImGui::BeginTabItem("Debug")) {
-			IMGUI_TOGGLE("Create Breakpoints", Options.Debug.bGenerateBreakpoints);
-			IMGUI_TOGGLE("Wrap Real Instructions in NOPs", Options.Debug.bGenerateMarks);
 			IMGUI_TOGGLE("Dump Disassembly", Options.Debug.bDumpAsm);
 			IMGUI_TOGGLE("Dump Individual Sections", Options.Debug.bDumpSections);
+			IMGUI_TOGGLE("Dump Function Ranges", Options.Debug.bDumpFunctions);
+			IMGUI_TOGGLE("Create Breakpoints", Options.Debug.bGenerateBreakpoints);
+			IMGUI_TOGGLE("Wrap Real Instructions in NOPs", Options.Debug.bGenerateMarks);
 			IMGUI_TOGGLE("Disable Mutation", Options.Debug.bDisableMutations);
 			IMGUI_TOGGLE("Disable Relocations", Options.Debug.bDisableRelocations);
 			if (ImGui::TreeNode("Icon Tests")) {
-				/*ImGui::Text("ICON_BARS: " ICON_BARS);
+				ImGui::Text("ICON_BARS: " ICON_BARS);
 				ImGui::Text("ICON_DEBUG: " ICON_DEBUG);
 				ImGui::Text("ICON_INFO: " ICON_INFO);
 				ImGui::Text("ICON_REASM: " ICON_REASM);
@@ -268,7 +255,6 @@ void DrawGUI() {
 				ImGui::Text("ICON_DARKMODE: " ICON_DARKMODE);
 				ImGui::Text("ICON_PROTECTION: " ICON_PROTECTION);
 				ImGui::Text("ICON_WARNING: " ICON_WARNING);
-				ImGui::Text("RANDOM: \xEF");*/
 				ImGui::DebugTextEncoding(ICON_BARS ICON_DEBUG ICON_INFO ICON_REASM ICON_PROTECT ICON_SAVE_CONFIG ICON_OPEN_FILE ICON_SETTINGS ICON_DARKMODE ICON_PROTECTION ICON_WARNING);
 				ImGui::TreePop();
 			}
