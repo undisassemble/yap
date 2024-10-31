@@ -163,9 +163,13 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	Label LzmaDec_DecodeReal = pA->newLabel();
 	Label LzmaDec_DecodeToDic = pA->newLabel();
 	Label LzmaDecode = pA->newLabel();
+	Label _rcx = pA->newLabel();
+	Label _rdx = pA->newLabel();
 
 	// Data
 	Label _skipdata = pA->newLabel();
+	pA->mov(ptr(_rcx), rcx);
+	pA->mov(ptr(_rdx), rdx);
 	pA->jmp(_skipdata);
 	Label destLen = pA->newLabel();
 	pA->bind(destLen);
@@ -304,10 +308,50 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	pA->lea(r9, ptr(srcLen));
 	pA->lea(rdx, ptr(destLen));
 	pA->call(LzmaDecode);
+	pA->mov(rcx, 0);
+	pA->xchg(ptr(_rcx), rcx);
+	pA->mov(rdx, 0);
+	pA->xchg(ptr(_rdx), rdx);
 	pA->pop(r9);
 	pA->pop(r8);
+	
+	// re-encode thingy madoodle
+	pA->mov(al, DecoderProc.At(0).value);
+	Label enc_loop = pA->newLabel();
+	pA->mov(r8b, al);
+	pA->bind(enc_loop);
+	pA->add(r8b, ptr(rcx));
+	pA->xor_(r8b, ptr(rcx));
+	for (int i = DecoderProc.Size() - 1; i > 0; i--) {
+		switch (DecoderProc.At(i).Mnemonic) {
+		case DI_XOR:
+			pA->xor_(byte_ptr(rcx), al);
+			break;
+		case DI_NOT:
+			pA->not_(byte_ptr(rcx));
+			break;
+		case DI_NEG:
+			pA->neg(byte_ptr(rcx));
+			break;
+		case DI_ADD:
+			pA->sub(byte_ptr(rcx), al);
+			break;
+		case DI_SUB:
+			pA->add(byte_ptr(rcx), al);
+		}
+	}
+	pA->mov(al, r8b);
+	pA->inc(rcx);
+	pA->dec(rdx);
+	pA->strict();
+	pA->jnz(enc_loop);
 	pA->ret();
 	
+	pA->bind(_rcx);
+	pA->dq(0);
+	pA->bind(_rdx);
+	pA->dq(0);
+
 	// LzmaDecode
 	#include "LzmaDecode.raw"
 
@@ -1227,7 +1271,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	return buf;
 }
 
-Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _In_ PE* pPackedBinary) {
+Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options, _In_ Asm* pPackedBinary) {
 	// Setup asmjit
 	Buffer buf = { 0 };
 	Environment environment;
@@ -1244,6 +1288,8 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 	Label Sha256_Init = a.newLabel();
 	Label Sha256_Update = a.newLabel();
 	Label Sha256_Final = a.newLabel();
+	Label LoadSegment;
+	if (::Options.Packing.bPartialUnpacking) LoadSegment = a.newLabel();
 	ShellcodeData.Labels.GetModuleHandleW = a.newLabel();
 	ShellcodeData.Labels.GetProcAddressByOrdinal = a.newLabel();
 	ShellcodeData.Labels.GetProcAddressA = a.newLabel();
@@ -2443,6 +2489,228 @@ Buffer GenerateInternalShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options,
 		a.jnz(loop);
 		a.bind(ret);
 		a.ret();
+	}
+
+	// Segment unpacker
+	Label Unpack;
+	if (::Options.Packing.bPartialUnpacking) {
+		Vector<FunctionRange> FunctionRanges = pOriginal->GetDisassembledFunctionRanges();
+		if (FunctionRanges.Size()) {
+			// Data
+			Vector<Buffer> FunctionBodies;
+			Unpack = a.newLabel();
+			Label Flag = a.newLabel();
+			a.bind(Flag);
+			a.db(0);
+			Label CurrentlyLoadedSegment = a.newLabel();
+			a.bind(CurrentlyLoadedSegment);
+			a.dd(FunctionRanges.Size() + 1);
+			Label PointerArray = a.newLabel();
+			a.bind(PointerArray);
+			for (int i = 0; i < FunctionRanges.Size(); i++) {
+				a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).dwStart);
+			}
+			Label SizeArray = a.newLabel();
+			a.bind(SizeArray);
+			for (int i = 0; i < FunctionRanges.Size(); i++) {
+				a.dd(FunctionRanges.At(i).dwSize);
+			}
+			Label EntryArray = a.newLabel();
+			a.bind(EntryArray);
+			for (int i = 0; i < FunctionRanges.Size(); i++) {
+				a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).dwEntry);
+			}
+			Label CompressedSizes = a.newLabel();
+			a.bind(CompressedSizes);
+			Label Compressed = a.newLabel();
+			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
+				Buffer buf;
+				buf.u64Size = FunctionRanges.At(i).dwSize;
+				buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+				pOriginal->ReadRVA(FunctionRanges.At(i).dwStart, buf.pBytes, buf.u64Size);
+				FunctionBodies.Push(PackSection(buf, Options));
+				ZeroMemory(buf.pBytes, buf.u64Size);
+				*reinterpret_cast<DWORD*>(PartialUnpackingHook + 2) = i;
+				memcpy_s(buf.pBytes + FunctionRanges.At(i).dwEntry - FunctionRanges.At(i).dwStart, buf.u64Size - (FunctionRanges.At(i).dwEntry - FunctionRanges.At(i).dwStart), PartialUnpackingHook, sizeof(PartialUnpackingHook));
+				pOriginal->WriteRVA(FunctionRanges.At(i).dwStart, buf.pBytes, buf.u64Size);
+				free(buf.pBytes);
+				a.dq(FunctionBodies.At(FunctionBodies.Size() - 1).u64Size);
+			}
+
+			Label UnloadSegment = a.newLabel();
+			Label _UnloadSegment = a.newLabel();
+			a.bind(_UnloadSegment);
+			a.call(UnloadSegment);
+			a.bind(LoadSegment);
+			
+			// Check if already loaded
+			a.mov(eax, ptr(CurrentlyLoadedSegment));
+			a.cmp(eax, FunctionRanges.Size());
+			a.strict();
+			a.jl(_UnloadSegment);
+			
+			// Load segment
+			a.pop(rax);
+			a.mov(ptr(CurrentlyLoadedSegment), eax);
+			a.push(rcx);
+			a.push(rdx);
+			a.push(r8);
+			a.push(r9);
+			a.push(r10);
+			a.push(r11);
+			a.mov(rdx, 0);
+			a.lea(rcx, ptr(Compressed));
+			a.lea(r8, ptr(CompressedSizes));
+			Label findcomploop = a.newLabel();
+			Label findcomploopexit = a.newLabel();
+			a.bind(findcomploop);
+			a.cmp(edx, eax);
+			a.strict();
+			a.je(findcomploopexit);
+			a.add(rcx, ptr(r8));
+			a.add(r8, 8);
+			a.inc(rdx);
+			a.jmp(findcomploop);
+			a.bind(findcomploopexit);
+			a.mov(rdx, ptr(r8));
+			a.lea(r8, ptr(PointerArray));
+			a.mov(r8, ptr(r8, rax, 3));
+			a.add(r8, ptr(InternalRelOff));
+			a.lea(r9, ptr(SizeArray));
+			a.mov(r9d, ptr(r9, rax, 2));
+			a.sub(rsp, 0x40);
+			a.call(Unpack);
+			a.add(rsp, 0x40);
+			a.pop(r11);
+			a.pop(r10);
+			a.pop(r9);
+			a.pop(r8);
+			a.pop(rdx);
+			a.mov(ecx, ptr(CurrentlyLoadedSegment));
+			a.lea(rax, ptr(EntryArray));
+			a.mov(rax, ptr(rax, ecx, 3));
+			a.add(rax, ptr(InternalRelOff));
+			a.pop(rcx);
+			a.xchg(ptr(rsp), rax);
+			a.add(rsp, 8);
+
+			// Call function
+			Label nflagisset = a.newLabel();
+			a.cmp(byte_ptr(Flag), 0);
+			a.strict();
+			a.je(nflagisset);
+			a.mov(byte_ptr(Flag), 0);
+			a.ret();
+			a.bind(nflagisset);
+			a.call(ptr(rsp, -8));
+			
+			// Check if return address is in another segment
+			a.xchg(ptr(rsp), rax);
+			a.push(rcx);
+			a.push(rdx);
+			a.push(r8);
+			a.push(r9);
+			a.push(r10);
+			a.push(r11);
+			a.mov(rcx, 0);
+			a.dec(rcx);
+			a.mov(r11, 1);
+			a.lea(r8, ptr(PointerArray));
+			a.lea(r9, ptr(SizeArray));
+			Label checkexit = a.newLabel();
+			Label checkloop = a.newLabel();
+			a.bind(checkloop);
+			a.cmp(rcx, FunctionRanges.Size());
+			a.strict();
+			a.jge(checkexit);
+			a.inc(rcx);
+			a.mov(rdx, ptr(r8, rcx, 3));
+			a.add(rdx, ptr(InternalRelOff));
+			a.cmp(rax, rdx);
+			a.strict();
+			a.jl(checkloop);
+			a.mov(r10d, ptr(r9, rcx, 2));
+			a.add(rdx, r10);
+			a.cmp(rax, rdx);
+			a.strict();
+			a.setl(byte_ptr(Flag));
+			a.strict();
+			a.jl(checkexit);
+			a.jmp(checkloop);
+			a.bind(checkexit);
+			a.pop(r11);
+			a.pop(r10);
+			a.pop(r9);
+			a.pop(r8);
+			a.pop(rdx);
+			Label dothingy = a.newLabel();
+			a.cmp(byte_ptr(Flag), 0);
+			a.strict();
+			a.jne(dothingy);
+			a.pop(rcx);
+			a.xchg(ptr(rsp), rax);
+			a.jmp(UnloadSegment);
+			a.bind(dothingy);
+			a.xchg(ptr(rsp, 8), rax);
+			a.push(rcx);
+			a.xchg(ptr(rsp, 8), rax);
+			a.mov(rcx, rax);
+			a.jmp(LoadSegment);
+
+			// Write function address
+			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
+				pOriginal->WriteRVA<uint64_t>(FunctionRanges.At(i).dwEntry + 8, pPackedBinary->GetBaseAddress() + holder.labelOffsetFromBase(LoadSegment) + ShellcodeData.BaseAddress);
+				ShellcodeData.Relocations.Relocations.Push(ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).dwEntry + 8);
+			}
+
+			a.bind(UnloadSegment);
+			a.push(rax);
+			a.push(rcx);
+			a.push(rdx);
+			a.push(r8);
+			a.push(r9);
+			a.mov(eax, ptr(CurrentlyLoadedSegment));
+			a.lea(rcx, ptr(PointerArray));
+			a.mov(rcx, ptr(rcx, rax, 3));
+			a.add(rcx, ptr(InternalRelOff));
+			a.lea(rdx, ptr(SizeArray));
+			a.mov(edx, ptr(rdx, rax, 2));
+			a.push(rax);
+			Label loop = a.newLabel();
+			a.mov(al, 0xCC);
+			a.bind(loop);
+			a.mov(byte_ptr(rcx), al);
+			a.inc(rcx);
+			a.dec(rdx);
+			a.strict();
+			a.jnz(loop);
+			a.pop(rax);
+			a.lea(rcx, ptr(EntryArray));
+			a.mov(rcx, ptr(rcx, rax, 3));
+			a.add(rcx, ptr(InternalRelOff));
+			a.mov(word_ptr(rcx), 0x6850);
+			a.mov(dword_ptr(rcx, 2), eax);
+			a.mov(word_ptr(rcx, 6), 0xB848);
+			a.lea(rax, ptr(LoadSegment));
+			a.mov(qword_ptr(rcx, 8), rax);
+			a.mov(qword_ptr(rcx, 16), 0xE0FF);
+			a.mov(dword_ptr(CurrentlyLoadedSegment), FunctionRanges.Size() + 1);
+			a.pop(r9);
+			a.pop(r8);
+			a.pop(rdx);
+			a.pop(rcx);
+			a.pop(rax);
+			a.ret();
+
+			a.bind(Compressed);
+			for (int i = 0; i < FunctionBodies.Size(); i++) {
+				a.embed(FunctionBodies.At(i).pBytes, FunctionBodies.At(i).u64Size);
+				free(FunctionBodies.At(i).pBytes);
+			}
+			FunctionBodies.Release();
+
+			GenerateUnpackingAlgorithm(&a, Unpack);
+		}
 	}
 
 	// Return data
