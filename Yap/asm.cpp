@@ -883,15 +883,15 @@ bool Asm::Analyze() {
 				while (1) {
 					bool bExit = false;
 					// Find end cases
-					if (Done.Includes(pLines->At(index).OldRVA) || (range.dwEntry != pLines->At(index).OldRVA && Functions.Includes(pLines->At(index).OldRVA)) || pLines->At(index).Type != Decoded) {
-						if (dwRVA != pLines->At(index).OldRVA && pLines->At(index).OldRVA + pLines->At(index).Decoded.Instruction.length > range.dwStart + range.dwSize) {
-							range.dwSize = (pLines->At(index).OldRVA + pLines->At(index).Decoded.Instruction.length) - range.dwStart;
+					if (Done.Includes(pLines->At(index).OldRVA) || (range.dwEntry != pLines->At(index).OldRVA && Functions.Includes(pLines->At(index).OldRVA))) {
+						if (dwRVA != pLines->At(index).OldRVA && pLines->At(index).OldRVA + GetLineSize(pLines->At(index)) > range.dwStart + range.dwSize) {
+							range.dwSize = (pLines->At(index).OldRVA + GetLineSize(pLines->At(index))) - range.dwStart;
 						}
 						break;
 					}
 
 					// CF stuff
-					if (IsInstructionCF(pLines->At(index).Decoded.Instruction.mnemonic) && pLines->At(index).Decoded.Instruction.mnemonic != ZYDIS_MNEMONIC_CALL) {
+					if (pLines->At(index).Type == Decoded && IsInstructionCF(pLines->At(index).Decoded.Instruction.mnemonic) && pLines->At(index).Decoded.Instruction.mnemonic != ZYDIS_MNEMONIC_CALL) {
 						if (pLines->At(index).Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_JMP) {
 							bExit = true;
 						}
@@ -909,10 +909,10 @@ bool Asm::Analyze() {
 						range.dwSize += range.dwStart - pLines->At(index).OldRVA;
 						range.dwStart = pLines->At(index).OldRVA;
 					}
-					if (pLines->At(index).OldRVA + pLines->At(index).Decoded.Instruction.length > range.dwStart + range.dwSize) {
-						range.dwSize = (pLines->At(index).OldRVA + pLines->At(index).Decoded.Instruction.length) - range.dwStart;
+					if (pLines->At(index).OldRVA + GetLineSize(pLines->At(index)) > range.dwStart + range.dwSize) {
+						range.dwSize = (pLines->At(index).OldRVA + GetLineSize(pLines->At(index))) - range.dwStart;
 					}
-					if (bExit || pLines->At(index).Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_RET) {
+					if (bExit || (pLines->At(index).Type == Decoded && pLines->At(index).Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_RET)) {
 						break;
 					}
 					index++;
@@ -929,6 +929,7 @@ bool Asm::Analyze() {
 		Functions.Release();
 
 		// Check for invalid functions
+		//Vector<DWORD> ToRemove;
 		for (int i = 0; i < FunctionRanges.Size(); i++) {
 			range = FunctionRanges.At(i);
 			if (range.dwEntry < range.dwStart || range.dwEntry > range.dwSize + range.dwStart) {
@@ -938,10 +939,15 @@ bool Asm::Analyze() {
 			}
 
 			// Combined functions (improve this)
-			for (int j = 0; j < FunctionRanges.Size() && j != i; j++) {
-				if (FunctionRanges.At(j).dwStart > range.dwStart && FunctionRanges.At(j).dwStart < range.dwStart + range.dwSize) {
-					FunctionRanges.Remove(i);
-					i--;
+			for (int j = 0; j < FunctionRanges.Size(); j++) if (j != i) {
+				FunctionRange range2 = FunctionRanges.At(j);
+				
+				// Combined
+				if (range2.dwStart < range.dwStart && range2.dwStart + range2.dwSize > range.dwStart) {
+					FunctionRanges.Remove(j);
+					if (i > j) {
+						i--;
+					}
 					j--;
 					continue;
 				}

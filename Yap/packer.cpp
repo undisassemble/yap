@@ -1430,6 +1430,9 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.mov(word_ptr(rax, 0xB0), bx); // WindowTitle
 		a.mov(word_ptr(rax, 0xB2), cx);
 		a.mov(ptr(rax, 0xB8), rdx);
+		a.mov(word_ptr(rax, 0x60), bx); // ImagePathName
+		a.mov(word_ptr(rax, 0x62), cx);
+		a.mov(ptr(rax, 0x68), rdx);
 		a.mov(rax, PEB);
 		a.mov(rax, ptr(rax, offsetof(_PEB, Ldr)));
 		a.mov(rax, ptr(rax, 0x10));
@@ -2596,12 +2599,14 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 
 			// Call function
 			Label nflagisset = a.newLabel();
+			a.block();
 			a.cmp(byte_ptr(Flag), 0);
-			a.strict();
+			a.block();
 			a.je(nflagisset);
 			a.mov(byte_ptr(Flag), 0);
 			a.ret();
 			a.bind(nflagisset);
+			a.block();
 			a.call(ptr(rsp, -8));
 			
 			// Check if return address is in another segment
