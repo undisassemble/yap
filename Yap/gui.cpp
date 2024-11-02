@@ -60,8 +60,7 @@ bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _
 	bool bRet = false;
 	if (bSaveTo) {
 		bRet = GetSaveFileName(&FileName);
-	}
-	else {
+	} else {
 		bRet = GetOpenFileName(&FileName);
 	}
 
@@ -72,6 +71,55 @@ bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _
 	return bRet;
 }
 
+void SaveProject() {
+	// Check file ending
+	char* ending = &Data.Project[lstrlenA(Data.Project) - 7];
+	if ((lstrlenA(Data.Project) < 7 || lstrcmpA(ending, ".yaproj")) && lstrlenA(Data.Project) < sizeof(Data.Project) - 8) {
+		memcpy(ending + 7, ".yaproj", 8);
+	}
+
+	// Open file
+	HANDLE hFile = CreateFileA(Data.Project, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
+		MessageBoxA(Data.hWnd, "Failed to save project!", NULL, MB_OK | MB_ICONERROR);
+		CloseHandle(hFile);
+		return;
+	}
+
+	// Write sig
+	WriteFile(hFile, "YAP", 3, NULL, NULL);
+
+	// Write data
+	WriteFile(hFile, &Options, sizeof(Options_t), NULL, NULL);
+	CloseHandle(hFile);
+}
+
+void LoadProject() {
+	char sig[3] = { 0 };
+	
+	// Open file
+	HANDLE hFile = CreateFileA(Data.Project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
+		MessageBoxA(Data.hWnd, "Failed to load project!", NULL, MB_OK | MB_ICONERROR);
+		CloseHandle(hFile);
+		Data.Project[0] = 0;
+		return;
+	}
+
+	// Read signature
+	ReadFile(hFile, sig, 3, NULL, NULL);
+	if (memcmp(sig, "YAP", 3)) {
+		MessageBoxA(Data.hWnd, "Invalid/corrupt project!", NULL, MB_OK | MB_ICONERROR);
+		CloseHandle(hFile);
+		Data.Project[0] = 0;
+		return;
+	}
+
+	// Read data
+	ReadFile(hFile, &Options, sizeof(Options_t), NULL, NULL);
+	CloseHandle(hFile);
+}
+
 void DrawGUI() {
 	// End if window is closed
 	if (!bOpen) {
@@ -79,25 +127,35 @@ void DrawGUI() {
 		_exit(0);
 	}
 	
-	ImGui::Begin("Yap (Yet Another Packer)", &bOpen, ImGuiWindowFlags_NoResize);
-	
-	// Drag-n-drop menu
-	if (!pAssembly) {
-		// Handle dropped file
-		if (Data.hDropFile) {
-			char File[MAX_PATH];
-			if (DragQueryFileA(Data.hDropFile, 0, File, MAX_PATH)) {
-				pAssembly = new Asm(File);
-				if (pAssembly->GetStatus()) {
-					MessageBoxA(Data.hWnd, "Could not parse binary!", NULL, MB_OK | MB_ICONERROR);
-				}
-			}
-			DragFinish(Data.hDropFile);
-			Data.hDropFile = NULL;
-		}
+	ImGui::Begin("YAP", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar);
 
-		ImGui::SetCursorPos(ImVec2((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Drop file here").x) / 2, (ImGui::GetWindowSize().y - ImGui::GetTextLineHeight()) / 2));
-		ImGui::Text("Drop file here");
+	// Menu bar
+	if (ImGui::BeginMenuBar()) {
+		if (ImGui::BeginMenu("File")) {
+			if (ImGui::MenuItem("New", "Ctrl + N")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
+			if (ImGui::MenuItem("Open", "Ctrl + O")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadProject(); }
+			if (ImGui::MenuItem("Save", "Ctrl + S")) { SaveProject(); }
+			if (ImGui::MenuItem("Save As", "Ctrl + Shift + S")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Settings")) {
+			if (ImGui::MenuItem("Auto Update", NULL, &Options.Settings.bCheckForUpdates)) {}
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("About")) {
+			if (ImGui::MenuItem("Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
+			if (ImGui::MenuItem("Usage")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Usage.md", NULL, NULL, 0); }
+			if (ImGui::MenuItem("Best Practices")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Usage.md#best-practices", NULL, NULL, 0); }
+			if (ImGui::MenuItem("License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
+			ImGui::EndMenu();
+		}
+		ImGui::EndMenuBar();
+	}
+	
+	// Select file menu
+	if (!Data.Project[0]) {
+		ImGui::SetCursorPos(ImVec2((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Create or select a project file").x) / 2, (ImGui::GetWindowSize().y - ImGui::GetTextLineHeight()) / 2));
+		ImGui::Text("Create or select a project file");
 	}
 
 	// Configuration menu
@@ -114,7 +172,7 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("Number of times the application should be packed.\n1: packed app\n2: packed packed app\n3: packed packed packed app\netc.");
 			ImGui::SliderInt("Compression Level", &Options.Packing.CompressionLevel, 1, 9);
 			ImGui::SetItemTooltip("How compressed the binary should be.");
-			ImGui::SliderInt("Mutation Level", &Options.Packing.MutationLevel, 1, 15);
+			ImGui::SliderInt("Mutation Level", &Options.Packing.MutationLevel, 1, 5);
 			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
 			DEBUG_ONLY(IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT."));
@@ -289,7 +347,14 @@ void DrawGUI() {
 		ImGui::EndTabBar();
 		ImGui::SetCursorPos(ImVec2(800 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetWindowScrollbarRect(ImGui::GetCurrentWindow(), ImGuiAxis_Y).GetWidth() : 0), 530 + ImGui::GetScrollY()));
 		if (ImGui::Button("Begin")) {
-			CreateThread(0, 0, Begin, 0, 0, 0);
+			char file[MAX_PATH] = { 0 };
+			if (!OpenFileDialogue(file, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, false)) {
+				MessageBoxA(Data.hWnd, "Fatal!", NULL, MB_OK | MB_ICONERROR);
+				LOG(Failed, MODULE_YAP, "Failed to open file dialogue: %d\n", CommDlgExtendedError());
+			} else {
+				pAssembly = new Asm(file);
+				CreateThread(0, 0, Begin, 0, 0, 0);
+			}
 		}
 	}
 
@@ -311,7 +376,7 @@ void DrawGUI() {
 		}
 		Data.bWaitingOnFile = false;
 	}
-	if (!pWindow) pWindow = ImGui::FindWindowByName("Yap (Yet Another Packer)");
+	if (!pWindow) pWindow = ImGui::FindWindowByName("YAP");
 }
 
 bool BeginGUI() {
@@ -325,16 +390,16 @@ bool BeginGUI() {
 	WindowClass.lpfnWndProc = (WNDPROC)WndProc;
 	WindowClass.hInstance = GetModuleHandle(NULL);
 	WindowClass.style = CS_CLASSDC;
-	WindowClass.lpszClassName = "Yap (Yet Another Packer)";
+	WindowClass.lpszClassName = "YAP";
 	if (!RegisterClassExA(&WindowClass)) {
 		return (bInitialized = false);
 	}
 
 	// Create window
 	if (!(Data.hWnd = CreateWindowExA(
-		WS_EX_ACCEPTFILES,
-		"Yap (Yet Another Packer)",
-		"Yap (Yet Another Packer)",
+		0,
+		"YAP",
+		"YAP",
 		0,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
@@ -345,7 +410,7 @@ bool BeginGUI() {
 		GetModuleHandleA(NULL),
 		NULL
 	))) {
-		UnregisterClassA("Yap (Yet Another Packer)", GetModuleHandleA(NULL));
+		UnregisterClassA("YAP", GetModuleHandleA(NULL));
 		return (bInitialized = false);
 	}
 	SetWindowLongA(Data.hWnd, GWL_STYLE, 0);
@@ -363,7 +428,7 @@ bool BeginGUI() {
 	// Create rendering thread
 	if (!CreateThread(0, 0, WindowThread, 0, 0, 0)) {
 		EndGUI();
-		UnregisterClassA("Yap (Yet Another Packer)", GetModuleHandleA(NULL));
+		UnregisterClassA("YAP", GetModuleHandleA(NULL));
 		return false;
 	}
 
@@ -449,9 +514,6 @@ LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 		break;
 	case WM_SHOWWINDOW:
 		bMinimized = wParam == FALSE;
-		break;
-	case WM_DROPFILES:
-		Data.hDropFile = (HDROP)wParam;
 	}
 	return ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam) ? TRUE : DefWindowProc(hWnd, uMsg, wParam, lParam);
 }

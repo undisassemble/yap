@@ -12,7 +12,6 @@
 
 // Forward declares
 DWORD WINAPI Begin(void* args);
-bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo);
 namespace Console {
 	void help();
 	void version();
@@ -66,10 +65,8 @@ int main(int argc, char** argv) {
 
 		// Handle files dropped on top of executable
 		if (argc == 2) {
-			pAssembly = new Asm(argv[1]);
-			if (pAssembly->GetStatus()) {
-				MessageBoxA(NULL, "Could not parse binary!", NULL, MB_OK | MB_ICONERROR);
-			}
+			strcpy_s(Data.Project, argv[1]);
+			LoadProject();
 		}
 
 		if (!BeginGUI()) {

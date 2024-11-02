@@ -281,8 +281,8 @@ struct Vector {
 };
 
 struct Data_t {
-	HDROP hDropFile = NULL;
-	char SaveFileName[MAX_PATH];
+	char Project[MAX_PATH] = { 0 };
+	char SaveFileName[MAX_PATH] = { 0 };
 	HWND hWnd = NULL;
 	bool bParsing : 1 = false;
 	bool bWaitingOnFile : 1 = false;
@@ -329,7 +329,7 @@ struct Options_t {
 		PackerTypes_t Immitate = YAP;
 		char Masquerade[MAX_PATH] = "C:\\Windows\\System32\\cmd.exe";
 		char Message[64] = { 0 };
-		int MutationLevel = 4;
+		int MutationLevel = 3;
 		int EncodingCounts = 1;
 	} Packing;
 

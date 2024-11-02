@@ -1,4 +1,4 @@
-# Yap (Yet Another Packer)
+# YAP (Yet Another Packer)
 
 > [!WARNING]
 > Yap can cause executables to become unstable and crash, use at your own risk.
