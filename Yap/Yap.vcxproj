@@ -23,9 +23,9 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{bb8f082b-8126-48e7-8cd7-5e3bc3a6396d}</ProjectGuid>
-    <RootNamespace>Yap</RootNamespace>
+    <RootNamespace>YAP</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>Yap</ProjectName>
+    <ProjectName>YAP</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

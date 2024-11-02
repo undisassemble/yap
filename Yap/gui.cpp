@@ -139,7 +139,7 @@ void DrawGUI() {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Settings")) {
-			if (ImGui::MenuItem("Auto Update", NULL, &Options.Settings.bCheckForUpdates)) {}
+			if (ImGui::MenuItem("Auto Update", NULL, &Settings.bCheckForUpdates)) {}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
@@ -174,8 +174,8 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("How compressed the binary should be.");
 			ImGui::SliderInt("Mutation Level", &Options.Packing.MutationLevel, 1, 5);
 			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
-			DEBUG_ONLY(IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT));
-			DEBUG_ONLY(ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT."));
+			IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT);
+			ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT.");
 			IMGUI_TOGGLE("Generate False Info", Options.Packing.bFalseSymbols);
 			ImGui::SetItemTooltip("Creates fake data directories and tables (doesn\'t affect size)");
 			IMGUI_TOGGLE("Delayed Entry Point", Options.Packing.bDelayedEntry);
@@ -323,12 +323,12 @@ void DrawGUI() {
 
 		if (ImGui::BeginTabItem("Settings")) {
 			if (
-				ImGui::Checkbox("Check For Updates", &Options.Settings.bCheckForUpdates) ||
-				ImGui::Combo("Reassembler Priority", (int*)&Options.Settings.Opt, "Automatic\0Prioritize Speed\0Prioritize Memory\0") ||
-				ImGui::Combo("Logging Level", (int*)&Options.Settings.Logging, "Nothing\0Errors\0Successes\0Warnings\0Info\0Extended Info\0")
+				ImGui::Checkbox("Check For Updates", &Settings.bCheckForUpdates) ||
+				ImGui::Combo("Reassembler Priority", (int*)&Settings.Opt, "Automatic\0Prioritize Speed\0Prioritize Memory\0") ||
+				ImGui::Combo("Logging Level", (int*)&Settings.Logging, "Nothing\0Errors\0Successes\0Warnings\0Info\0Extended Info\0")
 			) {
 				HANDLE hFile = CreateFileA("yap.config", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-				WriteFile(hFile, &Options.Settings, sizeof(Options.Settings), NULL, NULL);
+				WriteFile(hFile, &Settings, sizeof(Settings), NULL, NULL);
 				CloseHandle(hFile);
 			}
 			ImGui::EndTabItem();
@@ -514,6 +514,27 @@ LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 		break;
 	case WM_SHOWWINDOW:
 		bMinimized = wParam == FALSE;
+		break;
+	case WM_KEYDOWN:
+		if (!(lParam & KF_REPEAT) && (GetAsyncKeyState(VK_CONTROL) & 0x8000)) {
+			switch (wParam) {
+			case 0x53: // S
+				if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
+					OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
+					SaveProject();
+				} else {
+					SaveProject();
+				}
+				break;
+			case 0x4E: // N
+				OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
+				SaveProject();
+				break;
+			case 0x4F: // O
+				OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false);
+				LoadProject();
+			}
+		}
 	}
 	return ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam) ? TRUE : DefWindowProc(hWnd, uMsg, wParam, lParam);
 }

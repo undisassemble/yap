@@ -1232,7 +1232,7 @@ bool Asm::Mutate() {
 					Line first = replacement.At(0);
 					first.OldRVA = Lines->At(i).OldRVA;
 					replacement.Replace(0, first);
-					if (Options.Settings.Opt == PrioMem) {
+					if (Settings.Opt == PrioMem) {
 						Lines->Replace(i, replacement);
 						i += replacement.Size() - 1;
 					} else {
@@ -1243,13 +1243,13 @@ bool Asm::Mutate() {
 				replacement.Release();
 			}
 
-			if (Options.Settings.Opt == PrioSpeed && bAppend) {
+			if (Settings.Opt == PrioSpeed && bAppend) {
 				Overwrite.Push(Lines->At(i));
 			}
 		}
 
 		// Replace buffer for PrioSpeed
-		if (Options.Settings.Opt == PrioSpeed) {
+		if (Settings.Opt == PrioSpeed) {
 			Lines->Release();
 			Lines->nItems = Overwrite.nItems;
 			Lines->raw = Overwrite.raw;

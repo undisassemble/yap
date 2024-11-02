@@ -18,6 +18,7 @@ namespace Console {
 }
 
 Options_t Options;
+Settings_t Settings;
 Data_t Data;
 HANDLE hLogFile = NULL;
 HANDLE hStdOut = NULL;
@@ -31,7 +32,7 @@ int main(int argc, char** argv) {
 	// Load settings
 	HANDLE hSettings = CreateFileA("yap.config", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hSettings != INVALID_HANDLE_VALUE) {
-		ReadFile(hSettings, &Options.Settings, sizeof(Options.Settings), NULL, NULL);
+		ReadFile(hSettings, &Settings, sizeof(Settings), NULL, NULL);
 	}
 	CloseHandle(hSettings);
 
@@ -125,10 +126,10 @@ DWORD WINAPI Begin(void* args) {
 
 	// Select optimization mode
 	bool bResetOptimizations = false;
-	if (Options.Settings.Opt == PrioAuto) {
+	if (Settings.Opt == PrioAuto) {
 		bResetOptimizations = true;
 		LOG(Info, MODULE_YAP, "Prioritizing speed\n");
-		Options.Settings.Opt = PrioSpeed;
+		Settings.Opt = PrioSpeed;
 	}
 
 	// Reassembler
@@ -266,7 +267,7 @@ DWORD WINAPI Begin(void* args) {
 	}
 
 th_exit:
-	if (bResetOptimizations) Options.Settings.Opt = PrioAuto;
+	if (bResetOptimizations) Settings.Opt = PrioAuto;
 	LOG(Info, MODULE_YAP, "Ending Yap\n");
 	CloseHandle(hLogFile);
 	Data.bRunning = false;
