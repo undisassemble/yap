@@ -1,9 +1,9 @@
-[submodule "Yap/asmjit"]
-	path = Yap/asmjit
+[submodule "YAP/asmjit"]
+	path = YAP/asmjit
 	url = https://github.com/asmjit/asmjit.git
-[submodule "Yap/imgui"]
-	path = Yap/imgui
+[submodule "YAP/imgui"]
+	path = YAP/imgui
 	url = https://github.com/ocornut/imgui.git
-[submodule "Yap/zydis"]
-	path = Yap/zydis
+[submodule "YAP/zydis"]
+	path = YAP/zydis
 	url = https://github.com/zyantific/zydis.git
