@@ -28,13 +28,11 @@ Asm* pAssembly = NULL;
 int main(int argc, char** argv) {
 	// General setup
 	srand(time(NULL));
-
-	// Load settings
-	HANDLE hSettings = CreateFileA("yap.config", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hSettings != INVALID_HANDLE_VALUE) {
-		ReadFile(hSettings, &Settings, sizeof(Settings), NULL, NULL);
+	hLogFile = CreateFile("Yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (!hLogFile || hLogFile == INVALID_HANDLE_VALUE) {
+		LOG(Failed, MODULE_YAP, "Failed to open logging file: %d\n", GetLastError());
 	}
-	CloseHandle(hSettings);
+	LoadSettings();
 
 	// Find out if parent process is cmd.exe
 	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -121,7 +119,6 @@ DWORD WINAPI Begin(void* args) {
 		return 1;
 	
 	Data.bRunning = true;
-	hLogFile = CreateFile("Yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	LOG(Info, MODULE_YAP, "Starting Yap\n");
 
 	// Select optimization mode
@@ -269,7 +266,6 @@ DWORD WINAPI Begin(void* args) {
 th_exit:
 	if (bResetOptimizations) Settings.Opt = PrioAuto;
 	LOG(Info, MODULE_YAP, "Ending Yap\n");
-	CloseHandle(hLogFile);
 	Data.bRunning = false;
 	delete pAssembly;
 	return 0;

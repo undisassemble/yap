@@ -4,19 +4,20 @@
 #include <dxgi.h>
 #include <stdlib.h>
 #include <ctime>
+#include <Psapi.h>
+#include <Shlwapi.h>
 #include "imgui_internal.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
 #include "util.h"
 #include "asm.hpp"
-#pragma comment(lib, "d3d11.lib")
 
 static ID3D11Device* g_pd3dDevice = nullptr;
 static ID3D11DeviceContext* g_pd3dDeviceContext = nullptr;
 static IDXGISwapChain* g_pSwapChain = nullptr;
 static ID3D11RenderTargetView* g_mainRenderTargetView = nullptr;
 IDXGIOutput* g_pOutput = NULL;
-bool bMinimized = false, bOpen = true, bInitialized = false;;
+bool bMinimized = false, bOpen = true, bInitialized = false;
 const int width = 850;
 const int height = 560;
 ImGuiWindow* pWindow = NULL;
@@ -71,6 +72,54 @@ bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _
 	return bRet;
 }
 
+void SaveSettings() {
+	// Get file
+	char path[MAX_PATH];
+	DWORD sz = MAX_PATH;
+	if (!QueryFullProcessImageNameA(GetCurrentProcess(), 0, path, &sz)) {
+		LOG(Failed, MODULE_YAP, "Failed to save settings: %d (%s)\n", GetLastError(), path);
+		return;
+	}
+	if (!PathRemoveFileSpecA(path) || lstrlenA(path) > MAX_PATH - 12) {
+		LOG(Failed, MODULE_YAP, "Failed to save settings (misc)\n");
+		return;
+	}
+	memcpy(&path[lstrlenA(path)], "\\yap.config", 12);
+
+	// Write settings
+	HANDLE hFile = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
+		LOG(Failed, MODULE_YAP, "Failed to save settings: %d (%s)\n", GetLastError(), path);
+		return;
+	}
+	WriteFile(hFile, &Settings, sizeof(Settings_t), NULL, NULL);
+	CloseHandle(hFile);
+}
+
+void LoadSettings() {
+	// Get file
+	char path[MAX_PATH];
+	DWORD sz = MAX_PATH;
+	if (!QueryFullProcessImageNameA(GetCurrentProcess(), 0, path, &sz)) {
+		LOG(Failed, MODULE_YAP, "Failed to load settings: %d (%s)\n", GetLastError(), path);
+		return;
+	}
+	if (!PathRemoveFileSpecA(path) || lstrlenA(path) > MAX_PATH - 12) {
+		LOG(Failed, MODULE_YAP, "Failed to load settings (misc)\n");
+		return;
+	}
+	memcpy(&path[lstrlenA(path)], "\\yap.config", 12);
+
+	// Read settings
+	HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
+		LOG(Failed, MODULE_YAP, "Failed to load settings: %d (%s)\n", GetLastError(), path);
+		return;
+	}
+	ReadFile(hFile, &Settings, sizeof(Settings_t), NULL, NULL);
+	CloseHandle(hFile);
+}
+
 void SaveProject() {
 	// Check file ending
 	char* ending = &Data.Project[lstrlenA(Data.Project) - 7];
@@ -82,7 +131,7 @@ void SaveProject() {
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
 		MessageBoxA(Data.hWnd, "Failed to save project!", NULL, MB_OK | MB_ICONERROR);
-		CloseHandle(hFile);
+		LOG(Failed, MODULE_YAP, "Failed to save project: %d\n", GetLastError());
 		return;
 	}
 
@@ -101,7 +150,7 @@ void LoadProject() {
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
 		MessageBoxA(Data.hWnd, "Failed to load project!", NULL, MB_OK | MB_ICONERROR);
-		CloseHandle(hFile);
+		LOG(Failed, MODULE_YAP, "Failed to load project: %d\n", GetLastError());
 		Data.Project[0] = 0;
 		return;
 	}
@@ -139,7 +188,7 @@ void DrawGUI() {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Settings")) {
-			if (ImGui::MenuItem("Auto Update", NULL, &Settings.bCheckForUpdates)) {}
+			if (ImGui::MenuItem("Auto Update", NULL, &Settings.bCheckForUpdates)) { SaveSettings(); }
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
@@ -327,9 +376,7 @@ void DrawGUI() {
 				ImGui::Combo("Reassembler Priority", (int*)&Settings.Opt, "Automatic\0Prioritize Speed\0Prioritize Memory\0") ||
 				ImGui::Combo("Logging Level", (int*)&Settings.Logging, "Nothing\0Errors\0Successes\0Warnings\0Info\0Extended Info\0")
 			) {
-				HANDLE hFile = CreateFileA("yap.config", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-				WriteFile(hFile, &Settings, sizeof(Settings), NULL, NULL);
-				CloseHandle(hFile);
+				SaveSettings();
 			}
 			ImGui::EndTabItem();
 		}
