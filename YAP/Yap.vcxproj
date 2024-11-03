@@ -338,8 +338,9 @@
     <ClInclude Include="asmjit\src\asmjit\x86\x86opcode_p.h" />
     <ClInclude Include="asmjit\src\asmjit\x86\x86operand.h" />
     <ClInclude Include="asmjit\src\asmjit\x86\x86rapass_p.h" />
-    <ClInclude Include="font.hpp" />
+    <ClInclude Include="font.h" />
     <ClInclude Include="gui.hpp" />
+    <ClInclude Include="icons.h" />
     <ClInclude Include="imgui\backends\imgui_impl_dx11.h" />
     <ClInclude Include="imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="imgui\imconfig.h" />

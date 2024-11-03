@@ -794,7 +794,10 @@
     <ClInclude Include="zyasm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="font.hpp">
+    <ClInclude Include="font.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="icons.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

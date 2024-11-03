@@ -1,5 +1,6 @@
 #include "gui.hpp"
-#include "font.hpp"
+#include "font.h"
+#include "icons.h"
 #include <d3d11.h>
 #include <dxgi.h>
 #include <stdlib.h>
@@ -22,7 +23,7 @@ const int width = 850;
 const int height = 560;
 ImGuiWindow* pWindow = NULL;
 extern Asm* pAssembly;
-ImWchar range[] = { 0x20, 0x8A, 0 };
+ImWchar range[] = { 0xE005, 0xF8FF, 0 };
 
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 DWORD WINAPI WindowThread(void* args);
@@ -40,7 +41,13 @@ void InitGUI() {
 	io.IniFilename = NULL;
 	ApplyImGuiTheme();
 	io.Fonts->Clear();
-	io.FontDefault = io.Fonts->AddFontFromMemoryCompressedTTF(font_compressed_data, font_compressed_size, 16.f, NULL, range);
+	io.FontDefault = NULL;
+	io.Fonts->AddFontFromMemoryCompressedTTF(font_compressed_data, font_compressed_size, 16.f);
+	ImFontConfig config;
+	config.MergeMode = true;
+	config.GlyphMinAdvanceX = 16.f;
+	io.Fonts->AddFontFromMemoryCompressedTTF(icons_compressed_data, icons_compressed_size, 16.f, &config, range);
+	io.Fonts->Build();
 }
 
 // Opens file dialogue
@@ -181,10 +188,10 @@ void DrawGUI() {
 	// Menu bar
 	if (ImGui::BeginMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
-			if (ImGui::MenuItem("New", "Ctrl + N")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
-			if (ImGui::MenuItem("Open", "Ctrl + O")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadProject(); }
-			if (ImGui::MenuItem("Save", "Ctrl + S")) { SaveProject(); }
-			if (ImGui::MenuItem("Save As", "Ctrl + Shift + S")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
+			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
+			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadProject(); }
+			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveProject(); }
+			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save As", "Ctrl + Shift + S")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Settings")) {
@@ -192,10 +199,10 @@ void DrawGUI() {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
-			if (ImGui::MenuItem("Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
-			if (ImGui::MenuItem("Usage")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Usage.md", NULL, NULL, 0); }
-			if (ImGui::MenuItem("Best Practices")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Usage.md#best-practices", NULL, NULL, 0); }
-			if (ImGui::MenuItem("License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
+			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
+			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Usage")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Usage.md", NULL, NULL, 0); }
+			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Best Practices")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Usage.md#best-practices", NULL, NULL, 0); }
+			if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
 			ImGui::EndMenu();
 		}
 		ImGui::EndMenuBar();
@@ -211,7 +218,7 @@ void DrawGUI() {
 	else if (!Data.bRunning) {
 		ImGui::BeginTabBar("#Tabs");
 
-		if (ImGui::BeginTabItem("Packing")) {
+		if (ImGui::BeginTabItem(ICON_BOX_ARCHIVE " Packing")) {
 			IMGUI_TOGGLE("Enable Packer", Options.Packing.bEnabled);
 			ImGui::SetItemTooltip("Wraps the original binary with a custom loader.");
 			ImGui::SameLine();
@@ -268,7 +275,7 @@ void DrawGUI() {
 			ImGui::EndTabItem();
 		}
 
-		if (ImGui::BeginTabItem("Reassembler")) {
+		if (ImGui::BeginTabItem(ICON_CODE " Reassembler")) {
 			IMGUI_TOGGLE("Enabled", Options.Reassembly.bEnabled);
 			ImGui::SetItemTooltip("Disassembles your application, modifies the assembly a ton, and then assembles the modified assembly.");
 			IMGUI_TOGGLE("Test", Options.Reassembly.bTest);
@@ -279,7 +286,7 @@ void DrawGUI() {
 			ImGui::EndTabItem();
 		}
 
-		if (ImGui::BeginTabItem("VM")) {
+		if (ImGui::BeginTabItem(ICON_MICROCHIP " VM")) {
 			if (!Options.Packing.bEnabled || !Options.Reassembly.bEnabled) {
 				ImGui::BeginDisabled();
 				bool bDisabled = false;
@@ -342,7 +349,7 @@ void DrawGUI() {
 		}
 
 #ifdef _DEBUG
-		if (ImGui::BeginTabItem("Debug")) {
+		if (ImGui::BeginTabItem(ICON_BUG " Debug")) {
 			IMGUI_TOGGLE("Dump Disassembly", Options.Debug.bDumpAsm);
 			IMGUI_TOGGLE("Dump Individual Sections", Options.Debug.bDumpSections);
 			IMGUI_TOGGLE("Dump Function Ranges", Options.Debug.bDumpFunctions);
@@ -351,18 +358,7 @@ void DrawGUI() {
 			IMGUI_TOGGLE("Disable Mutation", Options.Debug.bDisableMutations);
 			IMGUI_TOGGLE("Disable Relocations", Options.Debug.bDisableRelocations);
 			if (ImGui::TreeNode("Icon Tests")) {
-				ImGui::Text("ICON_BARS: " ICON_BARS);
-				ImGui::Text("ICON_DEBUG: " ICON_DEBUG);
-				ImGui::Text("ICON_INFO: " ICON_INFO);
-				ImGui::Text("ICON_REASM: " ICON_REASM);
-				ImGui::Text("ICON_PROTECT: " ICON_PROTECT);
-				ImGui::Text("ICON_SAVE_CONFIG: " ICON_SAVE_CONFIG);
-				ImGui::Text("ICON_OPEN_FILE: " ICON_OPEN_FILE);
-				ImGui::Text("ICON_SETTINGS: " ICON_SETTINGS);
-				ImGui::Text("ICON_DARKMODE: " ICON_DARKMODE);
-				ImGui::Text("ICON_PROTECTION: " ICON_PROTECTION);
-				ImGui::Text("ICON_WARNING: " ICON_WARNING);
-				ImGui::DebugTextEncoding(ICON_BARS ICON_DEBUG ICON_INFO ICON_REASM ICON_PROTECT ICON_SAVE_CONFIG ICON_OPEN_FILE ICON_SETTINGS ICON_DARKMODE ICON_PROTECTION ICON_WARNING);
+				ImGui::DebugTextEncoding(ICON_FILE_SHIELD ICON_SHIELD ICON_SHIELD_HALVED ICON_TRIANGLE_EXCLAMATION ICON_CIRCLE_INFO ICON_CIRCLE_QUESTION ICON_FOLDER_OPEN ICON_FILE ICON_FLOPPY_DISK ICON_CODE ICON_MICROCHIP ICON_BOX ICON_BOX_OPEN ICON_BOX_ARCHIVE);
 				ImGui::TreePop();
 			}
 			ImGui::ShowMetricsWindow();
@@ -381,7 +377,7 @@ void DrawGUI() {
 			ImGui::EndTabItem();
 		}
 
-		if (ImGui::BeginTabItem("Version")) {
+		if (ImGui::BeginTabItem(ICON_CIRCLE_INFO " Version")) {
 			ImGui::Text("Yap Version: " __YAP_VERSION__);
 			ImGui::Text("ImGui Version: " IMGUI_VERSION);
 			ImGui::Text("Zydis Version: %d.%d.%d", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
@@ -393,7 +389,7 @@ void DrawGUI() {
 
 		ImGui::EndTabBar();
 		ImGui::SetCursorPos(ImVec2(800 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetWindowScrollbarRect(ImGui::GetCurrentWindow(), ImGuiAxis_Y).GetWidth() : 0), 530 + ImGui::GetScrollY()));
-		if (ImGui::Button("Begin")) {
+		if (ImGui::Button(ICON_SHIELD_HALVED " Begin")) {
 			char file[MAX_PATH] = { 0 };
 			if (!OpenFileDialogue(file, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, false)) {
 				MessageBoxA(Data.hWnd, "Fatal!", NULL, MB_OK | MB_ICONERROR);
