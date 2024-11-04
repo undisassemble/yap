@@ -232,8 +232,6 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
 			IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT);
 			ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT.");
-			IMGUI_TOGGLE("Generate False Info", Options.Packing.bFalseSymbols);
-			ImGui::SetItemTooltip("Creates fake data directories and tables (doesn\'t affect size)");
 			IMGUI_TOGGLE("Delayed Entry Point", Options.Packing.bDelayedEntry);
 			ImGui::SetItemTooltip("Changes the entry point of the application during runtime.");
 			IMGUI_TOGGLE("DLL Sideloading Mitigations", Options.Packing.bMitigateSideloading);
@@ -261,21 +259,19 @@ void DrawGUI() {
 			if (!Options.Reassembly.bEnabled) ImGui::EndDisabled();
 			ImGui::Combo("Immitate Packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
 			ImGui::SetItemTooltip("Changes some details about the packed binary to make it look like another packer.");
-			if (ImGui::TreeNode("Extended Options")) {
-				IMGUI_TOGGLE("Enable Process Masquerading", Options.Packing.bEnableMasquerade);
-				ImGui::SetItemTooltip("Makes the packed executable appear as a different process (NOT process hollowing).\nPlease note that the smaller the path the easier it is to use.");
-				ImGui::SameLine();
-				ImGui::InputText(" ", Options.Packing.Masquerade, MAX_PATH);
-				IMGUI_TOGGLE("Mark Critical (Requires Admin)", Options.Packing.bMarkCritical);
-				ImGui::SetItemTooltip("Marks the process as critical, causing the system to bluescreen when the process exits or is killed.\nRequires the packed process to be run with administrator privileges.");
-				ImGui::InputText("Leave a Message", Options.Packing.Message, 64);
-				ImGui::SetItemTooltip("Leave a little message for any possible reverse engineers.");
-				ImGui::TreePop();
-			}
+			IMGUI_TOGGLE("Enable Process Masquerading", Options.Packing.bEnableMasquerade);
+			ImGui::SetItemTooltip("Makes the packed executable appear as a different process (NOT process hollowing).\nPlease note that the smaller the path the easier it is to use.");
+			ImGui::SameLine();
+			ImGui::InputText(" ", Options.Packing.Masquerade, MAX_PATH);
+			IMGUI_TOGGLE("Mark Critical (Requires Admin)", Options.Packing.bMarkCritical);
+			ImGui::SetItemTooltip("Marks the process as critical, causing the system to bluescreen when the process exits or is killed.\nRequires the packed process to be run with administrator privileges.");
+			ImGui::InputText("Leave a Message", Options.Packing.Message, 64);
+			ImGui::SetItemTooltip("Leave a little message for any possible reverse engineers.");
 			ImGui::EndTabItem();
 		}
 
 		if (ImGui::BeginTabItem(ICON_CODE " Reassembler")) {
+			ImGui::Text("The reassembler is currently expiremental, the only tested/supported compilers are MSVC and GCC/G++.");
 			IMGUI_TOGGLE("Enabled", Options.Reassembly.bEnabled);
 			ImGui::SetItemTooltip("Disassembles your application, modifies the assembly a ton, and then assembles the modified assembly.");
 			IMGUI_TOGGLE("Test", Options.Reassembly.bTest);
@@ -388,8 +384,8 @@ void DrawGUI() {
 		}
 
 		ImGui::EndTabBar();
-		ImGui::SetCursorPos(ImVec2(800 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetWindowScrollbarRect(ImGui::GetCurrentWindow(), ImGuiAxis_Y).GetWidth() : 0), 530 + ImGui::GetScrollY()));
-		if (ImGui::Button(ICON_SHIELD_HALVED " Begin")) {
+		ImGui::SetCursorPos(ImVec2(770 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetWindowScrollbarRect(ImGui::GetCurrentWindow(), ImGuiAxis_Y).GetWidth() : 0), 530 + ImGui::GetScrollY()));
+		if (ImGui::Button(ICON_SHIELD_HALVED " Protect")) {
 			char file[MAX_PATH] = { 0 };
 			if (!OpenFileDialogue(file, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, false)) {
 				MessageBoxA(Data.hWnd, "Fatal!", NULL, MB_OK | MB_ICONERROR);

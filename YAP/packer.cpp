@@ -2766,7 +2766,6 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		char* MessageBackup = Options.Message;
 		Options.Message = NULL;
 		::Options.Packing.Message[0] = 0;
-		::Options.Packing.bFalseSymbols = false;
 		::Options.Packing.Immitate = YAP;
 		::Options.Packing.bAntiDebug = false;
 		::Options.Packing.bAntiSandbox = false;
@@ -3070,15 +3069,9 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	}
 
 	// Fake data
-	if (::Options.Packing.bFalseSymbols) {
-		pNT->OptionalHeader.DataDirectory[10].VirtualAddress = SecHeader.VirtualAddress; // Load config directory
-		pNT->OptionalHeader.DataDirectory[10].Size = sizeof(IMAGE_LOAD_CONFIG_DIRECTORY64);
-		pNT->OptionalHeader.DataDirectory[6].VirtualAddress = SecHeader.VirtualAddress + sizeof(IMAGE_LOAD_CONFIG_DIRECTORY64); // Debug directory
-		pNT->OptionalHeader.DataDirectory[6].Size = sizeof(IMAGE_DEBUG_DIRECTORY);
-		if (::Options.Packing.Immitate != UPX) {
-			pNT->FileHeader.PointerToSymbolTable = SecHeader.PointerToRawData + sizeof(IMAGE_LOAD_CONFIG_DIRECTORY64) + sizeof(IMAGE_DEBUG_DIRECTORY);
-			pNT->FileHeader.NumberOfSymbols = rand();
-		}
+	if (::Options.Packing.Immitate != UPX) {
+		pNT->FileHeader.PointerToSymbolTable = SecHeader.PointerToRawData + sizeof(IMAGE_LOAD_CONFIG_DIRECTORY64) + sizeof(IMAGE_DEBUG_DIRECTORY);
+		pNT->FileHeader.NumberOfSymbols = rand();
 	}
 
 	if (::Options.Packing.EncodingCounts > 1) {

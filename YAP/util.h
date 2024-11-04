@@ -322,7 +322,6 @@ struct Options_t {
 		bool bHideIAT : 1 = false;
 		bool bDelayedEntry : 1 = false;
 		bool bDontCompressRsrc : 1 = true;
-		bool bFalseSymbols : 1 = false;
 		bool bDirectSyscalls : 1 = false;
 		bool bPartialUnpacking : 1 = false;
 		int CompressionLevel = 5;
