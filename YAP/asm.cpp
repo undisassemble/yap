@@ -1253,6 +1253,18 @@ bool Asm::FixAddresses() {
 		}
 	}
 
+	// Fix function ranges
+	for (int i = 0; i < FunctionRanges.Size(); i++) {
+		FunctionRange range = FunctionRanges.At(i);
+		DWORD end = TranslateOldAddress(range.dwStart + range.dwSize);
+		range.dwStart = TranslateOldAddress(range.dwStart);
+		range.dwSize = end - range.dwStart;
+		for (int j = 0; j < range.Entries.Size(); j++) {
+			range.Entries.Replace(j, TranslateOldAddress(range.Entries.At(j)));
+		}
+		FunctionRanges.Replace(i, range);
+	}
+
 	LOG(Success, MODULE_REASSEMBLER, "Patched instructions\n");
 	return true;
 }
