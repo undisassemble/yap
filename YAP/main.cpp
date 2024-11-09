@@ -190,8 +190,11 @@ DWORD WINAPI Begin(void* args) {
 			HANDLE hDumped = CreateFile("Yap.functions.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];
 			for (int i = 0; i < pAssembly->GetDisassembledFunctionRanges().Size(); i++) {
-				int n = snprintf(buf, 512, "%08x: %08x -> %08x\n", pAssembly->GetDisassembledFunctionRanges().At(i).dwEntry, pAssembly->GetDisassembledFunctionRanges().At(i).dwStart, pAssembly->GetDisassembledFunctionRanges().At(i).dwStart + pAssembly->GetDisassembledFunctionRanges().At(i).dwSize);
-				WriteFile(hDumped, buf, n, NULL, NULL);
+				WriteFile(hDumped, "------------\n", 13, NULL, NULL);
+				for (int j = 0; j < pAssembly->GetDisassembledFunctionRanges().At(i).Entries.Size(); j++) {
+					int n = snprintf(buf, 512, "%08x: %08x -> %08x\n", pAssembly->GetDisassembledFunctionRanges().At(i).Entries.At(j), pAssembly->GetDisassembledFunctionRanges().At(i).dwStart, pAssembly->GetDisassembledFunctionRanges().At(i).dwStart + pAssembly->GetDisassembledFunctionRanges().At(i).dwSize);
+					WriteFile(hDumped, buf, n, NULL, NULL);
+				}
 			}
 			CloseHandle(hDumped);
 		}

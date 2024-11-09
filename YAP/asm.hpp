@@ -61,7 +61,7 @@ struct AsmSection {
 };
 
 struct FunctionRange {
-	DWORD dwEntry;
+	Vector<DWORD> Entries;
 	DWORD dwStart;
 	DWORD dwSize;
 };

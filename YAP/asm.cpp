@@ -857,7 +857,10 @@ bool Asm::Analyze() {
 			Done.Release();
 			dwRVA = Functions.At(i);
 			ToDo.Push(dwRVA);
-			range.dwEntry = dwRVA;
+			range.Entries.nItems = 0;
+			range.Entries.raw.pBytes = NULL;
+			range.Entries.raw.u64Size = 0;
+			range.Entries.Push(dwRVA);
 			range.dwStart = dwRVA;
 			range.dwSize = 0;
 
@@ -883,7 +886,7 @@ bool Asm::Analyze() {
 				while (1) {
 					bool bExit = false;
 					// Find end cases
-					if (Done.Includes(pLines->At(index).OldRVA) || (range.dwEntry != pLines->At(index).OldRVA && Functions.Includes(pLines->At(index).OldRVA))) {
+					if (Done.Includes(pLines->At(index).OldRVA) || (!range.Entries.Includes(pLines->At(index).OldRVA) && Functions.Includes(pLines->At(index).OldRVA))) {
 						if (dwRVA != pLines->At(index).OldRVA && pLines->At(index).OldRVA + GetLineSize(pLines->At(index)) > range.dwStart + range.dwSize) {
 							range.dwSize = (pLines->At(index).OldRVA + GetLineSize(pLines->At(index))) - range.dwStart;
 						}
@@ -920,7 +923,7 @@ bool Asm::Analyze() {
 				Done.Push(dwRVA);
 			} while (ToDo.Size());
 
-			if (range.dwSize > 17) FunctionRanges.Push(range);
+			FunctionRanges.Push(range);
 		}
 
 		// Cleanup
@@ -929,32 +932,87 @@ bool Asm::Analyze() {
 		Functions.Release();
 
 		// Check for invalid functions
-		//Vector<DWORD> ToRemove;
+		int merged = 0;
+		int removed = 0;
 		for (int i = 0; i < FunctionRanges.Size(); i++) {
 			range = FunctionRanges.At(i);
-			if (range.dwEntry < range.dwStart || range.dwEntry > range.dwSize + range.dwStart) {
-				FunctionRanges.Remove(i);
-				i--;
-				continue;
-			}
-
+			
 			// Combined functions (improve this)
 			for (int j = 0; j < FunctionRanges.Size(); j++) if (j != i) {
 				FunctionRange range2 = FunctionRanges.At(j);
 				
 				// Combined
-				if (range2.dwStart < range.dwStart && range2.dwStart + range2.dwSize > range.dwStart) {
-					FunctionRanges.Remove(j);
-					if (i > j) {
-						i--;
+				if (range2.dwStart >= range.dwStart && range2.dwStart + range2.dwSize <= range.dwStart + range.dwSize) {
+					if (range2.dwSize < 17) {
+						range.dwSize = range2.dwStart - range.dwStart;
+						removed++;
+					} else {
+						range.Entries.Push(range2.Entries);
+						merged++;
 					}
+					range2.Entries.Release();
+					FunctionRanges.Replace(i, range);
+					FunctionRanges.Remove(j);
+					if (i > j) i--;
 					j--;
 					continue;
+				}
+
+				// Overlapping
+				if (range2.dwStart >= range.dwStart && range2.dwStart < range.dwStart + range.dwSize) {
+					range.dwSize = range2.dwStart + range2.dwSize - range.dwStart;
+					range.Entries.Push(range2.Entries);
+					range2.Entries.Release();
+					FunctionRanges.Replace(i, range);
+					FunctionRanges.Remove(j);
+					i = -1;
+					break;
+				}
+				if (range2.dwStart <= range.dwStart && range2.dwStart + range2.dwSize > range.dwStart) {
+					range.dwSize = range.dwStart + range.dwSize - range2.dwStart;
+					range.dwStart = range2.dwStart;
+					range.Entries.Push(range2.Entries);
+					range2.Entries.Release();
+					FunctionRanges.Replace(i, range);
+					FunctionRanges.Remove(j);
+					i = -1;
+					break;
+				}
+			}
+		}
+
+		// Remove invalid data
+		for (int i = 0; i < FunctionRanges.Size(); i++) { 
+			FunctionRange range = FunctionRanges.At(i);
+			
+			// Functions that are too small
+			if (range.dwSize < 17) {
+				range.Entries.Release();
+				FunctionRanges.Remove(i);
+				i--;
+				removed++;
+				continue;
+			}
+
+			// Out-of-bounds entry points
+			for (int j = 0; j < range.Entries.Size(); j++) {
+				if (range.Entries.At(j) < range.dwStart || range.Entries.At(j) >= range.dwStart + range.dwSize) {
+					removed++;
+					if (range.Entries.Size() == 1) {
+						range.Entries.Release();
+						FunctionRanges.Remove(i);
+						i--;
+						break;
+					}
+					range.Entries.Remove(j);
+					j--;
+					merged--;
 				}
 			}
 		}
 
 		LOG(Info, MODULE_REASSEMBLER, "Found %d compatible functions\n", FunctionRanges.Size());
+		LOG(Info, MODULE_REASSEMBLER, "Merged %d functions, removed %d functions\n", merged, removed);
 	} else {
 		LOG(Info, MODULE_REASSEMBLER, "Skipping function range discovery as results are unused\n");
 	}

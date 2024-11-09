@@ -2507,25 +2507,29 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			a.db(0);
 			Label CurrentlyLoadedSegment = a.newLabel();
 			a.bind(CurrentlyLoadedSegment);
-			a.dd(FunctionRanges.Size() + 1);
+			a.dd(_I32_MAX);
 			Label PointerArray = a.newLabel();
 			a.bind(PointerArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
-				a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).dwStart);
+				a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).dwStart, FunctionRanges.At(i).Entries.Size());
 			}
 			Label SizeArray = a.newLabel();
 			a.bind(SizeArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
-				a.dd(FunctionRanges.At(i).dwSize);
+				a.dd(FunctionRanges.At(i).dwSize, FunctionRanges.At(i).Entries.Size());
 			}
 			Label EntryArray = a.newLabel();
 			a.bind(EntryArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
-				a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).dwEntry);
+				for (int j = 0; j < FunctionRanges.At(i).Entries.Size(); j++) {
+					a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).Entries.At(j));
+				}
 			}
 			Label CompressedSizes = a.newLabel();
 			a.bind(CompressedSizes);
 			Label Compressed = a.newLabel();
+			DWORD ID = 0;
+			int count = 0;
 			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
 				Buffer buf;
 				buf.u64Size = FunctionRanges.At(i).dwSize;
@@ -2533,11 +2537,15 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 				pOriginal->ReadRVA(FunctionRanges.At(i).dwStart, buf.pBytes, buf.u64Size);
 				FunctionBodies.Push(PackSection(buf, Options));
 				ZeroMemory(buf.pBytes, buf.u64Size);
-				*reinterpret_cast<DWORD*>(PartialUnpackingHook + 2) = i;
-				memcpy_s(buf.pBytes + FunctionRanges.At(i).dwEntry - FunctionRanges.At(i).dwStart, buf.u64Size - (FunctionRanges.At(i).dwEntry - FunctionRanges.At(i).dwStart), PartialUnpackingHook, sizeof(PartialUnpackingHook));
+				*reinterpret_cast<DWORD*>(PartialUnpackingHook + 2) = ID;
+				ID += FunctionRanges.At(i).Entries.Size();
+				for (int j = 0; j < FunctionRanges.At(i).Entries.Size(); j++) {
+					memcpy_s(buf.pBytes + FunctionRanges.At(i).Entries.At(j) - FunctionRanges.At(i).dwStart, buf.u64Size - (FunctionRanges.At(i).Entries.At(j) - FunctionRanges.At(i).dwStart), PartialUnpackingHook, sizeof(PartialUnpackingHook));
+				}
 				pOriginal->WriteRVA(FunctionRanges.At(i).dwStart, buf.pBytes, buf.u64Size);
 				free(buf.pBytes);
-				a.dq(FunctionBodies.At(FunctionBodies.Size() - 1).u64Size);
+				a.dq(FunctionBodies.At(FunctionBodies.Size() - 1).u64Size, FunctionRanges.At(i).Entries.Size());
+				count += FunctionRanges.At(i).Entries.Size();
 			}
 
 			Label UnloadSegment = a.newLabel();
@@ -2548,7 +2556,13 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			
 			// Check if already loaded
 			a.mov(eax, ptr(CurrentlyLoadedSegment));
-			a.cmp(eax, FunctionRanges.Size());
+			DEBUG_ONLY(Label dontkill = a.newLabel());
+			DEBUG_ONLY(a.cmp(rax, ptr(rsp)));
+			DEBUG_ONLY(a.strict());
+			DEBUG_ONLY(a.jne(dontkill));
+			DEBUG_ONLY(a.int3());
+			DEBUG_ONLY(a.bind(dontkill));
+			a.cmp(eax, count);
 			a.strict();
 			a.jl(_UnloadSegment);
 			
@@ -2564,16 +2578,26 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			a.mov(rdx, 0);
 			a.lea(rcx, ptr(Compressed));
 			a.lea(r8, ptr(CompressedSizes));
+			a.lea(r11, ptr(PointerArray));
+			a.mov(r9, ptr(r11, rax, 3));
 			Label findcomploop = a.newLabel();
 			Label findcomploopexit = a.newLabel();
 			a.bind(findcomploop);
 			a.cmp(edx, eax);
 			a.strict();
-			a.je(findcomploopexit);
+			a.jge(findcomploopexit);
+			a.mov(r10, ptr(r11, rdx, 3));
 			a.add(rcx, ptr(r8));
+			Label thing = a.newLabel();
+			a.bind(thing);
 			a.add(r8, 8);
 			a.inc(rdx);
-			a.jmp(findcomploop);
+			a.cmp(r10, ptr(r11, rdx, 3));
+			a.strict();
+			a.jz(thing);
+			a.cmp(r9, ptr(r11, rdx, 3));
+			a.strict();
+			a.jnz(findcomploop);
 			a.bind(findcomploopexit);
 			a.mov(rdx, ptr(r8));
 			a.lea(r8, ptr(PointerArray));
@@ -2625,7 +2649,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			Label checkexit = a.newLabel();
 			Label checkloop = a.newLabel();
 			a.bind(checkloop);
-			a.cmp(rcx, FunctionRanges.Size());
+			a.cmp(rcx, count);
 			a.strict();
 			a.jge(checkexit);
 			a.inc(rcx);
@@ -2664,8 +2688,10 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 
 			// Write function address
 			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
-				pOriginal->WriteRVA<uint64_t>(FunctionRanges.At(i).dwEntry + 8, pPackedBinary->GetBaseAddress() + holder.labelOffsetFromBase(LoadSegment) + ShellcodeData.BaseAddress);
-				ShellcodeData.Relocations.Relocations.Push(ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).dwEntry + 8);
+				for (int j = 0; j < FunctionRanges.At(i).Entries.Size(); j++) {
+					pOriginal->WriteRVA<uint64_t>(FunctionRanges.At(i).Entries.At(j) + 8, pPackedBinary->GetBaseAddress() + holder.labelOffsetFromBase(LoadSegment) + ShellcodeData.BaseAddress);
+					ShellcodeData.Relocations.Relocations.Push(ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).Entries.At(j) + 8);
+				}
 			}
 
 			a.bind(UnloadSegment);
@@ -2689,17 +2715,36 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			a.dec(rdx);
 			a.strict();
 			a.jnz(loop);
-			a.pop(rax);
+			a.pop(r8);
+			a.mov(r9, r8);
+			a.lea(rcx, ptr(PointerArray));
+			Label decloop = a.newLabel();
+			a.bind(decloop);
+			a.dec(r9);
+			a.mov(rdx, ptr(rcx, r8, 3));
+			a.cmp(rdx, ptr(rcx, r9, 3));
+			a.strict();
+			a.jz(decloop);
+			a.inc(r9);
+			a.mov(r8, r9);
+			Label setentryloop = a.newLabel();
+			a.bind(setentryloop);
 			a.lea(rcx, ptr(EntryArray));
-			a.mov(rcx, ptr(rcx, rax, 3));
+			a.mov(rcx, ptr(rcx, r8, 3));
 			a.add(rcx, ptr(InternalRelOff));
 			a.mov(word_ptr(rcx), 0x6850);
-			a.mov(dword_ptr(rcx, 2), eax);
+			a.mov(dword_ptr(rcx, 2), r8d);
 			a.mov(word_ptr(rcx, 6), 0xB848);
 			a.lea(rax, ptr(LoadSegment));
 			a.mov(qword_ptr(rcx, 8), rax);
 			a.mov(qword_ptr(rcx, 16), 0xE0FF);
-			a.mov(dword_ptr(CurrentlyLoadedSegment), FunctionRanges.Size() + 1);
+			a.inc(r8);
+			a.lea(rcx, ptr(PointerArray));
+			a.mov(rdx, ptr(rcx, r8, 3));
+			a.cmp(rdx, ptr(rcx, r9, 3));
+			a.strict();
+			a.jz(setentryloop);
+			a.mov(dword_ptr(CurrentlyLoadedSegment), _I32_MAX);
 			a.pop(r9);
 			a.pop(r8);
 			a.pop(rdx);
