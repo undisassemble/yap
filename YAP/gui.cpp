@@ -142,8 +142,9 @@ void SaveProject() {
 		return;
 	}
 
-	// Write sig
+	// Write sig + version
 	WriteFile(hFile, "YAP", 3, NULL, NULL);
+	WriteFile(hFile, __YAP_VERSION_NUM__, sizeof(DWORD), NULL, NULL);
 
 	// Write data
 	WriteFile(hFile, &Options, sizeof(Options_t), NULL, NULL);
@@ -152,7 +153,8 @@ void SaveProject() {
 
 void LoadProject() {
 	char sig[3] = { 0 };
-	
+	DWORD ver = 0;
+
 	// Open file
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
@@ -166,6 +168,15 @@ void LoadProject() {
 	ReadFile(hFile, sig, 3, NULL, NULL);
 	if (memcmp(sig, "YAP", 3)) {
 		MessageBoxA(Data.hWnd, "Invalid/corrupt project!", NULL, MB_OK | MB_ICONERROR);
+		CloseHandle(hFile);
+		Data.Project[0] = 0;
+		return;
+	}
+
+	// Read version
+	ReadFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
+	if (ver != __YAP_VERSION_NUM__) {
+		MessageBoxA(Data.hWnd, "Version mismatch!", NULL, MB_OK | MB_ICONERROR);
 		CloseHandle(hFile);
 		Data.Project[0] = 0;
 		return;
@@ -256,6 +267,9 @@ void DrawGUI() {
 			if (!Options.Reassembly.bEnabled) ImGui::BeginDisabled();
 			IMGUI_TOGGLE("Partial Unpacking", Options.Packing.bPartialUnpacking);
 			ImGui::SetItemTooltip(Options.Reassembly.bEnabled ? "Only allows one function to be loaded at a time, preventing the whole program from being dumped at once." : "Requires reassembler to be enabled");
+			ImGui::SameLine();
+			ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
+			ImGui::SetItemTooltip("This feature is not threadsafe, and only works on single threaded apps.");
 			if (!Options.Reassembly.bEnabled) ImGui::EndDisabled();
 			ImGui::Combo("Immitate Packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
 			ImGui::SetItemTooltip("Changes some details about the packed binary to make it look like another packer.");

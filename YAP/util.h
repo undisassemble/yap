@@ -35,6 +35,7 @@ using namespace x86;
 
 // Version
 #define __YAP_VERSION__ "0.0.0"
+#define __YAP_VERSION_NUM__ 0x00000000
 #ifdef _DEBUG
 #define __YAP_BUILD__ "DEBUG"
 #define DEBUG_ONLY(x) x
