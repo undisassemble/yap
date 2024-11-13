@@ -752,9 +752,6 @@
     <ClInclude Include="lzma\Precomp.h">
       <Filter>Header Files\Vendor</Filter>
     </ClInclude>
-    <ClInclude Include="vm_types.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="LzmaDec_DecodeReal.raw">
       <Filter>Header Files\Embed</Filter>
     </ClInclude>

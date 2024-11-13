@@ -1,5 +1,4 @@
 #include "vm.hpp"
-#include "vm_types.hpp"
 
 BYTE RandomizedOpcodes[47] = { 0 };
 BYTE RandomizedRegisters[77] = { 0 };
@@ -73,46 +72,7 @@ Label GenerateVMParser(_In_ PE* pPackedBinary, _In_ PE* pOriginal, _In_ PackerOp
 	pA->mov(ptr(v_r13), r13);
 	pA->mov(ptr(v_r14), r14);
 	pA->mov(ptr(v_r15), r15);
-	
-	// Prepare to execute
-	pA->pop(rbx); // Get function ID
-	pA->lea(rax, ptr(FunctionPtrs));
-	pA->mov(ebx, dword_ptr(rax, al, 2, 0));
-	pA->sub(rax, rbx);
-	pA->mov(rcx, rax);
-	Label skipintro = pA->newLabel();
-	pA->jmp(skipintro);
 
-	// Execution loop
-	Label loop = pA->newLabel();
-	pA->bind(loop);
-	pA->movzx(r8d, byte_ptr(rcx, 9));
-	pA->and_(r8b, 0b00111111);
-	pA->add(rcx, r8);
-	pA->bind(skipintro);
-	pA->mov(ebx, dword_ptr(rcx)); // Load RIP
-	for (int i = 0; i < sizeof(RandomizedOpcodes); i++) {
-		Label skip = pA->newLabel();
-		pA->cmp(byte_ptr(rcx, 8), i);
-		pA->jne(skip);
-
-		// fuck it ill do it later
-		switch (RandomizedOpcodes[i]) {
-		case RAW: {
-			
-			for (int j = 0; j < ZYDIS_MAX_INSTRUCTION_LENGTH; j++) {
-				pA->db(rand() & 255);
-			}
-			break;
-		}
-		case CALL: {
-
-			break;
-		}
-		}
-
-		pA->bind(skip);
-	}
 
 	// Restore registers and return to non-virtualized area
 	pA->mov(rax, ptr(v_rax));

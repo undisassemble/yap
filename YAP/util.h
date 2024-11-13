@@ -35,15 +35,16 @@ using namespace x86;
 
 // Version
 #define __YAP_VERSION__ "0.0.0"
-#define __YAP_VERSION_NUM__ 0x00000000
 #ifdef _DEBUG
 #define __YAP_BUILD__ "DEBUG"
 #define DEBUG_ONLY(x) x
 #define RELEASE_ONLY(x)
+#define __YAP_VERSION_NUM__ 0xFF000000
 #else
 #define __YAP_BUILD__ "RELEASE"
 #define DEBUG_ONLY(x)
 #define RELEASE_ONLY(x) x
+#define __YAP_VERSION_NUM__ 0x00000000
 #endif
 
 const int VMMinimumSize = 21;
@@ -213,7 +214,9 @@ struct Vector {
 
 	// Replaces instructions in order, size does not change
 	void Overwrite(_In_ DWORD i, _In_ Vector<T> Item) {
-
+		for (int j = 0; j < Item.Size() && i < Size(); j++ && i++) {
+			((T*)raw.pBytes)[i] = Item.At(j);
+		}
 	}
 
 	void Release() {
@@ -306,6 +309,11 @@ extern Data_t Data;
 extern HANDLE hLogFile;
 extern HANDLE hStdOut;
 
+struct ToVirt_t {
+	bool bRemoveExport : 1 = true;
+	char Name[25] = { 0 };
+};
+
 #ifndef UTIL_STRUCT_ONLY
 struct Options_t {
 	struct {
@@ -336,7 +344,8 @@ struct Options_t {
 	// Requires packing
 	struct {
 		bool bEnabled : 1 = false;
-		Vector<int> VMFuncs;
+		bool bVirtEntry : 1 = false;
+		Vector<ToVirt_t> VMFuncs;
 	} VM;
 
 	struct {
@@ -345,17 +354,6 @@ struct Options_t {
 		bool bStrip : 1 = false;
 		bool bSubstitution : 1 = false;
 	} Reassembly;
-
-	struct {
-		bool bDebugger : 1 = false;
-		bool bVM : 1 = false;
-		int iDebugger = 1; // 0 - No icon, 1 - MB_ICONERROR, 2 - MB_ICONWARNING, 3 - MB_ICONINFORMATION, 4 - MB_ICONQUESTION
-		int iVM = 1;
-		char DebuggerText[MAX_PATH] = "A debugger has been detected! Please close any debugging tools and relaunch.";
-		char VMText[MAX_PATH] = "A virtual machine has been detected! Please don\'t run me in a VM!";
-		char DebuggerTitle[26] = "Error";
-		char VMTitle[26] = "Error";
-	} Messages;
 
 #ifdef _DEBUG
 	struct {

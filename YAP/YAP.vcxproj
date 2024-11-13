@@ -372,7 +372,6 @@
     <ClInclude Include="SHA256.raw" />
     <ClInclude Include="util.h" />
     <ClInclude Include="vm.hpp" />
-    <ClInclude Include="vm_types.hpp" />
     <ClInclude Include="zyasm.hpp" />
     <ClInclude Include="zydis\dependencies\zycore\include\Zycore\Allocator.h" />
     <ClInclude Include="zydis\dependencies\zycore\include\Zycore\ArgParse.h" />

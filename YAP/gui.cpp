@@ -144,10 +144,19 @@ void SaveProject() {
 
 	// Write sig + version
 	WriteFile(hFile, "YAP", 3, NULL, NULL);
-	WriteFile(hFile, __YAP_VERSION_NUM__, sizeof(DWORD), NULL, NULL);
+	DWORD ver = __YAP_VERSION_NUM__;
+	WriteFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
 
 	// Write data
+	BYTE* pTemp = Options.VM.VMFuncs.raw.pBytes;
+	Options.VM.VMFuncs.raw.pBytes = NULL;
 	WriteFile(hFile, &Options, sizeof(Options_t), NULL, NULL);
+	Options.VM.VMFuncs.raw.pBytes = pTemp;
+
+	// Write VM funcs
+	for (int i = 0; i < Options.VM.VMFuncs.Size(); i++) {
+		WriteFile(hFile, &Options.VM.VMFuncs.At(i), sizeof(ToVirt_t), NULL, NULL);
+	}
 	CloseHandle(hFile);
 }
 
@@ -184,6 +193,12 @@ void LoadProject() {
 
 	// Read data
 	ReadFile(hFile, &Options, sizeof(Options_t), NULL, NULL);
+	
+	// Read VM funcs
+	Options.VM.VMFuncs.raw.pBytes = reinterpret_cast<BYTE*>(malloc(Options.VM.VMFuncs.raw.u64Size));
+	for (int i = 0; i < Options.VM.VMFuncs.Size(); i++) {
+		ReadFile(hFile, Options.VM.VMFuncs.raw.pBytes + i * sizeof(ToVirt_t), sizeof(ToVirt_t), NULL, NULL);
+	}
 	CloseHandle(hFile);
 }
 
@@ -309,37 +324,39 @@ void DrawGUI() {
 				if (Options.VM.VMFuncs.Size() >= 256) {
 					MessageBoxA(Data.hWnd, "Maximum number of functions selected!", NULL, MB_ICONINFORMATION | MB_OK);
 				} else {
-					Options.VM.VMFuncs.Push(0);
+					ToVirt_t empty;
+					Options.VM.VMFuncs.Push(empty);
 				}
 			}
 
 			for (int i = 0, n = Options.VM.VMFuncs.Size(); i < n; i++) {
 				// Label
 				char buf[512];
-				ImGui::Text("Function %d", i + 1);
 
 				// Dropdown
 				wsprintfA(buf, "BtnFn%d", i);
 				ImGui::PushID(buf);
-				if (Options.VM.VMFuncs.At(i)) {
-					strncpy_s(buf, "NOT IMPLIMENTED", 16);
-				} else {
-					memcpy(buf, "Select Function", 16);
-				}
-				ImGui::SameLine();
-				if (ImGui::BeginCombo("Function", buf)) {
-					for (int j = 0, m = 0; j < m; j++) {
-						strncpy_s(buf, "NOT IMPLIMENTED", 16);
-						if (ImGui::Selectable(buf)) {
-							Options.VM.VMFuncs.Replace(i, j + 1);
-						}
-						if (j == Options.VM.VMFuncs.At(i) - 1) {
-							ImGui::SetItemDefaultFocus();
-						}
-					}
-					ImGui::EndCombo();
+				wsprintfA(buf, "Function %d", i + 1);
+				char name[sizeof(Options.VM.VMFuncs.At(i).Name)] = { 0 };
+				memcpy(name, Options.VM.VMFuncs.At(i).Name, sizeof(name));
+				if (ImGui::InputText(buf, name, sizeof(name))) {
+					ToVirt_t entry = Options.VM.VMFuncs.At(i);
+					memcpy(entry.Name, name, sizeof(name));
+					Options.VM.VMFuncs.Replace(i, entry);
 				}
 				ImGui::PopID();
+				ImGui::SetItemTooltip("Name of exported function");
+				ImGui::SameLine();
+				wsprintfA(buf, "BtnCheck%d", i);
+				ImGui::PushID(buf);
+				bool bSet = Options.VM.VMFuncs.At(i).bRemoveExport;
+				if (ImGui::Checkbox("Remove Export", &bSet)) {
+					ToVirt_t entry = Options.VM.VMFuncs.At(i);
+					entry.bRemoveExport = bSet;
+					Options.VM.VMFuncs.Replace(i, entry);
+				}
+				ImGui::PopID();
+				ImGui::SetItemTooltip("Remove function from export table");
 
 				// Remove button
 				ImGui::SameLine();
@@ -347,8 +364,7 @@ void DrawGUI() {
 				ImGui::PushID(buf);
 				if (ImGui::Button("Remove")) {
 					uint64_t holder = 0;
-					for (int j = i; j < n - 1; j++) Options.VM.VMFuncs.Replace(j, Options.VM.VMFuncs.At(j + 1));
-					Options.VM.VMFuncs.Pop();
+					Options.VM.VMFuncs.Remove(i);
 					n--;
 					i--;
 				}
