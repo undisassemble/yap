@@ -350,9 +350,10 @@ struct Options_t {
 
 	struct {
 		bool bEnabled : 1 = false;
-		bool bTest : 1 = false;
 		bool bStrip : 1 = false;
+		bool bStripDOSStub : 1 = false;
 		bool bSubstitution : 1 = false;
+		uint64_t Rebase = 0;
 	} Reassembly;
 
 #ifdef _DEBUG

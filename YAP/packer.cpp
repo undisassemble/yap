@@ -947,7 +947,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	a.mov(r9, InternalShellcode.u64Size);
 	a.call(unpack);
 	free(workspace);
-
+	
 	// Relocation stuff
 	a.mov(rax, ptr(Reloc));
 	if (ShellcodeData.Relocations.Relocations.Size()) {

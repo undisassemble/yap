@@ -221,6 +221,15 @@ DWORD WINAPI Begin(void* args) {
 			LOG(Failed, MODULE_YAP, "Assembly failed!\n");
 			goto th_exit;
 		}
+
+		// Modify (after assembled)
+		if (Options.Reassembly.bStripDOSStub) {
+			pAssembly->StripDosStub();
+			pAssembly->FixHeaders();
+		}
+		if (Options.Reassembly.Rebase) {
+			pAssembly->RebaseImage(Options.Reassembly.Rebase);
+		}
 	}
 
 	// Pack
