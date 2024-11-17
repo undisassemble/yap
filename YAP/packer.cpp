@@ -915,10 +915,14 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	}
 
 	// Load each section
-	Label* pLabels = reinterpret_cast<Label*>(malloc(sizeof(Label) * pOriginal->GetNtHeaders()->x64.FileHeader.NumberOfSections));
+	Label CompressedSections = a.newLabel();
+	Label CompressedSizes = a.newLabel();
+	Label DecompressedSizes = a.newLabel();
+	Label VirtualAddrs = a.newLabel();
 	PE Copied(pOriginal);
 
 	BYTE* workspace = reinterpret_cast<BYTE*>(malloc(0xFFFFFF));
+	DWORD NumPacked = 0;
 	for (WORD i = 0, n = pOriginal->GetNtHeaders()->x64.FileHeader.NumberOfSections; i < n; i++) {
 		if (!pOriginal->GetSectionHeader(i)->Misc.VirtualSize || !pOriginal->GetSectionHeader(i)->SizeOfRawData) continue;
 		
@@ -926,17 +930,33 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		Buffer compressed = PackSection(pOriginal->GetSectionBytes(i), Options);
 		LOG(Info, MODULE_PACKER, "Packed section %.8s (%lld)\n", pOriginal->GetSectionHeader(i)->Name, (int64_t)compressed.u64Size - pOriginal->GetSectionHeader(i)->SizeOfRawData);
 		Copied.OverwriteSection(i, compressed.pBytes, compressed.u64Size);
-		
-		// Decompress data
-		
-		pLabels[i] = a.newLabel();
-		a.lea(rcx, ptr(pLabels[i]));
-		a.mov(rdx, compressed.u64Size);
-		a.mov(r8, pPackedBinary->GetNtHeaders()->x64.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA + pOriginal->GetSectionHeader(i)->VirtualAddress - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders);
-		a.add(r8, ptr(Reloc));
-		a.mov(r9, pOriginal->GetSectionBytes(i).u64Size);
-		a.call(unpack);
+		NumPacked++;
 	}
+	free(workspace);
+	a.mov(rsi, 0);
+	a.lea(rcx, ptr(CompressedSections));
+	a.mov(rbp, pPackedBinary->GetNtHeaders()->x64.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA);
+	uint64_t DecompressKey = rand64();
+	Label decompressloop = a.newLabel();
+	a.bind(decompressloop);
+	a.mov(rax, DecompressKey);
+	a.lea(rdx, ptr(CompressedSizes));
+	a.mov(rdx, ptr(rdx, rsi, 3));
+	a.xor_(rdx, rax);
+	a.lea(r8, ptr(VirtualAddrs));
+	a.mov(r8, ptr(r8, rsi, 3));
+	a.xor_(r8, rax);
+	a.add(r8, rbp);
+	a.add(r8, ptr(Reloc));
+	a.lea(r9, ptr(DecompressedSizes));
+	a.mov(r9, ptr(r9, rsi, 3));
+	a.xor_(r9, rax);
+	a.mov(rax, 0);
+	a.call(unpack);
+	a.inc(rsi);
+	a.cmp(rsi, NumPacked);
+	a.strict();
+	a.jne(decompressloop);
 	Label InternalShell = a.newLabel();
 	ULONG sz = 0;
 	Buffer CompressedInternal = PackSection(InternalShellcode, Options);
@@ -946,7 +966,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	a.add(r8, ptr(Reloc));
 	a.mov(r9, InternalShellcode.u64Size);
 	a.call(unpack);
-	free(workspace);
 	
 	// Relocation stuff
 	a.mov(rax, ptr(Reloc));
@@ -974,9 +993,9 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	a.garbage();
 
 	// Insert compressed data
+	a.bind(CompressedSections);
 	for (WORD i = 0, n = pOriginal->GetNtHeaders()->x64.FileHeader.NumberOfSections; i < n; i++) {
 		if (!pOriginal->GetSectionHeader(i)->Misc.VirtualSize || !pOriginal->GetSectionHeader(i)->SizeOfRawData) continue;
-		a.bind(pLabels[i]);
 		Buffer buf = Copied.GetSectionBytes(i);
 		for (int j = 0; j < buf.u64Size; j++) a.db(buf.pBytes[j]);
 	}
@@ -987,7 +1006,25 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.dq(0);
 	}
 	a.bind(InternalShell);
-	for (int i = 0; i < CompressedInternal.u64Size; i++) a.db(CompressedInternal.pBytes[i]);
+	a.embed(CompressedInternal.pBytes, CompressedInternal.u64Size);
+	
+	a.bind(CompressedSizes);
+	for (int i = 0; i < Copied.GetNtHeaders()->x64.FileHeader.NumberOfSections; i++) {
+		if (!pOriginal->GetSectionHeader(i)->Misc.VirtualSize || !pOriginal->GetSectionHeader(i)->SizeOfRawData) continue;
+		a.dq(Copied.GetSectionHeader(i)->SizeOfRawData ^ DecompressKey);
+	}
+
+	a.bind(DecompressedSizes);
+	for (int i = 0; i < pOriginal->GetNtHeaders()->x64.FileHeader.NumberOfSections; i++) {
+		if (!pOriginal->GetSectionHeader(i)->Misc.VirtualSize || !pOriginal->GetSectionHeader(i)->SizeOfRawData) continue;
+		a.dq(pOriginal->GetSectionHeader(i)->SizeOfRawData ^ DecompressKey);
+	}
+	
+	a.bind(VirtualAddrs);
+	for (int i = 0; i < pOriginal->GetNtHeaders()->x64.FileHeader.NumberOfSections; i++) {
+		if (!pOriginal->GetSectionHeader(i)->Misc.VirtualSize || !pOriginal->GetSectionHeader(i)->SizeOfRawData) continue;
+		a.dq((pOriginal->GetSectionHeader(i)->VirtualAddress - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders) ^ DecompressKey);
+	}
 
 	// GetModuleHandleW
 	{
@@ -1265,7 +1302,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
 	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
 	if (::Options.Packing.bAntiDump) *reinterpret_cast<QWORD*>(buf.pBytes + szOffSzShell) = buf.u64Size;
-	free(pLabels);
 	free(CompressedInternal.pBytes);
 	LOG(Success, MODULE_PACKER, "Generated loader shellcode\n");
 	return buf;
@@ -2875,7 +2911,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	pNT->OptionalHeader.Magic = 0x20B;
 	pNT->OptionalHeader.SectionAlignment = 0x1000;
 	pNT->OptionalHeader.FileAlignment = 0x200;
-	ShellcodeData.ImageBase = pNT->OptionalHeader.ImageBase = bIsDLL ? 0x10000000 : 0x140000000;
+	ShellcodeData.ImageBase = pNT->OptionalHeader.ImageBase = pOriginal->GetBaseAddress();
 	pNT->OptionalHeader.MajorOperatingSystemVersion = 4;
 	pNT->OptionalHeader.MajorSubsystemVersion = 6;
 	pNT->OptionalHeader.SizeOfHeaders = pPackedBinary->GetDosHeader()->e_lfanew + sizeof(IMAGE_NT_HEADERS64) + sizeof(IMAGE_SECTION_HEADER);
