@@ -12,9 +12,14 @@
 // Forward declares
 DWORD WINAPI Begin(void* args);
 namespace Console {
-	void help();
-	void version();
+	void help(char* name);
+	void buildversion();
+	void create(char* project);
+	void version(char* project);
+	void read(char* project);
+	void protect(char* project, char* input, char* output = NULL);
 }
+
 
 Options_t Options;
 Settings_t Settings;
@@ -27,7 +32,7 @@ Asm* pAssembly = NULL;
 int main(int argc, char** argv) {
 	// General setup
 	srand(time(NULL));
-	hLogFile = CreateFile("Yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	hLogFile = CreateFile("YAP.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hLogFile || hLogFile == INVALID_HANDLE_VALUE) {
 		LOG(Failed, MODULE_YAP, "Failed to open logging file: %d\n", GetLastError());
 	}
@@ -80,33 +85,42 @@ int main(int argc, char** argv) {
 
 		// Check number of arguments
 		if (argc < 2) {
-			Console::help();
+			Console::help(argv[0]);
 			return 1;
 		}
 
-		// Parse arguments
-		for (int i = 1; i < argc; i++) {
-
-			// --help, -h
-			if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
-				Console::help();
-				return 0;
-			}
-
-			// --version, -v
-			else if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-v")) {
-				Console::version();
-				return 0;
-			}
-
-			// --packer=, --packer:
-			else if (!memcmp(argv[i], "--packer=", 9) || !memcmp(argv[i], "--packer:", 9)) {
-				
-			}
+		// --version and --help
+		if (!lstrcmpA(argv[1], "--help") || !lstrcmpA(argv[1], "-h")) {
+			Console::help(argv[0]);
+			return 0;
+		} else if (!lstrcmpA(argv[1], "--version") || !lstrcmpA(argv[1], "-v")) {
+			Console::buildversion();
+			return 0;
 		}
 
-		// Begin
-		CreateThread(0, 0, Begin, 0, 0, 0);
+		// Check number of args again
+		if (argc < 3) {
+			Console::help(argv[0]);
+			return 1;
+		}
+		
+		// Dispatch
+		if (!lstrcmpA(argv[2], "create")) {
+			Console::create(argv[1]);
+		} else if (!lstrcmpA(argv[2], "version")) {
+			Console::version(argv[1]);
+		} else if (!lstrcmpA(argv[2], "read")) {
+			Console::read(argv[1]);
+		} else if (!lstrcmpA(argv[2], "protect")) {
+			if (argc < 4) {
+				LOG(Failed, MODULE_YAP, "Not enough arguments for command protect\n");
+				return 1;
+			}
+			Console::protect(argv[1], argv[3], argc > 4 ? argv[4] : NULL);
+		} else {
+			LOG(Failed, MODULE_YAP, "Unrecognized command: %s\n", argv[2]);
+			return 1;
+		}
 	}
 	return 0;
 }
@@ -118,7 +132,7 @@ DWORD WINAPI Begin(void* args) {
 		return 1;
 	
 	Data.bRunning = true;
-	LOG(Info, MODULE_YAP, "Starting Yap\n");
+	LOG(Info, MODULE_YAP, "Starting YAP\n");
 
 	// Select optimization mode
 	bool bResetOptimizations = false;
@@ -147,7 +161,7 @@ DWORD WINAPI Begin(void* args) {
 		// Dump disassembly
 #ifdef _DEBUG
 		if (Options.Debug.bDumpAsm) {
-			HANDLE hDumped = CreateFile("Yap.dump.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			HANDLE hDumped = CreateFile("YAP.dump.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];
 			ZydisFormatter Formatter;
 			ZydisFormatterInit(&Formatter, ZYDIS_FORMATTER_STYLE_INTEL);
@@ -187,7 +201,7 @@ DWORD WINAPI Begin(void* args) {
 		}
 
 		if (Options.Debug.bDumpFunctions) {
-			HANDLE hDumped = CreateFile("Yap.functions.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			HANDLE hDumped = CreateFile("YAP.functions.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];
 			for (int i = 0; i < pAssembly->GetDisassembledFunctionRanges().Size(); i++) {
 				WriteFile(hDumped, "------------\n", 13, NULL, NULL);
@@ -258,39 +272,182 @@ DWORD WINAPI Begin(void* args) {
 
 	// Save file
 	LOG(Success, MODULE_YAP, "All modules passed\n");
-	do {
-		Data.bWaitingOnFile = true;
-		while (Data.bWaitingOnFile) Sleep(1);
-		if (!pAssembly->ProduceBinary(Data.SaveFileName)) {
-			LOG(Failed, MODULE_YAP, "Failed to save file!\n");
-			goto th_exit;
+	if (Data.hWnd) {
+		do {
+			Data.bWaitingOnFile = true;
+			while (Data.bWaitingOnFile) Sleep(1);
+			if (!pAssembly->ProduceBinary(Data.SaveFileName)) {
+				LOG(Failed, MODULE_YAP, "Failed to save file!\n");
+				goto th_exit;
+			} else {
+				break;
+			}
+		} while (!Data.bUserCancelled);
+		if (Data.bUserCancelled) {
+			LOG(Info, MODULE_YAP, "User cancelled\n");
 		} else {
-			break;
+			LOG(Info_Extended, MODULE_YAP, "Saved to: %s\n", Data.SaveFileName);
 		}
-	} while (!Data.bUserCancelled);
-	if (Data.bUserCancelled) {
-		LOG(Info, MODULE_YAP, "User cancelled\n");
 	} else {
-		LOG(Info_Extended, MODULE_YAP, "Saved to: %s\n", Data.SaveFileName);
+		if (!pAssembly->ProduceBinary(reinterpret_cast<char*>(args))) {
+			LOG(Failed, MODULE_YAP, "Failed to save file!\n");
+		} else {
+			LOG(Info_Extended, MODULE_YAP, "Save to: %s\n", reinterpret_cast<char*>(args));
+		}
 	}
 
 th_exit:
 	if (bResetOptimizations) Settings.Opt = PrioAuto;
-	LOG(Info, MODULE_YAP, "Ending Yap\n");
+	LOG(Info, MODULE_YAP, "Ending YAP\n");
 	Data.bRunning = false;
 	delete pAssembly;
 	return 0;
 }
 
-void Console::help() {
+void Console::help(char* name) {
+	LOG(Nothing, MODULE_YAP, "Usage: %s PROJECT COMMAND\n\n", name);
 
+	LOG(Nothing, MODULE_YAP, "COMMANDS\n");
+	LOG(Nothing, MODULE_YAP, "\tcreate\t\tCreate project\n");
+	LOG(Nothing, MODULE_YAP, "\tversion\t\tGet version of project\n");
+	LOG(Nothing, MODULE_YAP, "\tread\t\tOutput configuration options from project\n");
+	LOG(Nothing, MODULE_YAP, "\tprotect INPUT [OUTPUT]\tProtect a file\n\n");
+
+	LOG(Nothing, MODULE_YAP, "ALTERNATIVE COMMANDS\n");
+	LOG(Nothing, MODULE_YAP, "%s --version\tGet build info\n", name);
+	LOG(Nothing, MODULE_YAP, "%s --help\tGet this help menu\n", name);
 }
 
-void Console::version() {
-	LOG(Nothing, MODULE_YAP, "Yap Version: " __YAP_VERSION__ "\n");
+void Console::buildversion() {
+	LOG(Nothing, MODULE_YAP, "YAP Version: " __YAP_VERSION__ "\n");
 	LOG(Nothing, MODULE_YAP, "Build: " __YAP_BUILD__ "\n");
 	LOG(Nothing, MODULE_YAP, "Build Time: " __DATE__ " " __TIME__ "\n");
 	LOG(Nothing, MODULE_YAP, "ImGui Version: " IMGUI_VERSION "\n");
 	LOG(Nothing, MODULE_YAP, "Zydis Version: %d.%d.%d\n", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
 	LOG(Nothing, MODULE_YAP, "AsmJit Version: %d.%d.%d\n", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
+}
+
+void Console::create(char* project) {
+	if (lstrlenA(project) + 1 > MAX_PATH) {
+		LOG(Failed, MODULE_YAP, "Cannot handle project files with names longer than MAX_PATH characters (%d bytes)!\n", MAX_PATH);
+		return;
+	}
+	memcpy(Data.Project, project, lstrlenA(project) + 1);
+	SaveProject();
+}
+
+void Console::version(char* project) {
+	HANDLE hFile = CreateFileA(project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	BYTE Sig[3] = { 0 };
+	DWORD Ver = 0;
+
+	// Read signature
+	ReadFile(hFile, Sig, 3, NULL, NULL);
+	if (memcmp(Sig, "YAP", 3)) {
+		LOG(Failed, MODULE_YAP, "%s is not a YAP project\n", project);
+	} else {
+		// Read version
+		ReadFile(hFile, &Ver, sizeof(DWORD), NULL, NULL);
+		LOG(Success, MODULE_YAP, "%d.%d.%d %s\n", Ver & __YAP_VERSION_MASK_MAJOR__, Ver & __YAP_VERSION_MASK_MINOR__, Ver & __YAP_VERSION_MASK_PATCH__, (Ver & __YAP_VERSION_MASK_DEBUG__) ? "DEBUG" : "RELEASE");
+	}
+
+	CloseHandle(hFile);
+}
+
+void Console::read(char* project) {
+	if (lstrlenA(project) + 1 > MAX_PATH) {
+		LOG(Failed, MODULE_YAP, "Cannot handle project files with names longer than MAX_PATH characters (%d bytes)!\n", MAX_PATH);
+		return;
+	}
+	memcpy(Data.Project, project, lstrlenA(project) + 1);
+	
+	// Load project
+	if (!LoadProject()) return;
+
+	LOG(Nothing, MODULE_YAP, "\nOptions for %s\n\n", project);
+	// List values
+#define LIST(name, type_id) LOG(Nothing, MODULE_YAP, "%s = %" #type_id "\n", #name, name)
+	LIST(Options.Packing.bEnabled, d);
+	LIST(Options.Packing.bAntiDump, d);
+	LIST(Options.Packing.bEnableMasquerade, d);
+	LIST(Options.Packing.bNukeHeaders, d);
+	LIST(Options.Packing.bMitigateSideloading, d);
+	LIST(Options.Packing.bOnlyLoadMicrosoft, d);
+	LIST(Options.Packing.bMarkCritical, d);
+	LIST(Options.Packing.bAntiDebug, d);
+	LIST(Options.Packing.bAntiVM, d);
+	LIST(Options.Packing.bAllowHyperV, d);
+	LIST(Options.Packing.bAntiSandbox, d);
+	LIST(Options.Packing.bHideIAT, d);
+	LIST(Options.Packing.bDelayedEntry, d);
+	LIST(Options.Packing.bDontCompressRsrc, d);
+	LIST(Options.Packing.bDirectSyscalls, d);
+	LIST(Options.Packing.bPartialUnpacking, d);
+	LIST(Options.Packing.CompressionLevel, d);
+	LIST(Options.Packing.Immitate, d);
+	LIST(Options.Packing.Masquerade, s);
+	LIST(Options.Packing.Message, );
+	LIST(Options.Packing.MutationLevel, d);
+	LIST(Options.Packing.EncodingCounts, d);
+	LIST(Options.VM.bEnabled, d);
+	LIST(Options.VM.bVirtEntry, d);
+	LIST(Options.Reassembly.bEnabled, d);
+	LIST(Options.Reassembly.bStrip, d);
+	LIST(Options.Reassembly.bStripDOSStub, d);
+	LIST(Options.Reassembly.bSubstitution, d);
+	LIST(Options.Reassembly.Rebase, p);
+#ifdef _DEBUG
+	LIST(Options.Debug.bDumpAsm, d);
+	LIST(Options.Debug.bDumpSections, d);
+	LIST(Options.Debug.bDumpFunctions, d);
+	LIST(Options.Debug.bGenerateBreakpoints, d);    
+	LIST(Options.Debug.bGenerateMarks, d);
+	LIST(Options.Debug.bDisableMutations, d);
+	LIST(Options.Debug.bDisableRelocations, d);
+#endif
+#undef LIST
+
+	// List VM funcs
+	LOG(Nothing, MODULE_YAP, "\nNum VM funcs: %d\n", Options.VM.VMFuncs.Size());
+	for (int i = 0; i < Options.VM.VMFuncs.Size(); i++) {
+		LOG(Nothing, MODULE_YAP, "Func %d name: %s\n", i + 1, Options.VM.VMFuncs.At(i).Name);
+		LOG(Nothing, MODULE_YAP, "Remove export of func %d: %d\n", i + 1, Options.VM.VMFuncs.At(i).bRemoveExport);
+	}
+}
+
+void Console::protect(char* project, char* input, char* output) {
+	if (lstrlenA(project) + 1 > MAX_PATH) {
+		LOG(Failed, MODULE_YAP, "Cannot handle project files with names longer than MAX_PATH characters (%d bytes)!\n", MAX_PATH);
+		return;
+	}
+	if (lstrlenA(input) + 1 > MAX_PATH || (output && lstrlenA(output) + 1 > MAX_PATH)) {
+		LOG(Failed, MODULE_YAP, "Cannot handle files with names longer than MAX_PATH characters (%d bytes)!\n", MAX_PATH);
+		return;
+	}
+	memcpy(Data.Project, project, lstrlenA(project) + 1);
+
+	// Load project
+	if (!LoadProject()) return;
+
+	// Output name
+	char TrueOutput[MAX_PATH] = { 0 };
+	if (output) {
+		memcpy(TrueOutput, output, lstrlenA(output) + 1);
+	} else {
+		int InputLen = lstrlenA(input);
+		memcpy(TrueOutput, input, InputLen + 1);
+		uint16_t i = InputLen - 1;
+		for (; i > 0; i--) {
+			if (TrueOutput[i] == '.') break;
+		}
+		if (i > InputLen || InputLen + 7 > MAX_PATH) {
+			LOG(Failed, MODULE_YAP, "Failed to set output name!\n");
+			return;
+		}
+		memmove(&TrueOutput[i + 7], &TrueOutput[i], InputLen + 1 - i);
+		memcpy(&TrueOutput[i], "_yapped", 7);
+	}
+
+	pAssembly = new Asm(input);
+	Begin(TrueOutput);
 }

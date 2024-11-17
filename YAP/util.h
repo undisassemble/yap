@@ -20,11 +20,11 @@ using namespace x86;
 #define LOG_INFO_EXTRA LOG_INFO
 #define LOG_WARNING "\x1B[33m[*]\x1B[39m "
 #define LOG_ERROR "\x1B[31m[-]\x1B[39m "
-#define MODULE_YAP "Yap"
+#define MODULE_YAP "YAP"
 #define MODULE_VM "VM"
 #define MODULE_PACKER "Packer"
 #define MODULE_REASSEMBLER "ReAsm"
-#define LOG(level, mod, str, ...) if (level <= ::Settings.Logging) { char _log_buf[128]; if (!level && ::Data.bUsingConsole) { snprintf(_log_buf, 128, "[" mod "]: \t" str, ##__VA_ARGS__); WriteConsoleA(hStdOut, _log_buf, strlen(_log_buf), NULL, NULL); } else if (level && ::Data.bUsingConsole) { snprintf(_log_buf, 128, "%s[" mod "]: \t" str, level == LoggingLevel_t::Failed ? LOG_ERROR : (level == LoggingLevel_t::Success ? LOG_SUCCESS : (level == LoggingLevel_t::Warning ? LOG_WARNING : (level == LoggingLevel_t::Info ? LOG_INFO : LOG_INFO_EXTRA))), ##__VA_ARGS__); WriteConsoleA(hStdOut, _log_buf, strlen(_log_buf), NULL, NULL); } if (level && ::hLogFile) { snprintf(_log_buf, 128, "%s[" mod "]: \t" str, level == LoggingLevel_t::Failed ? "[-] " : (level == LoggingLevel_t::Success ? "[+] " : (level == LoggingLevel_t::Warning ? "[*] " : (level == LoggingLevel_t::Info ? "[?] " : "[?] "))), ##__VA_ARGS__); WriteFile(hLogFile, _log_buf, strlen(_log_buf), NULL, NULL); } }
+#define LOG(level, mod, str, ...) if (level <= ::Settings.Logging) { char _log_buf[128]; if (!level && ::Data.bUsingConsole) { snprintf(_log_buf, 128, str, ##__VA_ARGS__); WriteConsoleA(hStdOut, _log_buf, strlen(_log_buf), NULL, NULL); } else if (level && ::Data.bUsingConsole) { snprintf(_log_buf, 128, "%s[" mod "]: \t" str, level == LoggingLevel_t::Failed ? LOG_ERROR : (level == LoggingLevel_t::Success ? LOG_SUCCESS : (level == LoggingLevel_t::Warning ? LOG_WARNING : (level == LoggingLevel_t::Info ? LOG_INFO : LOG_INFO_EXTRA))), ##__VA_ARGS__); WriteConsoleA(hStdOut, _log_buf, strlen(_log_buf), NULL, NULL); } if (level && ::hLogFile) { snprintf(_log_buf, 128, "%s[" mod "]: \t" str, level == LoggingLevel_t::Failed ? "[-] " : (level == LoggingLevel_t::Success ? "[+] " : (level == LoggingLevel_t::Warning ? "[*] " : (level == LoggingLevel_t::Info ? "[?] " : "[?] "))), ##__VA_ARGS__); WriteFile(hLogFile, _log_buf, strlen(_log_buf), NULL, NULL); } }
 
 // Macros
 #define IMGUI_TOGGLE(str, var) { bool _TEMP_BOOL = var; if(ImGui::Checkbox(str, &_TEMP_BOOL)) { var = _TEMP_BOOL; } } // Allows ImGui::Checkbox to be used with bitfields
@@ -35,6 +35,10 @@ using namespace x86;
 
 // Version
 #define __YAP_VERSION__ "0.0.0"
+#define __YAP_VERSION_MASK_DEBUG__ 0xFF000000
+#define __YAP_VERSION_MASK_MAJOR__ 0x000000FF
+#define __YAP_VERSION_MASK_MINOR__ 0x0000FF00
+#define __YAP_VERSION_MASK_PATCH__ 0x00FF0000
 #ifdef _DEBUG
 #define __YAP_BUILD__ "DEBUG"
 #define DEBUG_ONLY(x) x
@@ -317,7 +321,7 @@ struct ToVirt_t {
 #ifndef UTIL_STRUCT_ONLY
 struct Options_t {
 	struct {
-		bool bEnabled : 1 = true;
+		bool bEnabled : 1 = false;
 		bool bAntiDump : 1 = false;
 		bool bEnableMasquerade : 1 = false;
 		bool bNukeHeaders : 1 = false;

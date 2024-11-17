@@ -127,7 +127,7 @@ void LoadSettings() {
 	CloseHandle(hFile);
 }
 
-void SaveProject() {
+bool SaveProject() {
 	// Check file ending
 	char* ending = &Data.Project[lstrlenA(Data.Project) - 7];
 	if ((lstrlenA(Data.Project) < 7 || lstrcmpA(ending, ".yaproj")) && lstrlenA(Data.Project) < sizeof(Data.Project) - 8) {
@@ -137,9 +137,9 @@ void SaveProject() {
 	// Open file
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		MessageBoxA(Data.hWnd, "Failed to save project!", NULL, MB_OK | MB_ICONERROR);
+		if (Data.hWnd) MessageBoxA(Data.hWnd, "Failed to save project!", NULL, MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Failed to save project: %d\n", GetLastError());
-		return;
+		return false;
 	}
 
 	// Write sig + version
@@ -158,37 +158,40 @@ void SaveProject() {
 		WriteFile(hFile, &Options.VM.VMFuncs.At(i), sizeof(ToVirt_t), NULL, NULL);
 	}
 	CloseHandle(hFile);
+	LOG(Success, MODULE_YAP, "Saved project to %s\n", Data.Project);
+	return true;
 }
 
-void LoadProject() {
+bool LoadProject() {
 	char sig[3] = { 0 };
 	DWORD ver = 0;
 
 	// Open file
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		MessageBoxA(Data.hWnd, "Failed to load project!", NULL, MB_OK | MB_ICONERROR);
+		if (Data.hWnd) MessageBoxA(Data.hWnd, "Failed to load project!", NULL, MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Failed to load project: %d\n", GetLastError());
 		Data.Project[0] = 0;
-		return;
+		return false;
 	}
 
 	// Read signature
 	ReadFile(hFile, sig, 3, NULL, NULL);
 	if (memcmp(sig, "YAP", 3)) {
-		MessageBoxA(Data.hWnd, "Invalid/corrupt project!", NULL, MB_OK | MB_ICONERROR);
+		if (Data.hWnd) MessageBoxA(Data.hWnd, "Invalid/corrupt project!", NULL, MB_OK | MB_ICONERROR);
+		LOG(Failed, MODULE_YAP, "Invalid/corrupt project\n");
 		CloseHandle(hFile);
 		Data.Project[0] = 0;
-		return;
+		return false;
 	}
 
 	// Read version
 	ReadFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
 	if (ver != __YAP_VERSION_NUM__) {
-		MessageBoxA(Data.hWnd, "Version mismatch!", NULL, MB_OK | MB_ICONERROR);
+		if (Data.hWnd) MessageBoxA(Data.hWnd, "Version mismatch!", NULL, MB_OK | MB_ICONERROR);
 		CloseHandle(hFile);
 		Data.Project[0] = 0;
-		return;
+		return false;
 	}
 
 	// Read data
@@ -200,6 +203,8 @@ void LoadProject() {
 		ReadFile(hFile, Options.VM.VMFuncs.raw.pBytes + i * sizeof(ToVirt_t), sizeof(ToVirt_t), NULL, NULL);
 	}
 	CloseHandle(hFile);
+	LOG(Success, MODULE_YAP, "Loaded %s\n", Data.Project);
+	return true;
 }
 
 void DrawGUI() {
@@ -407,7 +412,7 @@ void DrawGUI() {
 		}
 
 		if (ImGui::BeginTabItem(ICON_CIRCLE_INFO " Version")) {
-			ImGui::Text("Yap Version: " __YAP_VERSION__);
+			ImGui::Text("YAP Version: " __YAP_VERSION__);
 			ImGui::Text("ImGui Version: " IMGUI_VERSION);
 			ImGui::Text("Zydis Version: %d.%d.%d", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
 			ImGui::Text("AsmJit Version: %d.%d.%d", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));

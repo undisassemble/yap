@@ -2877,11 +2877,9 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	}
 
 	// Setup DOS header & stub (e_lfanew is managed by PE)
-	if (true) {
-		pPackedBinary->GetDosStub()->u64Size = pOriginal->GetDosStub()->u64Size;
-		pPackedBinary->GetDosStub()->pBytes = reinterpret_cast<BYTE*>(malloc(pPackedBinary->GetDosStub()->u64Size));
-		memcpy(pPackedBinary->GetDosStub()->pBytes, pOriginal->GetDosStub()->pBytes, pOriginal->GetDosStub()->u64Size);
-	}
+	pPackedBinary->GetDosStub()->u64Size = pOriginal->GetDosStub()->u64Size;
+	pPackedBinary->GetDosStub()->pBytes = reinterpret_cast<BYTE*>(malloc(pPackedBinary->GetDosStub()->u64Size));
+	memcpy(pPackedBinary->GetDosStub()->pBytes, pOriginal->GetDosStub()->pBytes, pOriginal->GetDosStub()->u64Size);
 	pPackedBinary->GetDosHeader()->e_magic = IMAGE_DOS_SIGNATURE;
 	pPackedBinary->GetDosHeader()->e_lfanew = sizeof(IMAGE_DOS_HEADER) + pPackedBinary->GetDosStub()->u64Size;
 

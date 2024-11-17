@@ -141,7 +141,7 @@ private:
 			}
 		} while (o1 == o0);
 		if (o1.size() != o0.size()) {
-			LOG(Warning, "Size mismatch!\n");
+			LOG(Warning, MODULE_PACKER, "Size mismatch!\n");
 		}
 		return o1;
 	}
