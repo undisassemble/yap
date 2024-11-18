@@ -348,7 +348,7 @@ void Console::version(char* project) {
 	} else {
 		// Read version
 		ReadFile(hFile, &Ver, sizeof(DWORD), NULL, NULL);
-		LOG(Success, MODULE_YAP, "%d.%d.%d %s\n", Ver & __YAP_VERSION_MASK_MAJOR__, Ver & __YAP_VERSION_MASK_MINOR__, Ver & __YAP_VERSION_MASK_PATCH__, (Ver & __YAP_VERSION_MASK_DEBUG__) ? "DEBUG" : "RELEASE");
+		LOG(Nothing, MODULE_YAP, "%d.%d.%d %s\n", Ver & __YAP_VERSION_MASK_MAJOR__, (Ver & __YAP_VERSION_MASK_MINOR__) >> 8, (Ver & __YAP_VERSION_MASK_PATCH__) >> 16, (Ver & __YAP_VERSION_MASK_DEBUG__) ? "DEBUG" : "RELEASE");
 	}
 
 	CloseHandle(hFile);

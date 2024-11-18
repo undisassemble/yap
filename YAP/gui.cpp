@@ -187,7 +187,7 @@ bool LoadProject() {
 
 	// Read version
 	ReadFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
-	if (ver != __YAP_VERSION_NUM__) {
+	if ((ver & ~__YAP_VERSION_MASK_PATCH__) != (__YAP_VERSION_NUM__ & ~__YAP_VERSION_MASK_PATCH__)) {
 		if (Data.hWnd) MessageBoxA(Data.hWnd, "Version mismatch!", NULL, MB_OK | MB_ICONERROR);
 		CloseHandle(hFile);
 		Data.Project[0] = 0;
