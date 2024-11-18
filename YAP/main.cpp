@@ -134,6 +134,8 @@ DWORD WINAPI Begin(void* args) {
 	Data.bRunning = true;
 	LOG(Info, MODULE_YAP, "Starting YAP\n");
 
+	Options_t OptionsBackup = Options;
+
 	// Select optimization mode
 	bool bResetOptimizations = false;
 	if (Settings.Opt == PrioAuto) {
@@ -297,6 +299,7 @@ DWORD WINAPI Begin(void* args) {
 	}
 
 th_exit:
+	Options = OptionsBackup;
 	if (bResetOptimizations) Settings.Opt = PrioAuto;
 	LOG(Info, MODULE_YAP, "Ending YAP\n");
 	Data.bRunning = false;

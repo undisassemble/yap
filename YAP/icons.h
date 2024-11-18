@@ -19,6 +19,7 @@
 #define ICON_BOX_OPEN             "\xEF\x92\x9E" // F49E
 #define ICON_BOX_ARCHIVE          "\xEF\x86\x87" // F187
 #define ICON_BUG                  "\xEF\x86\x88" // F188
+#define ICON_GEARS                "\xEF\x82\x85" // F085
 
 static const unsigned int icons_compressed_size = 245474;
 static const unsigned int icons_compressed_data[245476/4] =

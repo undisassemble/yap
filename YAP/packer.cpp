@@ -1542,6 +1542,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		if (::Options.Packing.EncodingCounts <= 1) LOG(Warning, MODULE_PACKER, "No imports were found, assuming there are no imported DLLs.\n");
 		Label skip = a.newLabel();
 		a.jmp(skip);
+		a.bind(KERNEL32DLL);
+		a.embed(&Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest));
 		InternalRelOff = a.newLabel();
 		a.bind(InternalRelOff);
 		a.dq(ShellcodeData.BaseAddress + pPackedBinary->GetBaseAddress() + a.offset());

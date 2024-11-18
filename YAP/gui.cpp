@@ -400,14 +400,7 @@ void DrawGUI() {
 		}
 #endif
 
-		if (ImGui::BeginTabItem("Settings")) {
-			if (
-				ImGui::Checkbox("Check For Updates", &Settings.bCheckForUpdates) ||
-				ImGui::Combo("Reassembler Priority", (int*)&Settings.Opt, "Automatic\0Prioritize Speed\0Prioritize Memory\0") ||
-				ImGui::Combo("Logging Level", (int*)&Settings.Logging, "Nothing\0Errors\0Successes\0Warnings\0Info\0Extended Info\0")
-			) {
-				SaveSettings();
-			}
+		if (ImGui::BeginTabItem(ICON_GEARS " Advanced")) {
 			ImGui::EndTabItem();
 		}
 
