@@ -28,16 +28,16 @@ typedef struct {
 /// </summary>
 class PE {
 protected:
+	DWORD OverlayOffset = 0;
+	bool x86 = false;
+public:
 	PEStatus_t Status = NotSet;
 	Buffer DosStub = { 0 };
 	Buffer Overlay = { 0 };
-	DWORD OverlayOffset = 0;
-	BYTE** pSectionData = NULL;
+	Vector<Buffer> SectionData;
+	Vector<IMAGE_SECTION_HEADER> SectionHeaders;
 	IMAGE_DOS_HEADER DosHeader = { 0 };
 	ComboNTHeaders NTHeaders = { 0 };
-	IMAGE_SECTION_HEADER* pSectionHeaders = NULL;
-	bool x86 = false;
-public:
 
 	/// <summary>
 	/// Creates PE object with given file
@@ -65,8 +65,6 @@ public:
 
 	~PE();
 
-	void OverrideStatus(_In_ PEStatus_t NewStatus) { Status = NewStatus; }
-
 	/// <summary>
 	/// Retrieves the TLS callback array (can be written to/modified)
 	/// </summary>
@@ -84,40 +82,6 @@ public:
 	/// </summary>
 	/// <param name="u64NewBase">New base address</param>
 	void RebaseImage(_In_ uint64_t u64NewBase);
-
-	/// <summary>
-	/// Gets the raw bytes of a section
-	/// </summary>
-	/// <param name="sName">Name of the section</param>
-	/// <returns>Raw section bytes and size</returns>
-	Buffer GetSectionBytes(_In_ char* sName);
-
-	/// <summary>
-	/// Gets the raw bytes of a section
-	/// </summary>
-	/// <param name="wIndex">Index of the section</param>
-	/// <returns>Raw section bytes and size</returns>
-	Buffer GetSectionBytes(_In_ WORD wIndex);
-
-	/// <summary>
-	/// Finds section header with given name
-	/// </summary>
-	/// <param name="sName">Name of section to look for</param>
-	/// <returns>Pointer to the section header, or NULL on failure</returns>
-	IMAGE_SECTION_HEADER* GetSectionHeader(_In_opt_ char* sName);
-
-	/// <summary>
-	/// Gets the section header at specified index
-	/// </summary>
-	/// <param name="wIndex">Index of the section</param>
-	/// <returns>Pointer to the section header</returns>
-	IMAGE_SECTION_HEADER* GetSectionHeader(_In_ WORD wIndex);
-
-	/// <summary>
-	/// Gets array of section headers
-	/// </summary>
-	/// <returns>Pointer to section headers</returns>
-	IMAGE_SECTION_HEADER* GetSectionHeaders();
 
 	/// <summary>
 	/// Get binary machine type
@@ -153,24 +117,6 @@ public:
 	}
 
 	/// <summary>
-	/// Retrieves the images DOS header
-	/// </summary>
-	/// <returns>Pointer to DOS header</returns>
-	IMAGE_DOS_HEADER* GetDosHeader();
-
-	/// <summary>
-	/// Retrieves the images NT headers
-	/// </summary>
-	/// <returns>Pointer to NT headers</returns>
-	ComboNTHeaders* GetNtHeaders();
-
-	/// <summary>
-	/// Gets PE parse status
-	/// </summary>
-	/// <returns>Status of parser</returns>
-	PEStatus_t GetStatus();
-
-	/// <summary>
 	/// Fixes headers
 	/// </summary>
 	void FixHeaders();
@@ -183,12 +129,9 @@ public:
 	virtual void DeleteSection(_In_ WORD wIndex);
 	void OverwriteSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_opt_ size_t szBytes);
 	void InsertSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_ IMAGE_SECTION_HEADER Header);
-	WORD FindSection(_In_ char* sName);
 	WORD FindSectionByRaw(_In_ DWORD dwRaw);
-	Buffer* GetDosStub();
 	void StripDosStub();
 	IAT_ENTRY* GetIAT();
-	Buffer* GetOverlay();
 	void DiscardOverlay();
 	DWORD GetOverlayOffset();
 	

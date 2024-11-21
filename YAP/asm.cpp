@@ -87,11 +87,11 @@ Asm::Asm(_In_ char* sFileName) : PE(sFileName) {
 	Vector<Line> lines;
 	lines.bExponentialGrowth = true;
 	AsmSection sec = { 0 };
-	for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+	for (int i = 0; i < SectionHeaders.Size(); i++) {
 		sec.Lines = reinterpret_cast<Vector<Line>*>(malloc(sizeof(Vector<Line>)));
 		memcpy(sec.Lines, &lines, sizeof(Vector<Line>));
-		sec.OldRVA = GetSectionHeader(i)->VirtualAddress;
-		sec.OldSize = GetSectionHeader(i)->Misc.VirtualSize;
+		sec.OldRVA = SectionHeaders[i].VirtualAddress;
+		sec.OldSize = SectionHeaders[i].Misc.VirtualSize;
 		Sections.Push(sec);
 	}
 }
@@ -101,11 +101,11 @@ Asm::Asm(_In_ HANDLE hFile) : PE(hFile) {
 	Vector<Line> lines;
 	lines.bExponentialGrowth = true;
 	AsmSection sec = { 0 };
-	for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+	for (int i = 0; i < SectionHeaders.Size(); i++) {
 		sec.Lines = reinterpret_cast<Vector<Line>*>(malloc(sizeof(Vector<Line>)));
 		memcpy(sec.Lines, &lines, sizeof(Vector<Line>));
-		sec.NewRVA = sec.OldRVA = GetSectionHeader(i)->VirtualAddress;
-		sec.OldSize = GetSectionHeader(i)->Misc.VirtualSize;
+		sec.NewRVA = sec.OldRVA = SectionHeaders[i].VirtualAddress;
+		sec.OldSize = SectionHeaders[i].Misc.VirtualSize;
 		Sections.Push(sec);
 	}
 }
@@ -312,14 +312,14 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 		Lines = Sections[SectionIndex].Lines;
 		Buffer RawBytes = { 0 };
 		{
-			RawBytes = GetSectionBytes(FindSectionByRVA(dwRVA));
-			IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(FindSectionByRVA(dwRVA));
-			if (!pHeader || !RawBytes.pBytes || !RawBytes.u64Size) {
+			RawBytes = SectionData[FindSectionByRVA(dwRVA)];
+			IMAGE_SECTION_HEADER Header = SectionHeaders[FindSectionByRVA(dwRVA)];
+			if (!RawBytes.pBytes || !RawBytes.u64Size || !Header.Misc.VirtualSize) {
 				LOG(Warning, MODULE_REASSEMBLER, "Failed to get bytes for RVA %lu\n", dwRVA);
 				continue;
 			}
-			RawBytes.pBytes += dwRVA - pHeader->VirtualAddress;
-			RawBytes.u64Size -= dwRVA - pHeader->VirtualAddress;
+			RawBytes.pBytes += dwRVA - Header.VirtualAddress;
+			RawBytes.u64Size -= dwRVA - Header.VirtualAddress;
 		}
 
 		// Locate current position in index
@@ -416,7 +416,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 					// If address is a pointer, use the address stored at that address (if possible)
 					if (CraftedLine.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY) {
 						// If address is an import we dont want to disassemble it
-						IMAGE_DATA_DIRECTORY ImportDir = Decoder.machine_mode == ZYDIS_MACHINE_MODE_LONG_64 ? GetNtHeaders()->x64.OptionalHeader.DataDirectory[1] : GetNtHeaders()->x86.OptionalHeader.DataDirectory[1];
+						IMAGE_DATA_DIRECTORY ImportDir = Decoder.machine_mode == ZYDIS_MACHINE_MODE_LONG_64 ? NTHeaders.x64.OptionalHeader.DataDirectory[1] : NTHeaders.x86.OptionalHeader.DataDirectory[1];
 						if (u64Referencing >= ImportDir.VirtualAddress && u64Referencing < (uint64_t)ImportDir.VirtualAddress + ImportDir.Size) {
 							u64Referencing = 0;
 						}
@@ -424,13 +424,12 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 						// Find the section (u64Referencing is absolute, not an RVA, so we have to translate it manually)
 						else {
 							WORD wContainingIndex = FindSectionByRVA(u64Referencing);
-							IMAGE_SECTION_HEADER* pContainingHeader = GetSectionHeader(wContainingIndex);
-							if (!pContainingHeader || wContainingIndex == _UI16_MAX) {
+							if (wContainingIndex >= SectionHeaders.Size()) {
 								LOG(Failed, MODULE_REASSEMBLER, "Failed to disassemble code pointed to at %#x\n", u64Referencing);
 								TempLines.Release();
 								return false;
 							}
-
+							
 							// Extract the address
 							Line insert;
 							insert.OldRVA = u64Referencing;
@@ -461,8 +460,8 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 
 					if (u64Referencing) {
 						// Disassemble the address (if good)
-						IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(FindSectionByRVA(u64Referencing));
-						if (pHeader && pHeader->Characteristics & IMAGE_SCN_MEM_EXECUTE && pHeader->SizeOfRawData > u64Referencing - pHeader->VirtualAddress) {
+						IMAGE_SECTION_HEADER Header = SectionHeaders[FindSectionByRVA(u64Referencing)];
+						if (Header.Characteristics & IMAGE_SCN_MEM_EXECUTE && Header.SizeOfRawData > u64Referencing - Header.VirtualAddress) {
 							if (!ToDisasm.Includes(u64Referencing)) {
 								ToDisasm.Push(u64Referencing);
 								if (CraftedLine.Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_CALL && !Functions.Includes(u64Referencing)) {
@@ -690,14 +689,14 @@ bool Asm::Disassemble() {
 	ZydisDecoderInit(&Decoder, GetMachine(), x86 ? ZYDIS_STACK_WIDTH_32 : ZYDIS_STACK_WIDTH_64);
 
 	// Disassemble entry point
-	if (!DisasmRecursive(GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint)) {
+	if (!DisasmRecursive(NTHeaders.x64.OptionalHeader.AddressOfEntryPoint)) {
 		return false;
 	}
-	LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled Entry Point (0x%p)\n", GetBaseAddress() + GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint);
+	LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled Entry Point (0x%p)\n", GetBaseAddress() + NTHeaders.x64.OptionalHeader.AddressOfEntryPoint);
 
 	// Error check (TEMPORARY)
 	{
-		Vector<Line>* Lines = Sections[FindSectionIndex(GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint)].Lines;
+		Vector<Line>* Lines = Sections[FindSectionIndex(NTHeaders.x64.OptionalHeader.AddressOfEntryPoint)].Lines;
 		for (size_t i = 0; i < Lines->Size() - 1; i++) {
 			if (Lines->At(i).OldRVA + GetLineSize(Lines->At(i)) > Lines->At(i + 1).OldRVA) {
 				LOG(Failed, MODULE_REASSEMBLER, "Peepee poopoo (0x%p + %u -> 0x%p)\n", GetBaseAddress() + Lines->At(i).OldRVA, GetLineSize(Lines->At(i)), GetBaseAddress() + Lines->At(i + 1).OldRVA);
@@ -731,12 +730,12 @@ bool Asm::Disassemble() {
 	LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled Exports\n");
 
 	// Disassemble exception dir
-	IMAGE_DATA_DIRECTORY ExcDataDir = GetNtHeaders()->x64.OptionalHeader.DataDirectory[3];
+	IMAGE_DATA_DIRECTORY ExcDataDir = NTHeaders.x64.OptionalHeader.DataDirectory[3];
 	if (ExcDataDir.VirtualAddress) {
-		Buffer ExcData = GetSectionBytes(FindSectionByRVA(ExcDataDir.VirtualAddress));
-		IMAGE_SECTION_HEADER* pExcSecHeader = GetSectionHeader(FindSectionByRVA(ExcDataDir.VirtualAddress));
-		if (ExcData.pBytes && pExcSecHeader) {
-			RUNTIME_FUNCTION* pArray = reinterpret_cast<RUNTIME_FUNCTION*>(ExcData.pBytes + ExcDataDir.VirtualAddress - pExcSecHeader->VirtualAddress);
+		Buffer ExcData = SectionData[FindSectionByRVA(ExcDataDir.VirtualAddress)];
+		IMAGE_SECTION_HEADER ExcSecHeader = SectionHeaders[FindSectionByRVA(ExcDataDir.VirtualAddress)];
+		if (ExcData.pBytes && ExcSecHeader.VirtualAddress) {
+			RUNTIME_FUNCTION* pArray = reinterpret_cast<RUNTIME_FUNCTION*>(ExcData.pBytes + ExcDataDir.VirtualAddress - ExcSecHeader.VirtualAddress);
 			for (uint32_t i = 0, n = ExcDataDir.Size / sizeof(RUNTIME_FUNCTION); i < n; i++) {
 				if (!CheckRuntimeFunction(&pArray[i])) {
 					return false;
@@ -770,18 +769,18 @@ bool Asm::Disassemble() {
 	Line line;
 	LOG(Info_Extended, MODULE_REASSEMBLER, "Filling gaps\n");
 	for (int i = 0; i < Sections.Size(); i++) {
-		LOG(Info_Extended, MODULE_REASSEMBLER, "Filling section %.8s (%llu lines)\n", GetSectionHeader(i)->Name, Sections[i].Lines->Size());
+		LOG(Info_Extended, MODULE_REASSEMBLER, "Filling section %.8s (%llu lines)\n", SectionHeaders[i].Name, Sections[i].Lines->Size());
 
 		// Incase section holds no lines
 		if (!Sections[i].Lines->Size()) {	
 			line.Type = Embed;
 			line.OldRVA = Sections[i].OldRVA;
-			if (Sections[i].OldSize < GetSectionHeader(i)->SizeOfRawData) {
+			if (Sections[i].OldSize < SectionHeaders[i].SizeOfRawData) {
 				line.Embed.Size = Sections[i].OldSize;
 				Sections[i].Lines->Push(line);
 				continue;
 			}
-			line.Embed.Size = GetSectionHeader(i)->SizeOfRawData;
+			line.Embed.Size = SectionHeaders[i].SizeOfRawData;
 			if (line.OldRVA && line.Embed.Size) Sections[i].Lines->Push(line);
 			line.Type = Padding;
 			line.OldRVA += line.Embed.Size;
@@ -812,8 +811,8 @@ bool Asm::Disassemble() {
 
 		// Insert ending data
 		line.OldRVA = Sections[i].Lines->At(Sections[i].Lines->Size() - 1).OldRVA + GetLineSize(Sections[i].Lines->At(Sections[i].Lines->Size() - 1));
-		if (line.OldRVA - Sections[i].OldRVA < GetSectionHeader(i)->SizeOfRawData && line.OldRVA - Sections[i].OldRVA < Sections[i].OldSize) {
-			line.Embed.Size = ((Sections[i].OldSize < GetSectionHeader(i)->SizeOfRawData) ? Sections[i].OldSize : GetSectionHeader(i)->SizeOfRawData) - (line.OldRVA - Sections[i].OldRVA);
+		if (line.OldRVA - Sections[i].OldRVA < SectionHeaders[i].SizeOfRawData && line.OldRVA - Sections[i].OldRVA < Sections[i].OldSize) {
+			line.Embed.Size = ((Sections[i].OldSize < SectionHeaders[i].SizeOfRawData) ? Sections[i].OldSize : SectionHeaders[i].SizeOfRawData) - (line.OldRVA - Sections[i].OldRVA);
 			Sections[i].Lines->Push(line);
 		}
 
@@ -842,10 +841,10 @@ bool Asm::Analyze() {
 		Vector<Line>* pLines = NULL;
 		DWORD dwRVA;
 		DWORD index;
-		IMAGE_DATA_DIRECTORY IAT = GetNtHeaders()->x64.OptionalHeader.DataDirectory[1];
+		IMAGE_DATA_DIRECTORY IAT = NTHeaders.x64.OptionalHeader.DataDirectory[1];
 
 		// Add entries
-		if (!Functions.Includes(GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint)) Functions.Push(GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint);
+		if (!Functions.Includes(NTHeaders.x64.OptionalHeader.AddressOfEntryPoint)) Functions.Push(NTHeaders.x64.OptionalHeader.AddressOfEntryPoint);
 		for (uint64_t* pTLS = GetTLSCallbacks(); pTLS && *pTLS; pTLS++) {
 			if (!Functions.Includes(*pTLS - GetBaseAddress())) Functions.Push(*pTLS - GetBaseAddress());
 		}
@@ -1031,16 +1030,16 @@ bool Asm::FixAddresses() {
 	sec.NewRVA = sec.OldRVA;
 	sec.NewSize = GetAssembledSize(0);
 	Sections.Replace(0, sec);
-	if (sec.NewRVA != sec.OldRVA || sec.NewSize != sec.OldSize) LOG(Info_Extended, MODULE_REASSEMBLER, "%.8s changed memory range: (%08x - %08x) -> (%08x - %08x)\n", GetSectionHeader((WORD)0)->Name, sec.OldRVA, sec.OldRVA + sec.OldSize, sec.NewRVA, sec.NewRVA + sec.NewSize);
+	if (sec.NewRVA != sec.OldRVA || sec.NewSize != sec.OldSize) LOG(Info_Extended, MODULE_REASSEMBLER, "%.8s changed memory range: (%08x - %08x) -> (%08x - %08x)\n", SectionHeaders[0].Name, sec.OldRVA, sec.OldRVA + sec.OldSize, sec.NewRVA, sec.NewRVA + sec.NewSize);
 	for (WORD SecIndex = 1; SecIndex < Sections.Size(); SecIndex++) {
 		sec = Sections[SecIndex];
 		sec.NewRVA = Sections[SecIndex - 1].NewRVA + Sections[SecIndex - 1].NewSize;
 		sec.NewRVA += (sec.NewRVA % NTHeaders.x64.OptionalHeader.SectionAlignment) ? NTHeaders.x64.OptionalHeader.SectionAlignment - (sec.NewRVA % NTHeaders.x64.OptionalHeader.SectionAlignment) : 0;
 		sec.NewSize = GetAssembledSize(SecIndex);
 		Sections.Replace(SecIndex, sec);
-		if (sec.NewRVA != sec.OldRVA || sec.NewSize != sec.OldSize) LOG(Info_Extended, MODULE_REASSEMBLER, "%.8s changed memory range: (%08x - %08x) -> (%08x - %08x)\n", GetSectionHeader(SecIndex)->Name, sec.OldRVA, sec.OldRVA + sec.OldSize, sec.NewRVA, sec.NewRVA + sec.NewSize);
+		if (sec.NewRVA != sec.OldRVA || sec.NewSize != sec.OldSize) LOG(Info_Extended, MODULE_REASSEMBLER, "%.8s changed memory range: (%08x - %08x) -> (%08x - %08x)\n", SectionHeaders[SecIndex].Name, sec.OldRVA, sec.OldRVA + sec.OldSize, sec.NewRVA, sec.NewRVA + sec.NewSize);
 	}
-
+	
 	// Set new RVAs
 	for (DWORD SecIndex = 0; SecIndex < Sections.Size(); SecIndex++) {
 		// Apply new addresses
@@ -1217,12 +1216,12 @@ bool Asm::FixAddresses() {
 	}
 	
 	// Fix exception dir
-	IMAGE_DATA_DIRECTORY ExcDataDir = GetNtHeaders()->x64.OptionalHeader.DataDirectory[3];
+	IMAGE_DATA_DIRECTORY ExcDataDir = NTHeaders.x64.OptionalHeader.DataDirectory[3];
 	if (ExcDataDir.VirtualAddress) {
-		Buffer ExcData = GetSectionBytes(FindSectionByRVA(ExcDataDir.VirtualAddress));
-		IMAGE_SECTION_HEADER* pExcSecHeader = GetSectionHeader(FindSectionByRVA(ExcDataDir.VirtualAddress));
-		if (ExcData.pBytes && pExcSecHeader) {
-			RUNTIME_FUNCTION* pArray = reinterpret_cast<RUNTIME_FUNCTION*>(ExcData.pBytes + ExcDataDir.VirtualAddress - pExcSecHeader->VirtualAddress);
+		Buffer ExcData = SectionData[FindSectionByRVA(ExcDataDir.VirtualAddress)];
+		IMAGE_SECTION_HEADER ExcSecHeader = SectionHeaders[FindSectionByRVA(ExcDataDir.VirtualAddress)];
+		if (ExcData.pBytes && ExcSecHeader.VirtualAddress) {
+			RUNTIME_FUNCTION* pArray = reinterpret_cast<RUNTIME_FUNCTION*>(ExcData.pBytes + ExcDataDir.VirtualAddress - ExcSecHeader.VirtualAddress);
 			for (DWORD i = 0, n = ExcDataDir.Size / sizeof(RUNTIME_FUNCTION); i < n; i++) {
 				CheckRuntimeFunction(&pArray[i], true);
 			}
@@ -1439,7 +1438,7 @@ bool Asm::Assemble() {
 			if (line.Type == Padding) {
 				if (i < n - 1) {
 					LOG(Failed, MODULE_REASSEMBLER, "Encountered code beyond the end of the section.\n");
-					LOG(Info_Extended, MODULE_REASSEMBLER, "In section %.8s\n", GetSectionHeader(i)->Name);
+					LOG(Info_Extended, MODULE_REASSEMBLER, "In section %.8s\n", SectionHeaders[i].Name);
 					return false;
 				}
 				continue;
@@ -1479,7 +1478,7 @@ bool Asm::Assemble() {
 #ifdef _DEBUG
 		if (Options.Debug.bDumpSections) {
 			char sname[12] = { 0 };
-			snprintf(sname, 12, "%.8s.bin", GetSectionHeader(SecIndex)->Name);
+			snprintf(sname, 12, "%.8s.bin", SectionHeaders[SecIndex].Name);
 			HANDLE hFile = CreateFile(sname, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			WriteFile(hFile, Buf.pBytes, Buf.u64Size, NULL, NULL);
 			CloseHandle(hFile);
@@ -1493,8 +1492,10 @@ bool Asm::Assemble() {
 
 	for (int i = 0; i < Sections.Size(); i++) {
 		OverwriteSection(i, Sections[i].Assembled.pBytes, Sections[i].Assembled.u64Size);
-		GetSectionHeader(i)->VirtualAddress = Sections[i].NewRVA;
-		GetSectionHeader(i)->Misc.VirtualSize = Sections[i].NewSize;
+		IMAGE_SECTION_HEADER Header = SectionHeaders[i];
+		Header.VirtualAddress = Sections[i].NewRVA;
+		Header.Misc.VirtualSize = Sections[i].NewSize;
+		SectionHeaders.Replace(i, Header);
 	}
 
 	FixHeaders();
@@ -1530,11 +1531,13 @@ bool Asm::Strip() {
 					char bak = str[7];
 					str[7] = 0;
 					if (!lstrcmpA(str, ".debug_")) {
-						if (pSectionHeaders[sym.SectionNumber - 1].Misc.VirtualSize || pSectionHeaders[sym.SectionNumber - 1].VirtualAddress) {
+						if (SectionHeaders[sym.SectionNumber - 1].Misc.VirtualSize || SectionHeaders[sym.SectionNumber - 1].VirtualAddress) {
 							str[7] = bak;
-							LOG(Info, MODULE_REASSEMBLER, "Unloaded section %.8s (%s)\n", pSectionHeaders[sym.SectionNumber - 1].Name, str);
-							pSectionHeaders[sym.SectionNumber - 1].Misc.VirtualSize = 0;
-							pSectionHeaders[sym.SectionNumber - 1].VirtualAddress = 0;
+							IMAGE_SECTION_HEADER Header = SectionHeaders[sym.SectionNumber - 1];
+							Header.Misc.VirtualSize = 0;
+							Header.VirtualAddress = 0;
+							SectionHeaders.Replace(sym.SectionNumber - 1, Header);
+							LOG(Info, MODULE_REASSEMBLER, "Unloaded section %.8s (%s)\n", SectionHeaders[sym.SectionNumber - 1].Name, str);
 						}
 					}
 					str[7] = bak;
@@ -1547,7 +1550,7 @@ bool Asm::Strip() {
 
 	// Overlay
 	if (NTHeaders.x64.FileHeader.PointerToSymbolTable >= OverlayOffset) {
-		IMAGE_SYMBOL* pSyms = reinterpret_cast<IMAGE_SYMBOL*>(GetOverlay()->pBytes + (NTHeaders.x64.FileHeader.PointerToSymbolTable - OverlayOffset));
+		IMAGE_SYMBOL* pSyms = reinterpret_cast<IMAGE_SYMBOL*>(Overlay.pBytes + (NTHeaders.x64.FileHeader.PointerToSymbolTable - OverlayOffset));
 		char* pStrs = reinterpret_cast<char*>(pSyms) + sizeof(IMAGE_SYMBOL) * NTHeaders.x64.FileHeader.NumberOfSymbols;
 		for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSymbols; i++) {
 			if (!pSyms[i].N.Name.Short && pSyms[i].N.Name.Long) {
@@ -1556,11 +1559,13 @@ bool Asm::Strip() {
 					char bak = str[7];
 					str[7] = 0;
 					if (!lstrcmpA(str, ".debug_")) {
-						if (pSectionHeaders[pSyms[i].SectionNumber - 1].Misc.VirtualSize || pSectionHeaders[pSyms[i].SectionNumber - 1].VirtualAddress) {
+						if (SectionHeaders[pSyms[i].SectionNumber - 1].Misc.VirtualSize || SectionHeaders[pSyms[i].SectionNumber - 1].VirtualAddress) {
 							str[7] = bak;
-							LOG(Info, MODULE_REASSEMBLER, "Unloaded section %.8s (%s)\n", pSectionHeaders[pSyms[i].SectionNumber - 1].Name, str);
-							pSectionHeaders[pSyms[i].SectionNumber - 1].Misc.VirtualSize = 0;
-							pSectionHeaders[pSyms[i].SectionNumber - 1].VirtualAddress = 0;
+							IMAGE_SECTION_HEADER Header = SectionHeaders[pSyms[i].SectionNumber - 1];
+							Header.Misc.VirtualSize = 0;
+							Header.VirtualAddress = 0;
+							SectionHeaders.Replace(pSyms[i].SectionNumber - 1, Header);
+							LOG(Info, MODULE_REASSEMBLER, "Unloaded section %.8s (%s)\n", SectionHeaders[pSyms[i].SectionNumber - 1].Name, str);
 						}
 					}
 					str[7] = bak;
@@ -1573,8 +1578,8 @@ bool Asm::Strip() {
 
 	// Useless sections
 	for (WORD i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-		if (!pSectionHeaders[i].VirtualAddress || !pSectionHeaders[i].Misc.VirtualSize) {
-			LOG(Info, MODULE_REASSEMBLER, "Removed section %.8s\n", pSectionHeaders[i].Name);
+		if (!SectionHeaders[i].VirtualAddress || !SectionHeaders[i].Misc.VirtualSize) {
+			LOG(Info, MODULE_REASSEMBLER, "Removed section %.8s\n", SectionHeaders[i].Name);
 			DeleteSection(i);
 			i--;
 		}

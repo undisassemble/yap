@@ -98,11 +98,15 @@ struct Buffer {
 			}
 			memcpy(pBytes + u64Size - Other.u64Size, Other.pBytes, Other.u64Size);
 			if (!bDontFree) {
-				free(Other.pBytes);
-				Other.pBytes = NULL;
-				Other.u64Size = 0;
+				Other.Release();
 			}
 		}
+	}
+
+	void Release() {
+		if (pBytes) free(pBytes);
+		pBytes = NULL;
+		u64Size = 0;
 	}
 };
 
@@ -228,9 +232,7 @@ struct Vector {
 	}
 
 	void Release() {
-		if (raw.pBytes && !bCannotBeReleased) free(raw.pBytes);
-		raw.pBytes = NULL;
-		raw.u64Size = 0;
+		raw.Release();
 		nItems = 0;
 	}
 

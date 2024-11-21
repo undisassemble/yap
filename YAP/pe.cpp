@@ -7,15 +7,15 @@ PE::PE(_In_ char* sFileName) {
 
 	HANDLE hFile = CreateFileA(sFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
-		this->Status = NoFile;
+		Status = NoFile;
 		return;
 	}
-	this->ParseFile(hFile);
+	ParseFile(hFile);
 	CloseHandle(hFile);
 }
 
 PE::PE(_In_ HANDLE hFile) {
-	this->ParseFile(hFile);
+	ParseFile(hFile);
 }
 
 PE::PE(_In_ bool x86) {
@@ -23,24 +23,14 @@ PE::PE(_In_ bool x86) {
 }
 
 PE::~PE() {
-	if (pSectionData && false) {
-		for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-			if (pSectionData[i])
-				free(pSectionData[i]);
-		}
-		free(pSectionData);
+	while (SectionData.Size()) {
+		Buffer data = SectionData.Pop();
+		data.Release();
 	}
-	if (pSectionHeaders)
-		free(pSectionHeaders);
-	if (DosStub.pBytes && DosStub.u64Size) {
-		free(DosStub.pBytes);
-		DosStub.pBytes = reinterpret_cast<BYTE*>(DosStub.u64Size = 0);
-	}
-	if (Overlay.pBytes) {
-		free(Overlay.pBytes);
-		Overlay.pBytes = 0;
-		Overlay.u64Size = 0;
-	}
+	SectionData.Release();
+	SectionHeaders.Release();
+	DosStub.Release();
+	Overlay.Release();
 	OverlayOffset = 0;
 	Status = NotSet;
 }
@@ -53,22 +43,24 @@ PE::PE(_In_ PE* pOther) {
 	DosStub = pOther->DosStub;
 	DosStub.pBytes = reinterpret_cast<BYTE*>(malloc(DosStub.u64Size));
 	memcpy(DosStub.pBytes, pOther->DosStub.pBytes, DosStub.u64Size);
-	pSectionHeaders = reinterpret_cast<IMAGE_SECTION_HEADER*>(malloc(NTHeaders.x64.FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER)));
-	memcpy(pSectionHeaders, pOther->pSectionHeaders, NTHeaders.x64.FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER));
-	pSectionData = reinterpret_cast<BYTE**>(malloc(NTHeaders.x64.FileHeader.NumberOfSections * sizeof(BYTE*)));
+	SectionHeaders.raw.u64Size = pOther->SectionHeaders.raw.u64Size;
+	SectionHeaders.raw.pBytes = reinterpret_cast<BYTE*>(malloc(SectionHeaders.raw.u64Size));
+	SectionHeaders.nItems = pOther->SectionHeaders.nItems;
+	memcpy(SectionHeaders.raw.pBytes, pOther->SectionHeaders.raw.pBytes, SectionHeaders.raw.u64Size);
 	for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-		if (pSectionHeaders[i].SizeOfRawData) {
-			pSectionData[i] = reinterpret_cast<BYTE*>(malloc(pSectionHeaders[i].SizeOfRawData));
-			memcpy(pSectionData[i], pOther->pSectionData[i], pSectionHeaders[i].SizeOfRawData);
-		} else {
-			pSectionData[i] = NULL;
+		Buffer buf = { 0 };
+		if (pOther->SectionData[i].u64Size) {
+			buf.u64Size = pOther->SectionData[i].u64Size;
+			buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+			memcpy(buf.pBytes, pOther->SectionData[i].pBytes, buf.u64Size);
 		}
+		SectionData.Push(buf);
 	}
 }
 
 bool PE::ParseFile(_In_ HANDLE hFile) {
 	if (hFile == INVALID_HANDLE_VALUE || !hFile) {
-		this->Status = NotSet;
+		Status = NotSet;
 		return false;
 	}
 
@@ -76,14 +68,14 @@ bool PE::ParseFile(_In_ HANDLE hFile) {
 	size_t szBytes = GetFileSize(hFile, NULL);
 	BYTE* pBytes = reinterpret_cast<BYTE*>(malloc(szBytes));
 	if (!szBytes || !pBytes || !ReadFile(hFile, pBytes, szBytes, NULL, NULL)) {
-		this->Status = NoFile;
+		Status = NoFile;
 		return false;;
 	}
 
 	// DOS header
-	memcpy(&this->DosHeader, pBytes, sizeof(IMAGE_DOS_HEADER));
-	if (this->DosHeader.e_magic != IMAGE_DOS_SIGNATURE) {
-		this->Status = NotPE;
+	memcpy(&DosHeader, pBytes, sizeof(IMAGE_DOS_HEADER));
+	if (DosHeader.e_magic != IMAGE_DOS_SIGNATURE) {
+		Status = NotPE;
 		free(pBytes);
 		szBytes = 0;
 		return false;
@@ -95,55 +87,54 @@ bool PE::ParseFile(_In_ HANDLE hFile) {
 	memcpy(DosStub.pBytes, pBytes + sizeof(IMAGE_DOS_HEADER), DosStub.u64Size);
 
 	// NT headers
-	memcpy(&this->NTHeaders.x86, pBytes + this->DosHeader.e_lfanew, sizeof(IMAGE_NT_HEADERS64));
-	if (this->NTHeaders.x64.Signature != IMAGE_NT_SIGNATURE) {
-		this->Status = NotPE;
+	memcpy(&NTHeaders.x86, pBytes + DosHeader.e_lfanew, sizeof(IMAGE_NT_HEADERS64));
+	if (NTHeaders.x64.Signature != IMAGE_NT_SIGNATURE) {
+		Status = NotPE;
 		free(pBytes);
 		szBytes = 0;
 		return false;
 	}
 	
 	// Validate architecture
-	if (this->NTHeaders.x64.FileHeader.Machine == IMAGE_FILE_MACHINE_I386) {
-		this->x86 = true;
-		if (this->NTHeaders.x86.OptionalHeader.Magic != 0x10B) {
-			this->Status = NotPE;
+	if (NTHeaders.x64.FileHeader.Machine == IMAGE_FILE_MACHINE_I386) {
+		x86 = true;
+		if (NTHeaders.x86.OptionalHeader.Magic != 0x10B) {
+			Status = NotPE;
 			free(pBytes);
 			szBytes = 0;
 			return false;
 		}
-	} else if (this->NTHeaders.x64.FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) {
-		this->Status = Unsupported;
+	} else if (NTHeaders.x64.FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) {
+		Status = Unsupported;
 		free(pBytes);
 		szBytes = 0;
 		return false;
-	} else if (this->NTHeaders.x64.OptionalHeader.Magic != 0x20B) {
-		this->Status = NotPE;
+	} else if (NTHeaders.x64.OptionalHeader.Magic != 0x20B) {
+		Status = NotPE;
 		free(pBytes);
 		szBytes = 0;
 		return false;
 	}
 
-	if (IMAGE_NUMBEROF_DIRECTORY_ENTRIES - this->NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes)
-		memset(&this->NTHeaders.x64.OptionalHeader.DataDirectory[this->NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes], 0, sizeof(IMAGE_DATA_DIRECTORY) * (IMAGE_NUMBEROF_DIRECTORY_ENTRIES -
-			this->NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes));
+	if (IMAGE_NUMBEROF_DIRECTORY_ENTRIES - NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes)
+		memset(&NTHeaders.x64.OptionalHeader.DataDirectory[NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes], 0, sizeof(IMAGE_DATA_DIRECTORY) * (IMAGE_NUMBEROF_DIRECTORY_ENTRIES - NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes));
 
-	this->pSectionHeaders = reinterpret_cast<IMAGE_SECTION_HEADER*>(malloc(sizeof(IMAGE_SECTION_HEADER) * this->NTHeaders.x64.FileHeader.NumberOfSections));
-	memcpy(this->pSectionHeaders, pBytes + this->DosHeader.e_lfanew + this->NTHeaders.x64.FileHeader.SizeOfOptionalHeader + sizeof(IMAGE_FILE_HEADER) + 4, sizeof(IMAGE_SECTION_HEADER) *
-		this->NTHeaders.x64.FileHeader.NumberOfSections);
-	this->pSectionData = reinterpret_cast<BYTE**>(malloc(sizeof(BYTE*) * this->NTHeaders.x64.FileHeader.NumberOfSections));
+	SectionHeaders.raw.u64Size = sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections;
+	SectionHeaders.raw.pBytes = reinterpret_cast<BYTE*>(malloc(SectionHeaders.raw.u64Size));
+	SectionHeaders.nItems = NTHeaders.x64.FileHeader.NumberOfSections;
+	memcpy(SectionHeaders.raw.pBytes, pBytes + DosHeader.e_lfanew + NTHeaders.x64.FileHeader.SizeOfOptionalHeader + sizeof(IMAGE_FILE_HEADER) + 4, SectionHeaders.raw.u64Size);
 	
-	for (int i = 0; i < this->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-		if (this->pSectionHeaders[i].SizeOfRawData) {
-			pSectionData[i] = reinterpret_cast<BYTE*>(malloc(this->pSectionHeaders[i].SizeOfRawData));
-			memcpy(pSectionData[i], pBytes + this->pSectionHeaders[i].PointerToRawData, this->pSectionHeaders[i].SizeOfRawData);
-		} else {
-			pSectionData[i] = NULL;
+	for (int i = 0; i < SectionHeaders.Size(); i++) {
+		Buffer buf = { 0 };
+		if ((buf.u64Size = SectionHeaders[i].SizeOfRawData)) {
+			buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+			memcpy(buf.pBytes, pBytes + SectionHeaders[i].PointerToRawData, buf.u64Size);
 		}
+		SectionData.Push(buf);
 	}
 
 	// Overlay
-	OverlayOffset = pSectionHeaders[NTHeaders.x64.FileHeader.NumberOfSections - 1].PointerToRawData + pSectionHeaders[NTHeaders.x64.FileHeader.NumberOfSections - 1].SizeOfRawData;
+	OverlayOffset = SectionHeaders[SectionHeaders.Size() - 1].PointerToRawData + SectionHeaders[SectionHeaders.Size() - 1].SizeOfRawData;
 	Overlay.u64Size = szBytes - OverlayOffset;
 	if (Overlay.u64Size) {
 		Overlay.pBytes = reinterpret_cast<BYTE*>(malloc(Overlay.u64Size));
@@ -152,7 +143,7 @@ bool PE::ParseFile(_In_ HANDLE hFile) {
 		OverlayOffset = 0;
 	}
 
-	Status = PEStatus_t::Normal;
+	Status = Normal;
 	free(pBytes);
 	szBytes = 0;
 	return true;
@@ -166,15 +157,15 @@ Vector<IMAGE_IMPORT_DESCRIPTOR> PE::GetImportedDLLs() {
 	ret.bCannotBeReleased = true;
 	if (Status || !NTHeaders.x64.OptionalHeader.DataDirectory[1].VirtualAddress || !NTHeaders.x64.OptionalHeader.DataDirectory[1].Size) return ret;
 	Buffer buf = { 0 };
-	IMAGE_SECTION_HEADER* pHeader;
+	IMAGE_SECTION_HEADER Header;
 	{
 		WORD i = FindSectionByRVA(NTHeaders.x64.OptionalHeader.DataDirectory[1].VirtualAddress);
-		buf = GetSectionBytes(i);
-		pHeader = GetSectionHeader(i);
-		if (!pHeader || !buf.pBytes || !buf.u64Size || NTHeaders.x64.OptionalHeader.DataDirectory[1].VirtualAddress + NTHeaders.x64.OptionalHeader.DataDirectory[1].Size > pHeader->VirtualAddress + pHeader->Misc.VirtualSize) return ret;
+		buf = SectionData[i];
+		Header = SectionHeaders[i];
+		if (!buf.pBytes || !buf.u64Size || NTHeaders.x64.OptionalHeader.DataDirectory[1].VirtualAddress + NTHeaders.x64.OptionalHeader.DataDirectory[1].Size > Header.VirtualAddress + Header.Misc.VirtualSize) return ret;
 	}
 
-	ret.raw.pBytes = buf.pBytes + NTHeaders.x64.OptionalHeader.DataDirectory[1].VirtualAddress - pHeader->VirtualAddress;
+	ret.raw.pBytes = buf.pBytes + NTHeaders.x64.OptionalHeader.DataDirectory[1].VirtualAddress - Header.VirtualAddress;
 	IMAGE_IMPORT_DESCRIPTOR* pTable = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(ret.raw.pBytes);
 	IMAGE_IMPORT_DESCRIPTOR zero = { 0 };
 	for (int i = 0; NTHeaders.x64.OptionalHeader.DataDirectory[1].Size >= i * sizeof(IMAGE_IMPORT_DESCRIPTOR); i++) {
@@ -185,38 +176,16 @@ Vector<IMAGE_IMPORT_DESCRIPTOR> PE::GetImportedDLLs() {
 	return ret;
 }
 
-IMAGE_DOS_HEADER* PE::GetDosHeader() {
-	return &this->DosHeader;
-}
-
-ComboNTHeaders* PE::GetNtHeaders() {
-	return &this->NTHeaders;
-}
-
-IMAGE_SECTION_HEADER* PE::GetSectionHeader(_In_opt_ char* sName) {
-	if (this->Status)
-		return NULL;
-
-	if (!sName)
-		return this->pSectionHeaders;
-
-	return this->GetSectionHeader(this->FindSection(sName));
-}
-
-Buffer PE::GetSectionBytes(_In_ char* sName) {
-	return this->GetSectionBytes(this->FindSection(sName));
-}
-
 ZydisMachineMode PE::GetMachine() {
-	return this->x86 ? ZYDIS_MACHINE_MODE_LONG_COMPAT_32 : ZYDIS_MACHINE_MODE_LONG_64;
+	return x86 ? ZYDIS_MACHINE_MODE_LONG_COMPAT_32 : ZYDIS_MACHINE_MODE_LONG_64;
 }
 
 WORD PE::FindSectionByRaw(_In_ DWORD dwRaw) {
 	if (Status || dwRaw >= OverlayOffset)
 		return _UI16_MAX;
 
-	for (WORD i = 0; i < this->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-		if (this->pSectionHeaders[i].PointerToRawData && this->pSectionHeaders[i].VirtualAddress && this->pSectionHeaders[i].PointerToRawData <= dwRaw && this->pSectionHeaders[i].SizeOfRawData >= dwRaw) {
+	for (WORD i = 0; i < SectionHeaders.Size(); i++) {
+		if (SectionHeaders[i].PointerToRawData && SectionHeaders[i].VirtualAddress && SectionHeaders[i].PointerToRawData <= dwRaw && SectionHeaders[i].SizeOfRawData >= dwRaw) {
 			return i;
 		}
 	}
@@ -225,12 +194,11 @@ WORD PE::FindSectionByRaw(_In_ DWORD dwRaw) {
 }
 
 WORD PE::FindSectionByRVA(_In_ DWORD dwRVA) {
-	if (this->Status)
+	if (Status)
 		return _UI16_MAX;
 
-	for (WORD i = 0; i < this->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-		if (//this->pSectionHeaders[i].PointerToRawData && 
-			this->pSectionHeaders[i].VirtualAddress && this->pSectionHeaders[i].VirtualAddress <= dwRVA && this->pSectionHeaders[i].VirtualAddress + this->pSectionHeaders[i].Misc.VirtualSize >= dwRVA) {
+	for (WORD i = 0; i < SectionHeaders.Size(); i++) {
+		if (SectionHeaders[i].VirtualAddress && SectionHeaders[i].VirtualAddress <= dwRVA && SectionHeaders[i].VirtualAddress + SectionHeaders[i].Misc.VirtualSize >= dwRVA) {
 			return i;
 		}
 	}
@@ -242,26 +210,18 @@ DWORD PE::RVAToRaw(_In_ DWORD dwRVA) {
 	if (Status)
 		return 0;
 
-	IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(FindSectionByRVA(dwRVA));
-
-	if (pHeader)
-		return pHeader->PointerToRawData + (dwRVA - pHeader->VirtualAddress);
-
-	return 0;
+	WORD wIndex = FindSectionByRVA(dwRVA);
+	if (wIndex >= SectionHeaders.Size()) return 0;
+	return SectionHeaders[wIndex].PointerToRawData + (dwRVA - SectionHeaders[wIndex].VirtualAddress);
 }
 
 DWORD PE::RawToRVA(_In_ DWORD dwRaw) {
-	if (Status)
+	if (Status || dwRaw >= OverlayOffset)
 		return 0;
-	
-	if (dwRaw >= OverlayOffset) return 0;
 
-	IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(FindSectionByRaw(dwRaw));
-
-	if (pHeader)
-		return pHeader->VirtualAddress + (dwRaw - pHeader->PointerToRawData);
-
-	return 0;
+	WORD wIndex = FindSectionByRaw(dwRaw);
+	if (wIndex >= SectionHeaders.Size()) return 0;
+	return SectionHeaders[wIndex].VirtualAddress + (dwRaw - SectionHeaders[wIndex].PointerToRawData);
 }
 
 uint64_t* PE::GetTLSCallbacks() {
@@ -269,174 +229,85 @@ uint64_t* PE::GetTLSCallbacks() {
 		return NULL;
 
 	// Get directory
-	IMAGE_DATA_DIRECTORY TLSDataDir = GetNtHeaders()->x64.OptionalHeader.DataDirectory[9];
+	IMAGE_DATA_DIRECTORY TLSDataDir = NTHeaders.x64.OptionalHeader.DataDirectory[9];
 	if (!TLSDataDir.VirtualAddress)
 		return NULL;
 
 	// Getting TLS callback array
 	IMAGE_TLS_DIRECTORY64 dir = ReadRVA<IMAGE_TLS_DIRECTORY64>(TLSDataDir.VirtualAddress);
-	Buffer TLSData = GetSectionBytes(FindSectionByRVA(dir.AddressOfCallBacks - GetBaseAddress()));
-	IMAGE_SECTION_HEADER* pTLSSecHeader = GetSectionHeader(FindSectionByRVA(dir.AddressOfCallBacks - GetBaseAddress()));
-	return reinterpret_cast<uint64_t*>(TLSData.pBytes + dir.AddressOfCallBacks - GetBaseAddress() - pTLSSecHeader->VirtualAddress);
-}
-
-PEStatus_t PE::GetStatus() {
-	return Status;
-}
-
-Buffer PE::GetSectionBytes(_In_ WORD wIndex) {
-	Buffer Buf = { 0 };
-	if (this->Status || wIndex > this->NTHeaders.x64.FileHeader.NumberOfSections - 1) {
-		return Buf;
-	}
-
-	Buf.pBytes = this->pSectionData[wIndex];
-	Buf.u64Size = this->pSectionHeaders[wIndex].SizeOfRawData;
-	return Buf;
-}
-
-Buffer* PE::GetDosStub() {
-	return &DosStub;
+	WORD wIndex = FindSectionByRVA(dir.AddressOfCallBacks - GetBaseAddress());
+	if (wIndex >= SectionHeaders.Size()) return NULL;
+	return reinterpret_cast<uint64_t*>(SectionData[wIndex].pBytes + dir.AddressOfCallBacks - GetBaseAddress() - SectionHeaders[wIndex].VirtualAddress);
 }
 
 IAT_ENTRY* PE::GetIAT() {
-	IMAGE_DATA_DIRECTORY IATDir = GetNtHeaders()->x64.OptionalHeader.DataDirectory[1];
-	if (!IATDir.VirtualAddress || !IATDir.Size)
-		return NULL;
+	IMAGE_DATA_DIRECTORY IATDir = NTHeaders.x64.OptionalHeader.DataDirectory[1];
+	if (!IATDir.VirtualAddress || !IATDir.Size) return NULL;
 	WORD i = FindSectionByRVA(IATDir.VirtualAddress);
-	if (i == _UI16_MAX)
-		return NULL;
-	return reinterpret_cast<IAT_ENTRY*>(GetSectionBytes(i).pBytes + (IATDir.VirtualAddress - GetSectionHeader(i)->VirtualAddress));
+	if (i >= SectionHeaders.Size()) return NULL;
+	return reinterpret_cast<IAT_ENTRY*>(SectionData[i].pBytes + (IATDir.VirtualAddress - SectionHeaders[i].VirtualAddress));
 }
 
 void PE::StripDosStub() {
-	if (DosStub.pBytes && DosStub.u64Size) {
-		free(DosStub.pBytes);
-		DosStub.pBytes = reinterpret_cast<BYTE*>(DosStub.u64Size = 0);
-	}
+	DosStub.Release();
 }
 
 void PE::RebaseImage(_In_ uint64_t u64NewBase) {
 	if (!(NTHeaders.x64.FileHeader.Characteristics & IMAGE_FILE_RELOCS_STRIPPED)) {
-		IMAGE_DATA_DIRECTORY reloc;
-		WORD i;
-		Buffer sec = { 0 };
-		IMAGE_BASE_RELOCATION relocation;
-		DWORD rva;
-
-		reloc = NTHeaders.x64.OptionalHeader.DataDirectory[5];
-		i = FindSectionByRVA(reloc.VirtualAddress);
-		sec = GetSectionBytes(i);
-		if (sec.pBytes && sec.u64Size) {
-
-			sec.pBytes += (reloc.VirtualAddress - GetSectionHeader(i)->VirtualAddress);
-			sec.u64Size -= (reloc.VirtualAddress - GetSectionHeader(i)->VirtualAddress);
-
-			WORD nOff = 0;
-			do {
-				relocation = *reinterpret_cast<IMAGE_BASE_RELOCATION*>(sec.pBytes + nOff);
-				if (!relocation.SizeOfBlock || !relocation.VirtualAddress) break;
-				for (int j = 0, n = (relocation.SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(WORD); j < n; j++) {
-					i = *reinterpret_cast<WORD*>(sec.pBytes + nOff + sizeof(IMAGE_BASE_RELOCATION) + sizeof(WORD) * j);
-					if ((i & 0b1111000000000000) != 0b1010000000000000) continue;
-					rva = relocation.VirtualAddress + (i & 0b0000111111111111);
-					uint64_t value = ReadRVA<uint64_t>(rva);
-					value -= NTHeaders.x64.OptionalHeader.ImageBase;
-					value += u64NewBase;
-					WriteRVA<uint64_t>(rva, value);
-				}
-				nOff += relocation.SizeOfBlock;
-			} while (relocation.SizeOfBlock && reloc.Size > nOff);
+		Vector<DWORD> Relocs = GetRelocations();
+		for (int i = 0; i < Relocs.Size(); i++) {
+			WriteRVA<uint64_t>(Relocs[i], ReadRVA<uint64_t>(Relocs[i]) - GetBaseAddress() + u64NewBase);
 		}
+		Relocs.Release();
 	}
-	NTHeaders.x64.OptionalHeader.ImageBase = u64NewBase;
-}
-
-IMAGE_SECTION_HEADER* PE::GetSectionHeader(_In_ WORD wIndex) {
-	if (this->Status || wIndex >= this->NTHeaders.x64.FileHeader.NumberOfSections) {
-		return NULL;
-	}
-	return &this->pSectionHeaders[wIndex];
-}
-
-IMAGE_SECTION_HEADER* PE::GetSectionHeaders() {
-	return this->pSectionHeaders;
+	if (x86) NTHeaders.x86.OptionalHeader.ImageBase = u64NewBase;
+	else NTHeaders.x64.OptionalHeader.ImageBase = u64NewBase;
 }
 
 uint64_t PE::GetBaseAddress() {
-	return this->x86 ? this->NTHeaders.x86.OptionalHeader.ImageBase : this->NTHeaders.x64.OptionalHeader.ImageBase;
+	return x86 ? NTHeaders.x86.OptionalHeader.ImageBase : NTHeaders.x64.OptionalHeader.ImageBase;
 }
 
 void PE::DeleteSection(_In_ WORD wIndex) {
 	// Check valid index
-	if (this->Status || wIndex >= this->NTHeaders.x64.FileHeader.NumberOfSections) {
+	if (Status || wIndex >= SectionHeaders.Size())
 		return;
-	}
 
 	// Delete header
-	this->NTHeaders.x64.FileHeader.NumberOfSections--;
-	IMAGE_SECTION_HEADER* pNewSectionHeaders = reinterpret_cast<IMAGE_SECTION_HEADER*>(malloc(sizeof(IMAGE_SECTION_HEADER) * this->NTHeaders.x64.FileHeader.NumberOfSections));
-	memcpy(pNewSectionHeaders, this->pSectionHeaders, sizeof(IMAGE_SECTION_HEADER) * wIndex);
-	memcpy(&pNewSectionHeaders[wIndex], &this->pSectionHeaders[wIndex + 1], sizeof(IMAGE_SECTION_HEADER) * (this->NTHeaders.x64.FileHeader.NumberOfSections - wIndex));
-	free(this->pSectionHeaders);
-	this->pSectionHeaders = pNewSectionHeaders;
+	NTHeaders.x64.FileHeader.NumberOfSections--;
+	SectionHeaders.Remove(wIndex);
 
 	// Delete data (if any)
-	if (this->pSectionData[wIndex]) {
-		free(this->pSectionData[wIndex]);
-	}
-	BYTE** pNewSectionData = reinterpret_cast<BYTE**>(malloc(sizeof(BYTE*) * this->NTHeaders.x64.FileHeader.NumberOfSections));
-	memcpy(pNewSectionData, this->pSectionData, sizeof(BYTE*) * wIndex);
-	memcpy(&pNewSectionData[wIndex], &this->pSectionData[wIndex + 1], sizeof(BYTE*) * (this->NTHeaders.x64.FileHeader.NumberOfSections - wIndex));
-	free(this->pSectionData);
-	this->pSectionData = pNewSectionData;
+	SectionData[wIndex].Release();
+	SectionData.Remove(wIndex);
 }
 
 void PE::OverwriteSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_opt_ size_t szBytes) {
 	// Check valid index
-	if (this->Status || wIndex >= this->NTHeaders.x64.FileHeader.NumberOfSections) {
+	if (Status || wIndex >= SectionHeaders.Size())
 		return;
-	}
 	
-	if (this->pSectionData[wIndex]) {
-		free(this->pSectionData[wIndex]);
-	}
-	this->pSectionHeaders[wIndex].SizeOfRawData = szBytes;
-	this->pSectionData[wIndex] = pBytes;
+	Buffer data = { 0 };
+	data.pBytes = pBytes;
+	data.u64Size = szBytes;
+	IMAGE_SECTION_HEADER Header = SectionHeaders[wIndex];
+	Header.SizeOfRawData = szBytes;
+	SectionData[wIndex].Release();
+	SectionData.Replace(wIndex, data);
+	SectionHeaders.Replace(wIndex, Header);
 }
 
 void PE::InsertSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_ IMAGE_SECTION_HEADER Header) {
-	if (wIndex > NTHeaders.x64.FileHeader.NumberOfSections) {
+	if (Status || wIndex > SectionHeaders.Size())
 		return;
-	}
-
-	// Resize data
-	NTHeaders.x64.FileHeader.NumberOfSections++;
-	pSectionHeaders = reinterpret_cast<IMAGE_SECTION_HEADER*>(realloc(pSectionHeaders, sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections));
-	pSectionData = reinterpret_cast<BYTE**>(realloc(pSectionData, sizeof(BYTE*) * NTHeaders.x64.FileHeader.NumberOfSections));
-
-	// Shift existing data
-	for (int i = NTHeaders.x64.FileHeader.NumberOfSections - 1; i > wIndex; i--) {
-		pSectionHeaders[i] = pSectionHeaders[i - 1];
-		pSectionData[i] = pSectionData[i - 1];
-	}
 
 	// Insert
-	pSectionHeaders[wIndex] = Header;
-	pSectionData[wIndex] = pBytes;
-}
-
-WORD PE::FindSection(_In_ char* sName) {
-	if (this->Status)
-		return _UI16_MAX;
-
-	for (WORD i = 0; i < this->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-		if (!strcmp(reinterpret_cast<char*>(this->pSectionHeaders[i].Name), sName)) {
-			return i;
-		}
-	}
-	
-	return _UI16_MAX;
+	Buffer data = { 0 };
+	data.pBytes = pBytes;
+	data.u64Size = Header.SizeOfRawData;
+	SectionHeaders.Insert(wIndex, Header);
+	SectionData.Insert(wIndex, data);
+	NTHeaders.x64.FileHeader.NumberOfSections++;
 }
 
 void PE::FixHeaders() {
@@ -445,35 +316,41 @@ void PE::FixHeaders() {
 
 	// Raw addresses
 	DWORD Raw = NTHeaders.x64.OptionalHeader.SizeOfHeaders;
-	for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+	IMAGE_SECTION_HEADER Header = { 0 };
+	for (int i = 0; i < SectionHeaders.Size(); i++) {
 		Raw += (Raw % NTHeaders.x64.OptionalHeader.FileAlignment) ? NTHeaders.x64.OptionalHeader.FileAlignment - (Raw % NTHeaders.x64.OptionalHeader.FileAlignment) : 0;
-		pSectionHeaders[i].PointerToRawData = Raw;
-		Raw += pSectionHeaders[i].SizeOfRawData;
+		Header = SectionHeaders[i];
+		Header.PointerToRawData = Raw;
+		SectionHeaders.Replace(i, Header);
+		Raw += SectionHeaders[i].SizeOfRawData;
 	}
 }
 
 void PE::MoveSections() {
-	uint64_t u64RawAddress = this->DosHeader.e_lfanew + (this->x86 ? sizeof(IMAGE_NT_HEADERS32) : sizeof(IMAGE_NT_HEADERS64)) + sizeof(IMAGE_SECTION_HEADER) * this->NTHeaders.x64.FileHeader.NumberOfSections;
+	uint64_t u64RawAddress = DosHeader.e_lfanew + (x86 ? sizeof(IMAGE_NT_HEADERS32) : sizeof(IMAGE_NT_HEADERS64)) + sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections;
 	uint64_t u64RVA = u64RawAddress;
 
-	for (WORD i = 0; i < this->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+	IMAGE_SECTION_HEADER Header = { 0 };
+	for (WORD i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
 		// Alignment
-		u64RawAddress += (u64RawAddress % this->NTHeaders.x64.OptionalHeader.FileAlignment) ? (this->NTHeaders.x64.OptionalHeader.FileAlignment - u64RawAddress % this->NTHeaders.x64.OptionalHeader.FileAlignment) : 0;
-		u64RVA += (u64RVA % this->NTHeaders.x64.OptionalHeader.SectionAlignment) ? (this->NTHeaders.x64.OptionalHeader.SectionAlignment - u64RVA % this->NTHeaders.x64.OptionalHeader.SectionAlignment) : 0;
+		u64RawAddress += (u64RawAddress % NTHeaders.x64.OptionalHeader.FileAlignment) ? (NTHeaders.x64.OptionalHeader.FileAlignment - u64RawAddress % NTHeaders.x64.OptionalHeader.FileAlignment) : 0;
+		u64RVA += (u64RVA % NTHeaders.x64.OptionalHeader.SectionAlignment) ? (NTHeaders.x64.OptionalHeader.SectionAlignment - u64RVA % NTHeaders.x64.OptionalHeader.SectionAlignment) : 0;
 
 		// Copy addresses
-		this->pSectionHeaders[i].VirtualAddress = u64RVA;
-		this->pSectionHeaders[i].PointerToRawData = u64RawAddress;
+		Header = SectionHeaders[i];
+		Header.VirtualAddress = u64RVA;
+		Header.PointerToRawData = u64RawAddress;
+		SectionHeaders.Replace(i, Header);
 
 		// Move stuffs
-		u64RVA += this->pSectionHeaders[i].Misc.VirtualSize;
-		u64RawAddress += this->pSectionHeaders[i].SizeOfRawData;
+		u64RVA += Header.Misc.VirtualSize;
+		u64RawAddress += Header.SizeOfRawData;
 	}
 }
 
 bool PE::ProduceBinary(_In_ HANDLE hFile) {
 	// DOS Header
-	if (!WriteFile(hFile, &this->DosHeader, sizeof(IMAGE_DOS_HEADER), NULL, NULL)) {
+	if (!WriteFile(hFile, &DosHeader, sizeof(IMAGE_DOS_HEADER), NULL, NULL)) {
 		return false;
 	}
 
@@ -483,40 +360,40 @@ bool PE::ProduceBinary(_In_ HANDLE hFile) {
 	}
 
 	// NT Headers (skip DOS stub)
-	if (!WriteFile(hFile, &this->NTHeaders, this->x86 ? sizeof(IMAGE_NT_HEADERS32) : sizeof(IMAGE_NT_HEADERS64), NULL, NULL)) {
+	if (!WriteFile(hFile, &NTHeaders, x86 ? sizeof(IMAGE_NT_HEADERS32) : sizeof(IMAGE_NT_HEADERS64), NULL, NULL)) {
 		return false;
 	}
 
 	// Section Headers
-	if (!WriteFile(hFile, this->pSectionHeaders, sizeof(IMAGE_SECTION_HEADER) * this->NTHeaders.x64.FileHeader.NumberOfSections, NULL, NULL)) {
+	if (!WriteFile(hFile, SectionHeaders.raw.pBytes, SectionHeaders.Size() * sizeof(IMAGE_SECTION_HEADER), NULL, NULL)) {
 		return false;
 	}
 
 	// Section Data
-	DWORD dwCurrentAddress = DosHeader.e_lfanew + (this->x86 ? sizeof(IMAGE_NT_HEADERS32) : sizeof(IMAGE_NT_HEADERS64)) + sizeof(IMAGE_SECTION_HEADER) * this->NTHeaders.x64.FileHeader.NumberOfSections;
+	DWORD dwCurrentAddress = DosHeader.e_lfanew + (x86 ? sizeof(IMAGE_NT_HEADERS32) : sizeof(IMAGE_NT_HEADERS64)) + sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections;
 	BYTE* pZeros = NULL;
-	for (WORD i = 0; i < this->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-		if (!pSectionHeaders[i].PointerToRawData) continue;
+	for (WORD i = 0; i < SectionHeaders.Size(); i++) {
+		if (!SectionHeaders[i].PointerToRawData) continue;
 
 		// Padding
-		if (dwCurrentAddress < this->pSectionHeaders[i].PointerToRawData) {
-			pZeros = reinterpret_cast<BYTE*>(calloc(this->pSectionHeaders[i].PointerToRawData - dwCurrentAddress, 1));
-			if (!pZeros || !WriteFile(hFile, pZeros, this->pSectionHeaders[i].PointerToRawData - dwCurrentAddress, NULL, NULL)) {
+		if (dwCurrentAddress < SectionHeaders[i].PointerToRawData) {
+			pZeros = reinterpret_cast<BYTE*>(calloc(SectionHeaders[i].PointerToRawData - dwCurrentAddress, 1));
+			if (!pZeros || !WriteFile(hFile, pZeros, SectionHeaders[i].PointerToRawData - dwCurrentAddress, NULL, NULL)) {
 				if (pZeros) free(pZeros);
 				return false;
 			}
 			free(pZeros);
-			dwCurrentAddress += this->pSectionHeaders[i].PointerToRawData - dwCurrentAddress;
-		} else if (dwCurrentAddress > this->pSectionHeaders[i].PointerToRawData) {
+			dwCurrentAddress += SectionHeaders[i].PointerToRawData - dwCurrentAddress;
+		} else if (dwCurrentAddress > SectionHeaders[i].PointerToRawData) {
 			return false;
 		}
 		
 		// Write actual data (if any)
-		if (this->pSectionHeaders[i].SizeOfRawData) {
-			if (!WriteFile(hFile, this->pSectionData[i], this->pSectionHeaders[i].SizeOfRawData, NULL, NULL)) {
+		if (SectionHeaders[i].SizeOfRawData) {
+			if (!WriteFile(hFile, SectionData[i].pBytes, SectionHeaders[i].SizeOfRawData, NULL, NULL)) {
 				return false;
 			}
-			dwCurrentAddress += this->pSectionHeaders[i].SizeOfRawData;
+			dwCurrentAddress += SectionHeaders[i].SizeOfRawData;
 		}
 	}
 
@@ -552,15 +429,12 @@ Vector<DWORD> PE::GetExportedFunctionRVAs() {
 	
 	// Copy data
 	WORD wContainingSection = FindSectionByRVA(ExportTable.AddressOfFunctions);
-	IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(wContainingSection);
-	Buffer Data = GetSectionBytes(wContainingSection);
-	if (wContainingSection == _UI16_MAX || !pHeader || !Data.pBytes || !Data.u64Size || pHeader->SizeOfRawData - (ExportTable.AddressOfFunctions - pHeader->VirtualAddress) < sizeof(DWORD) * ExportTable.NumberOfFunctions) return vec;
+	if (wContainingSection >= SectionHeaders.Size()) return vec;
+	Buffer Data = SectionData[wContainingSection];
+	if (!Data.pBytes || !Data.u64Size || SectionHeaders[wContainingSection].SizeOfRawData - (ExportTable.AddressOfFunctions - SectionHeaders[wContainingSection].VirtualAddress) < sizeof(DWORD) * ExportTable.NumberOfFunctions) return vec;
 	vec.raw.u64Size = ExportTable.NumberOfFunctions * sizeof(DWORD);
-	vec.raw.pBytes = Data.pBytes + ExportTable.AddressOfFunctions - pHeader->VirtualAddress;
+	vec.raw.pBytes = Data.pBytes + ExportTable.AddressOfFunctions - SectionHeaders[wContainingSection].VirtualAddress;
 	vec.nItems = ExportTable.NumberOfFunctions;
-	vec.bCannotBeReleased = true;
-	//vec.raw.pBytes = reinterpret_cast<BYTE*>(malloc(vec.raw.u64Size));
-	//memcpy(vec.raw.pBytes, Data.pBytes + ExportTable.AddressOfFunctions - pHeader->VirtualAddress, vec.raw.u64Size);
 	return vec;
 }
 
@@ -573,11 +447,11 @@ Vector<char*> PE::GetExportedFunctionNames() {
 
 	// Prepare data
 	WORD wContainingSection = FindSectionByRVA(ExportTable.AddressOfNames);
-	IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(wContainingSection);
-	Buffer Data = GetSectionBytes(wContainingSection);
-	if (wContainingSection == _UI16_MAX || !pHeader || !Data.pBytes || !Data.u64Size) return vec;
-	Data.pBytes += ExportTable.AddressOfNames - pHeader->VirtualAddress;
-	Data.u64Size -= (ExportTable.AddressOfNames - pHeader->VirtualAddress);
+	if (wContainingSection >= SectionHeaders.Size()) return vec;
+	Buffer Data = SectionData[wContainingSection];
+	if (!Data.pBytes || !Data.u64Size) return vec;
+	Data.pBytes += ExportTable.AddressOfNames - SectionHeaders[wContainingSection].VirtualAddress;
+	Data.u64Size -= (ExportTable.AddressOfNames - SectionHeaders[wContainingSection].VirtualAddress);
 	
 	// Copy data
 	for (int i = 0; Data.u64Size >= sizeof(DWORD) && i < ExportTable.NumberOfNames; i++) {
@@ -589,47 +463,46 @@ Vector<char*> PE::GetExportedFunctionNames() {
 }
 
 char* PE::ReadRVAString(_In_ DWORD dwRVA) {
-	Buffer buf = GetSectionBytes(FindSectionByRVA(dwRVA));
-	IMAGE_SECTION_HEADER* pHeader = GetSectionHeader(FindSectionByRVA(dwRVA));
-	if (!buf.pBytes || !buf.u64Size || !pHeader) return NULL;
-	return reinterpret_cast<char*>(buf.pBytes + (dwRVA - pHeader->VirtualAddress));
+	WORD wIndex = FindSectionByRVA(dwRVA);
+	if (wIndex >= SectionHeaders.Size() || !SectionData[wIndex].pBytes || !SectionData[wIndex].u64Size) return NULL;
+	return reinterpret_cast<char*>(SectionData[wIndex].pBytes + (dwRVA - SectionHeaders[wIndex].VirtualAddress));
 }
 
 void PE::WriteRVA(_In_ DWORD dwRVA, _In_ void* pData, _In_ size_t szData) {
 	// Verify stuff
 	WORD wSectionIndex = FindSectionByRVA(dwRVA);
-	if (!pData || !szData || wSectionIndex > NTHeaders.x64.FileHeader.NumberOfSections - 1 || !pSectionHeaders[wSectionIndex].SizeOfRawData || pSectionHeaders[wSectionIndex].VirtualAddress > dwRVA || pSectionHeaders[wSectionIndex].VirtualAddress + pSectionHeaders[wSectionIndex].Misc.VirtualSize < dwRVA + szData) {
+	if (!pData || !szData || wSectionIndex > NTHeaders.x64.FileHeader.NumberOfSections - 1 || !SectionHeaders[wSectionIndex].SizeOfRawData || SectionHeaders[wSectionIndex].VirtualAddress > dwRVA || SectionHeaders[wSectionIndex].VirtualAddress + SectionHeaders[wSectionIndex].Misc.VirtualSize < dwRVA + szData) {
 		return;
 	}
 
 	// Write data
-	memcpy(pSectionData[wSectionIndex] + (dwRVA - pSectionHeaders[wSectionIndex].VirtualAddress), pData, szData);
+	memcpy(SectionData[wSectionIndex].pBytes + (dwRVA - SectionHeaders[wSectionIndex].VirtualAddress), pData, szData);
 }
 
 void PE::ReadRVA(_In_ DWORD dwRVA, _Out_ void* pData, _In_ size_t szData) {
 	WORD wSectionIndex = FindSectionByRVA(dwRVA);
-	if (!pData || !szData || wSectionIndex > NTHeaders.x64.FileHeader.NumberOfSections - 1 || !pSectionHeaders[wSectionIndex].SizeOfRawData || pSectionHeaders[wSectionIndex].VirtualAddress > dwRVA ||
-		pSectionHeaders[wSectionIndex].VirtualAddress + pSectionHeaders[wSectionIndex].Misc.VirtualSize < dwRVA + szData) {
+	if (!pData || !szData || wSectionIndex > NTHeaders.x64.FileHeader.NumberOfSections - 1 || !SectionHeaders[wSectionIndex].SizeOfRawData || SectionHeaders[wSectionIndex].VirtualAddress > dwRVA ||
+		SectionHeaders[wSectionIndex].VirtualAddress + SectionHeaders[wSectionIndex].Misc.VirtualSize < dwRVA + szData) {
 		ZeroMemory(pData, szData);
 		return;
 	}
 
-	memcpy(pData, pSectionData[wSectionIndex] + (dwRVA - pSectionHeaders[wSectionIndex].VirtualAddress), szData);
+	memcpy(pData, SectionData[wSectionIndex].pBytes + (dwRVA - SectionHeaders[wSectionIndex].VirtualAddress), szData);
 }
 
 Vector<DWORD> PE::GetRelocations() {
 	Vector<DWORD> ret;
-	if (Status || !NTHeaders.x64.OptionalHeader.DataDirectory[5].Size || !NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress || GetNtHeaders()->x64.FileHeader.Characteristics & IMAGE_FILE_RELOCS_STRIPPED) return ret;
+	if (Status || !NTHeaders.x64.OptionalHeader.DataDirectory[5].Size || !NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress || NTHeaders.x64.FileHeader.Characteristics & IMAGE_FILE_RELOCS_STRIPPED) return ret;
 	
 	WORD i;
 	Buffer sec = { 0 };
 	IMAGE_BASE_RELOCATION* pRelocation;
 
 	i = FindSectionByRVA(NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress);
-	sec = GetSectionBytes(i);
+	sec = SectionData[i];
 	if (sec.pBytes && sec.u64Size) {
-		sec.pBytes += (NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress - GetSectionHeader(i)->VirtualAddress);
-		sec.u64Size -= (NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress - GetSectionHeader(i)->VirtualAddress);
+		sec.pBytes += (NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress - SectionHeaders[i].VirtualAddress);
+		sec.u64Size -= (NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress - SectionHeaders[i].VirtualAddress);
 		WORD nOff = 0;
 
 		do {
@@ -646,16 +519,9 @@ Vector<DWORD> PE::GetRelocations() {
 	return ret;
 }
 
-
-Buffer* PE::GetOverlay() {
-	return &Overlay;
-}
-
 void PE::DiscardOverlay() {
 	OverlayOffset = 0;
-	if (Overlay.pBytes) free(Overlay.pBytes);
-	Overlay.pBytes = 0;
-	Overlay.u64Size = 0;
+	Overlay.Release();
 }
 
 DWORD PE::GetOverlayOffset() {
