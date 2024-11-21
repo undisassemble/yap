@@ -169,6 +169,10 @@ struct Vector {
 		return ((T*)raw.pBytes)[i];
 	}
 
+	T operator[](_In_ int i) {
+		return At(i);
+	}
+
 	void Push(_In_ T Item) {
 		if (bCannotBeReleased) return;
 		nItems++;
@@ -178,7 +182,7 @@ struct Vector {
 
 	void Push(Vector<T> Items) {
 		for (int i = 0; i < Items.Size(); i++) {
-			Push(Items.At(i));
+			Push(Items[i]);
 		}
 	}
 
@@ -206,7 +210,7 @@ struct Vector {
 	// Replaces first instruction, inserts the remainder
 	void Replace(_In_ DWORD i, _In_ Vector<T> Item) {
 		if (!Item.Size() || i >= Size()) return;
-		Replace(i, Item.At(0));
+		Replace(i, Item[0]);
 		Item.nItems--;
 		Item.raw.pBytes += sizeof(T);
 		Item.raw.u64Size -= sizeof(T);
@@ -219,7 +223,7 @@ struct Vector {
 	// Replaces instructions in order, size does not change
 	void Overwrite(_In_ DWORD i, _In_ Vector<T> Item) {
 		for (int j = 0; j < Item.Size() && i < Size(); j++ && i++) {
-			((T*)raw.pBytes)[i] = Item.At(j);
+			((T*)raw.pBytes)[i] = Item[j];
 		}
 	}
 

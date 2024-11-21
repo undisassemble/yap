@@ -112,8 +112,8 @@ Asm::Asm(_In_ HANDLE hFile) : PE(hFile) {
 
 Asm::~Asm() {
 	for (int i = 0; i < Sections.Size(); i++) {
-		Sections.At(i).Lines->Release();
-		free(Sections.At(i).Lines);
+		Sections[i].Lines->Release();
+		free(Sections[i].Lines);
 	}
 	Sections.Release();
 	JumpTables.Release();
@@ -121,7 +121,7 @@ Asm::~Asm() {
 }
 
 DWORD Asm::GetNextOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex) {
-	Vector<Line>* Lines = Sections.At(dwSec).Lines;
+	Vector<Line>* Lines = Sections[dwSec].Lines;
 	if (!Lines || Lines->Size() <= dwIndex) return _UI32_MAX;
 	
 	for (; dwIndex < Lines->Size(); dwIndex++) {
@@ -132,7 +132,7 @@ DWORD Asm::GetNextOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex) {
 }
 
 DWORD Asm::GetPrevOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex) {
-	Vector<Line>* Lines = Sections.At(dwSec).Lines;
+	Vector<Line>* Lines = Sections[dwSec].Lines;
 	if (!Lines) return _UI32_MAX;
 
 	for (;; dwIndex--) {
@@ -146,7 +146,7 @@ DWORD Asm::GetPrevOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex) {
 DWORD Asm::FindSectionIndex(_In_ DWORD dwRVA) {
 	DEBUG_ONLY(uint64_t TickCount = GetTickCount64());
 	for (DWORD i = 0; i < Sections.Size(); i++) {
-		if (Sections.At(i).OldRVA <= dwRVA && Sections.At(i).OldRVA + Sections.At(i).OldSize >= dwRVA) {
+		if (Sections[i].OldRVA <= dwRVA && Sections[i].OldRVA + Sections[i].OldSize >= dwRVA) {
 			DEBUG_ONLY(Data.TimeSpentSearching += GetTickCount64() - TickCount);
 			return i;
 		}
@@ -157,7 +157,7 @@ DWORD Asm::FindSectionIndex(_In_ DWORD dwRVA) {
 
 DWORD Asm::FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 	if (dwSec > Sections.Size()) return _UI32_MAX;
-	Vector<Line>* Lines = Sections.At(dwSec).Lines;
+	Vector<Line>* Lines = Sections[dwSec].Lines;
 
 	// If no lines exist, it will just be the first line
 	if (!Lines || !Lines->Size())
@@ -214,7 +214,7 @@ DWORD Asm::FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 }
 
 DWORD Asm::FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
-	Vector<Line>* Lines = Sections.At(dwSec).Lines;
+	Vector<Line>* Lines = Sections[dwSec].Lines;
 
 	// If no lines exist, it will just be the first line
 	if (!Lines->Size())
@@ -298,7 +298,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 		// Setup
 		dwRVA = ToDisasm.Pop();
 		//CurrentFunc = Funcs.Pop();
-		//range = ranges.At(CurrentFunc);
+		//range = ranges[CurrentFunc];
 		TempLines.Release();
 		if (!dwRVA) {
 			LOG(Warning, MODULE_REASSEMBLER, "Skipping NULL RVA\n");
@@ -309,7 +309,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 			LOG(Failed, MODULE_REASSEMBLER, "Failed to find index of section at %u\n", dwRVA);
 			return false;
 		}
-		Lines = Sections.At(SectionIndex).Lines;
+		Lines = Sections[SectionIndex].Lines;
 		Buffer RawBytes = { 0 };
 		{
 			RawBytes = GetSectionBytes(FindSectionByRVA(dwRVA));
@@ -359,7 +359,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 				do {
 					rva = ReadRVA<DWORD>(disp);
 					trva = odisp + rva;
-					if (!(trva != 0xCCCCCCCC && trva >= Sections.At(SectionIndex).OldRVA && trva < Sections.At(SectionIndex).OldRVA + Sections.At(SectionIndex).OldSize)) break;
+					if (!(trva != 0xCCCCCCCC && trva >= Sections[SectionIndex].OldRVA && trva < Sections[SectionIndex].OldRVA + Sections[SectionIndex].OldSize)) break;
 					if (!JumpTables.Includes(trva)) JumpTables.Push(trva);
 					Line TempJumpTable = { 0 };
 					TempJumpTable.OldRVA = disp;
@@ -373,14 +373,14 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 						LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for %#x\n", disp);
 						return false;
 					}
-					if (i != _UI32_MAX - 1) Sections.At(SecIndex).Lines->Insert(i, TempJumpTable);
+					if (i != _UI32_MAX - 1) Sections[SecIndex].Lines->Insert(i, TempJumpTable);
 					disp += sizeof(DWORD);
 				} while (1);
 			}
 			if (CraftedLine.Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_MOV && CraftedLine.Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY && CraftedLine.Decoded.Operands[1].mem.scale == 4 && CraftedLine.Decoded.Operands[1].mem.base != ZYDIS_REGISTER_RIP) {
 				DWORD rva = 0;
 				DWORD disp = CraftedLine.Decoded.Operands[1].mem.disp.value;
-				while ((rva = ReadRVA<DWORD>(disp)) != 0xCCCCCCCC && rva >= Sections.At(SectionIndex).OldRVA && rva < Sections.At(SectionIndex).OldRVA + Sections.At(SectionIndex).OldSize) {
+				while ((rva = ReadRVA<DWORD>(disp)) != 0xCCCCCCCC && rva >= Sections[SectionIndex].OldRVA && rva < Sections[SectionIndex].OldRVA + Sections[SectionIndex].OldSize) {
 					if (!JumpTables.Includes(rva)) JumpTables.Push(rva);
 					Line TempJumpTable = { 0 };
 					TempJumpTable.OldRVA = disp;
@@ -392,7 +392,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 						LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for %#x\n", disp);
 						return false;
 					}
-					if (i != _UI32_MAX - 1) Sections.At(SecIndex).Lines->Insert(i, TempJumpTable);
+					if (i != _UI32_MAX - 1) Sections[SecIndex].Lines->Insert(i, TempJumpTable);
 					disp += sizeof(DWORD);
 				}
 			}
@@ -451,7 +451,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 								if (wInsertAt == _UI16_MAX) {
 									LOG(Warning, MODULE_REASSEMBLER, "Failed to find position to insert line at 0x%p\n", GetBaseAddress() + insert.OldRVA);
 								} else if (wInsertAt != _UI16_MAX - 1) {
-									Sections.At(wContainingIndex).Lines->Insert(wInsertAt, insert);
+									Sections[wContainingIndex].Lines->Insert(wInsertAt, insert);
 								}
 							}
 
@@ -510,8 +510,8 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 	//ranges.Replace(CurrentFunc, range);
 
 	// Store verified functions
-	//for (int i = 0; i < verified.Size(); i++) if (verified.At(i)) {
-		//FunctionRanges.Push(ranges.At(i));
+	//for (int i = 0; i < verified.Size(); i++) if (verified[i]) {
+		//FunctionRanges.Push(ranges[i]);
 	//}
 
 	ToDisasm.Release();
@@ -562,7 +562,7 @@ bool Asm::Disassemble() {
 	Vector<DWORD> relocs = GetRelocations();
 	for (int i = 0; i < relocs.Size(); i++) {
 		Line insert;
-		insert.OldRVA = relocs.At(i);
+		insert.OldRVA = relocs[i];
 		insert.Type = Pointer;
 		insert.Pointer.IsAbs = true;
 		insert.Pointer.Abs = ReadRVA<uint64_t>(insert.OldRVA);
@@ -572,7 +572,7 @@ bool Asm::Disassemble() {
 			LOG(Warning, MODULE_REASSEMBLER, "Failed to find position to insert line at 0x%p\n", GetBaseAddress() + insert.OldRVA);
 			continue;
 		}
-		Sections.At(wContainingSec).Lines->Insert(wIndex, insert);
+		Sections[wContainingSec].Lines->Insert(wIndex, insert);
 	}
 
 	// Insert known RVAs
@@ -595,15 +595,15 @@ bool Asm::Disassemble() {
 			do {
 				ReadRVA(insert.OldRVA, &entry, sizeof(IAT_ENTRY));
 				insert.Pointer.RVA = entry.LookupRVA;
-				Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+				Sections[wSecIndex].Lines->Insert(wIndex, insert);
 				wIndex++;
 				insert.OldRVA += sizeof(DWORD) * 3;
 				insert.Pointer.RVA = entry.NameRVA;
-				Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+				Sections[wSecIndex].Lines->Insert(wIndex, insert);
 				wIndex++;
 				insert.OldRVA += sizeof(DWORD);
 				insert.Pointer.RVA = entry.ThunkRVA;
-				Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+				Sections[wSecIndex].Lines->Insert(wIndex, insert);
 				wIndex++;
 				insert.OldRVA += sizeof(DWORD);
 			} while (entry.LookupRVA && entry.NameRVA);
@@ -626,7 +626,7 @@ bool Asm::Disassemble() {
 				// Do
 				do {
 					insert.Pointer.RVA = ReadRVA<DWORD>(insert.OldRVA);
-					Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+					Sections[wSecIndex].Lines->Insert(wIndex, insert);
 					wIndex++;
 					insert.OldRVA += sizeof(uint64_t);
 				} while (insert.Pointer.RVA);
@@ -644,15 +644,15 @@ bool Asm::Disassemble() {
 				return false;
 			}
 			insert.Pointer.RVA = ExportTable.AddressOfFunctions;
-			Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+			Sections[wSecIndex].Lines->Insert(wIndex, insert);
 			wIndex++;
 			insert.OldRVA += sizeof(DWORD);
 			insert.Pointer.RVA = ExportTable.AddressOfNames;
-			Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+			Sections[wSecIndex].Lines->Insert(wIndex, insert);
 			wIndex++;
 			insert.OldRVA += sizeof(DWORD);
 			insert.Pointer.RVA = ExportTable.AddressOfNameOrdinals;
-			Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+			Sections[wSecIndex].Lines->Insert(wIndex, insert);
 
 			// Functions
 			insert.OldRVA = ExportTable.AddressOfFunctions;
@@ -664,7 +664,7 @@ bool Asm::Disassemble() {
 			}
 			for (int i = 0; i < ExportTable.NumberOfFunctions; i++) {
 				insert.Pointer.RVA = ReadRVA<DWORD>(insert.OldRVA);
-				Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+				Sections[wSecIndex].Lines->Insert(wIndex, insert);
 				wIndex++;
 				insert.OldRVA += sizeof(DWORD);
 			}
@@ -679,7 +679,7 @@ bool Asm::Disassemble() {
 			}
 			for (int i = 0; i < ExportTable.NumberOfNames; i++) {
 				insert.Pointer.RVA = ReadRVA<DWORD>(insert.OldRVA);
-				Sections.At(wSecIndex).Lines->Insert(wIndex, insert);
+				Sections[wSecIndex].Lines->Insert(wIndex, insert);
 				wIndex++;
 				insert.OldRVA += sizeof(DWORD);
 			}
@@ -697,7 +697,7 @@ bool Asm::Disassemble() {
 
 	// Error check (TEMPORARY)
 	{
-		Vector<Line>* Lines = Sections.At(FindSectionIndex(GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint)).Lines;
+		Vector<Line>* Lines = Sections[FindSectionIndex(GetNtHeaders()->x64.OptionalHeader.AddressOfEntryPoint)].Lines;
 		for (size_t i = 0; i < Lines->Size() - 1; i++) {
 			if (Lines->At(i).OldRVA + GetLineSize(Lines->At(i)) > Lines->At(i + 1).OldRVA) {
 				LOG(Failed, MODULE_REASSEMBLER, "Peepee poopoo (0x%p + %u -> 0x%p)\n", GetBaseAddress() + Lines->At(i).OldRVA, GetLineSize(Lines->At(i)), GetBaseAddress() + Lines->At(i + 1).OldRVA);
@@ -722,10 +722,10 @@ bool Asm::Disassemble() {
 		Vector<DWORD> Exports = GetExportedFunctionRVAs();
 		Vector<char*> ExportNames = GetExportedFunctionNames();
 		for (int i = 0; i < Exports.Size(); i++) {
-			if (!DisasmRecursive(Exports.At(i))) {
+			if (!DisasmRecursive(Exports[i])) {
 				return false;
 			}
-			LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled exported function \'%s\'\n", ExportNames.At(i));
+			LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled exported function \'%s\'\n", ExportNames[i]);
 		}
 	}
 	LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled Exports\n");
@@ -770,58 +770,58 @@ bool Asm::Disassemble() {
 	Line line;
 	LOG(Info_Extended, MODULE_REASSEMBLER, "Filling gaps\n");
 	for (int i = 0; i < Sections.Size(); i++) {
-		LOG(Info_Extended, MODULE_REASSEMBLER, "Filling section %.8s (%llu lines)\n", GetSectionHeader(i)->Name, Sections.At(i).Lines->Size());
+		LOG(Info_Extended, MODULE_REASSEMBLER, "Filling section %.8s (%llu lines)\n", GetSectionHeader(i)->Name, Sections[i].Lines->Size());
 
 		// Incase section holds no lines
-		if (!Sections.At(i).Lines->Size()) {	
+		if (!Sections[i].Lines->Size()) {	
 			line.Type = Embed;
-			line.OldRVA = Sections.At(i).OldRVA;
-			if (Sections.At(i).OldSize < GetSectionHeader(i)->SizeOfRawData) {
-				line.Embed.Size = Sections.At(i).OldSize;
-				Sections.At(i).Lines->Push(line);
+			line.OldRVA = Sections[i].OldRVA;
+			if (Sections[i].OldSize < GetSectionHeader(i)->SizeOfRawData) {
+				line.Embed.Size = Sections[i].OldSize;
+				Sections[i].Lines->Push(line);
 				continue;
 			}
 			line.Embed.Size = GetSectionHeader(i)->SizeOfRawData;
-			if (line.OldRVA && line.Embed.Size) Sections.At(i).Lines->Push(line);
+			if (line.OldRVA && line.Embed.Size) Sections[i].Lines->Push(line);
 			line.Type = Padding;
 			line.OldRVA += line.Embed.Size;
-			line.Padding.Size = Sections.At(i).OldSize - (line.OldRVA - Sections.At(i).OldRVA);
-			if (line.OldRVA && line.Padding.Size) Sections.At(i).Lines->Push(line);
+			line.Padding.Size = Sections[i].OldSize - (line.OldRVA - Sections[i].OldRVA);
+			if (line.OldRVA && line.Padding.Size) Sections[i].Lines->Push(line);
 			continue;
 		}
 
 		// Insert prepended data
 		line.Type = Embed;
-		if (Sections.At(i).Lines->At(0).OldRVA > Sections.At(i).OldRVA) {
-			line.OldRVA = Sections.At(i).OldRVA;
-			line.Embed.Size = Sections.At(i).Lines->At(0).OldRVA - Sections.At(i).OldRVA;
-			Sections.At(i).Lines->Insert(0, line);
-		} else if (Sections.At(i).Lines->At(0).OldRVA < Sections.At(i).OldRVA) {
+		if (Sections[i].Lines->At(0).OldRVA > Sections[i].OldRVA) {
+			line.OldRVA = Sections[i].OldRVA;
+			line.Embed.Size = Sections[i].Lines->At(0).OldRVA - Sections[i].OldRVA;
+			Sections[i].Lines->Insert(0, line);
+		} else if (Sections[i].Lines->At(0).OldRVA < Sections[i].OldRVA) {
 			LOG(Warning, MODULE_REASSEMBLER, "First line in section %d begins below the section (you should *hopefully* never see this)\n", i);
 		}
 
 		// Insert embedded data
-		for (int j = 0; j < Sections.At(i).Lines->Size() - 1; j++) {
-			line.OldRVA = Sections.At(i).Lines->At(j).OldRVA + GetLineSize(Sections.At(i).Lines->At(j));
-			if (line.OldRVA < Sections.At(i).Lines->At(j + 1).OldRVA) {
-				line.Embed.Size = Sections.At(i).Lines->At(j + 1).OldRVA - line.OldRVA;
-				Sections.At(i).Lines->Insert(j + 1, line);
+		for (int j = 0; j < Sections[i].Lines->Size() - 1; j++) {
+			line.OldRVA = Sections[i].Lines->At(j).OldRVA + GetLineSize(Sections[i].Lines->At(j));
+			if (line.OldRVA < Sections[i].Lines->At(j + 1).OldRVA) {
+				line.Embed.Size = Sections[i].Lines->At(j + 1).OldRVA - line.OldRVA;
+				Sections[i].Lines->Insert(j + 1, line);
 				j++;
 			}
 		}
 
 		// Insert ending data
-		line.OldRVA = Sections.At(i).Lines->At(Sections.At(i).Lines->Size() - 1).OldRVA + GetLineSize(Sections.At(i).Lines->At(Sections.At(i).Lines->Size() - 1));
-		if (line.OldRVA - Sections.At(i).OldRVA < GetSectionHeader(i)->SizeOfRawData && line.OldRVA - Sections.At(i).OldRVA < Sections.At(i).OldSize) {
-			line.Embed.Size = ((Sections.At(i).OldSize < GetSectionHeader(i)->SizeOfRawData) ? Sections.At(i).OldSize : GetSectionHeader(i)->SizeOfRawData) - (line.OldRVA - Sections.At(i).OldRVA);
-			Sections.At(i).Lines->Push(line);
+		line.OldRVA = Sections[i].Lines->At(Sections[i].Lines->Size() - 1).OldRVA + GetLineSize(Sections[i].Lines->At(Sections[i].Lines->Size() - 1));
+		if (line.OldRVA - Sections[i].OldRVA < GetSectionHeader(i)->SizeOfRawData && line.OldRVA - Sections[i].OldRVA < Sections[i].OldSize) {
+			line.Embed.Size = ((Sections[i].OldSize < GetSectionHeader(i)->SizeOfRawData) ? Sections[i].OldSize : GetSectionHeader(i)->SizeOfRawData) - (line.OldRVA - Sections[i].OldRVA);
+			Sections[i].Lines->Push(line);
 		}
 
 		// Insert padding
 		line.Type = Padding;
-		line.OldRVA = Sections.At(i).Lines->At(Sections.At(i).Lines->Size() - 1).OldRVA + GetLineSize(Sections.At(i).Lines->At(Sections.At(i).Lines->Size() - 1));
-		line.Padding.Size = Sections.At(i).OldSize - (line.OldRVA - Sections.At(i).OldRVA);
-		if (line.OldRVA && line.Padding.Size) Sections.At(i).Lines->Push(line);
+		line.OldRVA = Sections[i].Lines->At(Sections[i].Lines->Size() - 1).OldRVA + GetLineSize(Sections[i].Lines->At(Sections[i].Lines->Size() - 1));
+		line.Padding.Size = Sections[i].OldSize - (line.OldRVA - Sections[i].OldRVA);
+		if (line.OldRVA && line.Padding.Size) Sections[i].Lines->Push(line);
 	}
 	LOG(Success, MODULE_REASSEMBLER, "Filled gaps\n");
 	DEBUG_ONLY(Data.TimeSpentFilling = GetTickCount64() - TickCount - (Data.TimeSpentSearching - OldTimeSpentSeaching));
@@ -855,7 +855,7 @@ bool Asm::Analyze() {
 			// Setup
 			ToDo.Release();
 			Done.Release();
-			dwRVA = Functions.At(i);
+			dwRVA = Functions[i];
 			ToDo.Push(dwRVA);
 			range.Entries.nItems = 0;
 			range.Entries.raw.pBytes = NULL;
@@ -871,7 +871,7 @@ bool Asm::Analyze() {
 				pLines = NULL;
 				{
 					DWORD secIndex = FindSectionIndex(dwRVA);
-					pLines = Sections.At(secIndex).Lines;
+					pLines = Sections[secIndex].Lines;
 					if (!pLines) {
 						LOG(Warning, MODULE_REASSEMBLER, "Line not found for RVA 0x%08x\n", dwRVA);
 						continue;
@@ -935,11 +935,11 @@ bool Asm::Analyze() {
 		int merged = 0;
 		int removed = 0;
 		for (int i = 0; i < FunctionRanges.Size(); i++) {
-			range = FunctionRanges.At(i);
+			range = FunctionRanges[i];
 			
 			// Combined functions (improve this)
 			for (int j = 0; j < FunctionRanges.Size(); j++) if (j != i) {
-				FunctionRange range2 = FunctionRanges.At(j);
+				FunctionRange range2 = FunctionRanges[j];
 				
 				// Combined
 				if (range2.dwStart >= range.dwStart && range2.dwStart + range2.dwSize <= range.dwStart + range.dwSize) {
@@ -983,7 +983,7 @@ bool Asm::Analyze() {
 
 		// Remove invalid data
 		for (int i = 0; i < FunctionRanges.Size(); i++) { 
-			FunctionRange range = FunctionRanges.At(i);
+			FunctionRange range = FunctionRanges[i];
 			
 			// Functions that are too small
 			if (range.dwSize < 17) {
@@ -996,7 +996,7 @@ bool Asm::Analyze() {
 
 			// Out-of-bounds entry points
 			for (int j = 0; j < range.Entries.Size(); j++) {
-				if (range.Entries.At(j) < range.dwStart || range.Entries.At(j) >= range.dwStart + range.dwSize) {
+				if (range.Entries[j] < range.dwStart || range.Entries[j] >= range.dwStart + range.dwSize) {
 					removed++;
 					if (range.Entries.Size() == 1) {
 						range.Entries.Release();
@@ -1027,14 +1027,14 @@ bool Asm::FixAddresses() {
 	
 	// Fix sections
 	AsmSection sec;
-	sec = Sections.At(0);
+	sec = Sections[0];
 	sec.NewRVA = sec.OldRVA;
 	sec.NewSize = GetAssembledSize(0);
 	Sections.Replace(0, sec);
 	if (sec.NewRVA != sec.OldRVA || sec.NewSize != sec.OldSize) LOG(Info_Extended, MODULE_REASSEMBLER, "%.8s changed memory range: (%08x - %08x) -> (%08x - %08x)\n", GetSectionHeader((WORD)0)->Name, sec.OldRVA, sec.OldRVA + sec.OldSize, sec.NewRVA, sec.NewRVA + sec.NewSize);
 	for (WORD SecIndex = 1; SecIndex < Sections.Size(); SecIndex++) {
-		sec = Sections.At(SecIndex);
-		sec.NewRVA = Sections.At(SecIndex - 1).NewRVA + Sections.At(SecIndex - 1).NewSize;
+		sec = Sections[SecIndex];
+		sec.NewRVA = Sections[SecIndex - 1].NewRVA + Sections[SecIndex - 1].NewSize;
 		sec.NewRVA += (sec.NewRVA % NTHeaders.x64.OptionalHeader.SectionAlignment) ? NTHeaders.x64.OptionalHeader.SectionAlignment - (sec.NewRVA % NTHeaders.x64.OptionalHeader.SectionAlignment) : 0;
 		sec.NewSize = GetAssembledSize(SecIndex);
 		Sections.Replace(SecIndex, sec);
@@ -1044,8 +1044,8 @@ bool Asm::FixAddresses() {
 	// Set new RVAs
 	for (DWORD SecIndex = 0; SecIndex < Sections.Size(); SecIndex++) {
 		// Apply new addresses
-		Lines = Sections.At(SecIndex).Lines;
-		DWORD dwCurrentAddress = Sections.At(SecIndex).NewRVA;
+		Lines = Sections[SecIndex].Lines;
+		DWORD dwCurrentAddress = Sections[SecIndex].NewRVA;
 		Line line = { 0 };
 		for (size_t i = 0; i < Lines->Size(); i++) {
 			line = Lines->At(i);
@@ -1084,7 +1084,7 @@ bool Asm::FixAddresses() {
 
 	for (DWORD SecIndex = 0; SecIndex < Sections.Size(); SecIndex++) {
 		// Fix relative addresses in asm
-		Lines = Sections.At(SecIndex).Lines;
+		Lines = Sections[SecIndex].Lines;
 		Line line;
 		uint64_t u64Referencing = 0;
 		int64_t i64Off = 0;
@@ -1111,7 +1111,7 @@ bool Asm::FixAddresses() {
 							return false;
 						}
 
-						if (u64Referencing < Sections.At(0).OldRVA) {
+						if (u64Referencing < Sections[0].OldRVA) {
 							ZydisFormatter fmt;
 							ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
 							char op[128];
@@ -1232,7 +1232,7 @@ bool Asm::FixAddresses() {
 	// Fix relocations
 	Vector<DWORD> Relocations = GetRelocations();
 	for (int i = 0; i < Relocations.Size(); i++) {
-		Relocations.Replace(i, TranslateOldAddress(Relocations.At(i)));
+		Relocations.Replace(i, TranslateOldAddress(Relocations[i]));
 	}
 	Buffer relocs = GenerateRelocSection(Relocations);
 	RemoveData(NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress, NTHeaders.x64.OptionalHeader.DataDirectory[5].Size);
@@ -1255,12 +1255,12 @@ bool Asm::FixAddresses() {
 
 	// Fix function ranges
 	for (int i = 0; i < FunctionRanges.Size(); i++) {
-		FunctionRange range = FunctionRanges.At(i);
+		FunctionRange range = FunctionRanges[i];
 		DWORD end = TranslateOldAddress(range.dwStart + range.dwSize);
 		range.dwStart = TranslateOldAddress(range.dwStart);
 		range.dwSize = end - range.dwStart;
 		for (int j = 0; j < range.Entries.Size(); j++) {
-			range.Entries.Replace(j, TranslateOldAddress(range.Entries.At(j)));
+			range.Entries.Replace(j, TranslateOldAddress(range.Entries[j]));
 		}
 		FunctionRanges.Replace(i, range);
 	}
@@ -1282,7 +1282,7 @@ bool Asm::Mutate() {
 	for (WORD wSecIndex = 0; wSecIndex < Sections.Size(); wSecIndex++) {
 		Vector<Line> Overwrite;
 		Overwrite.bExponentialGrowth = true;
-		Vector<Line>* Lines = Sections.At(wSecIndex).Lines;
+		Vector<Line>* Lines = Sections[wSecIndex].Lines;
 		Vector<Line> replacement;
 		for (DWORD i = 0; i < Lines->Size(); i++) {
 			if (Lines->At(i).Type != Decoded) continue;
@@ -1299,7 +1299,7 @@ bool Asm::Mutate() {
 				
 				// Replace instruction
 				if (replacement.Size()) {
-					Line first = replacement.At(0);
+					Line first = replacement[0];
 					first.OldRVA = Lines->At(i).OldRVA;
 					replacement.Replace(0, first);
 					if (Settings.Opt == PrioMem) {
@@ -1342,7 +1342,7 @@ bool Asm::Assemble() {
 	BYTE Raw[ZYDIS_MAX_INSTRUCTION_LENGTH];
 
 	for (DWORD SecIndex = 0; SecIndex < Sections.Size(); SecIndex++) {
-		Lines = Sections.At(SecIndex).Lines;
+		Lines = Sections[SecIndex].Lines;
 
 		for (size_t i = 0; i < Lines->Size(); i++) {
 			line = Lines->At(i);
@@ -1486,15 +1486,15 @@ bool Asm::Assemble() {
 		}
 #endif
 
-		AsmSection sec = Sections.At(SecIndex);
+		AsmSection sec = Sections[SecIndex];
 		sec.Assembled = Buf;
 		Sections.Replace(SecIndex, sec);
 	}
 
 	for (int i = 0; i < Sections.Size(); i++) {
-		OverwriteSection(i, Sections.At(i).Assembled.pBytes, Sections.At(i).Assembled.u64Size);
-		GetSectionHeader(i)->VirtualAddress = Sections.At(i).NewRVA;
-		GetSectionHeader(i)->Misc.VirtualSize = Sections.At(i).NewSize;
+		OverwriteSection(i, Sections[i].Assembled.pBytes, Sections[i].Assembled.u64Size);
+		GetSectionHeader(i)->VirtualAddress = Sections[i].NewRVA;
+		GetSectionHeader(i)->Misc.VirtualSize = Sections[i].NewSize;
 	}
 
 	FixHeaders();
@@ -1594,7 +1594,7 @@ void Asm::DeleteSection(_In_ WORD wIndex) {
 
 DWORD Asm::GetAssembledSize(_In_ DWORD SectionIndex) {
 	DWORD dwSize = 0;
-	Vector<Line>* Lines = Sections.At(SectionIndex).Lines;
+	Vector<Line>* Lines = Sections[SectionIndex].Lines;
 	for (DWORD i = 0; i < Lines->Size(); i++) {
 		dwSize += GetLineSize(Lines->At(i));
 	}
@@ -1602,8 +1602,8 @@ DWORD Asm::GetAssembledSize(_In_ DWORD SectionIndex) {
 }
 
 void Asm::InsertLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ Line Line) {
-	if (SectionIndex >= Sections.Size() || LineIndex > Sections.At(SectionIndex).Lines->Size()) return;
-	Sections.At(SectionIndex).Lines->Insert(LineIndex, Line);
+	if (SectionIndex >= Sections.Size() || LineIndex > Sections[SectionIndex].Lines->Size()) return;
+	Sections[SectionIndex].Lines->Insert(LineIndex, Line);
 }
 
 DWORD Asm::TranslateOldAddress(_In_ DWORD dwRVA) {
@@ -1612,10 +1612,10 @@ DWORD Asm::TranslateOldAddress(_In_ DWORD dwRVA) {
 	// Check if in between headers
 	DWORD SecIndex = 0;
 	for (; SecIndex < Sections.Size(); SecIndex++) {
-		if (dwRVA < Sections.At(SecIndex).OldRVA) {
-			return (SecIndex ? (dwRVA + Sections.At(SecIndex - 1).NewRVA) - Sections.At(SecIndex - 1).OldRVA : dwRVA);
+		if (dwRVA < Sections[SecIndex].OldRVA) {
+			return (SecIndex ? (dwRVA + Sections[SecIndex - 1].NewRVA) - Sections[SecIndex - 1].OldRVA : dwRVA);
 		}
-		else if (dwRVA >= Sections.At(SecIndex).OldRVA && dwRVA < Sections.At(SecIndex).OldRVA + Sections.At(SecIndex).OldSize) {
+		else if (dwRVA >= Sections[SecIndex].OldRVA && dwRVA < Sections[SecIndex].OldRVA + Sections[SecIndex].OldSize) {
 			break;
 		}
 	}
@@ -1625,15 +1625,15 @@ DWORD Asm::TranslateOldAddress(_In_ DWORD dwRVA) {
 		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate address %#x\n", dwRVA);
 		return 0;
 	}
-	if (szIndex < Sections.At(SecIndex).Lines->Size()) {
-		return dwRVA + Sections.At(SecIndex).Lines->At(szIndex).NewRVA - Sections.At(SecIndex).Lines->At(szIndex).OldRVA;
+	if (szIndex < Sections[SecIndex].Lines->Size()) {
+		return dwRVA + Sections[SecIndex].Lines->At(szIndex).NewRVA - Sections[SecIndex].Lines->At(szIndex).OldRVA;
 	}
 	
-	return dwRVA + Sections.At(SecIndex).NewRVA - Sections.At(SecIndex).OldRVA;
+	return dwRVA + Sections[SecIndex].NewRVA - Sections[SecIndex].OldRVA;
 }
 
 bool Asm::InsertNewLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ ZydisEncoderRequest* pRequest) {
-	if (!pRequest || SectionIndex >= Sections.Size() || LineIndex > Sections.At(SectionIndex).Lines->Size()) return false;
+	if (!pRequest || SectionIndex >= Sections.Size() || LineIndex > Sections[SectionIndex].Lines->Size()) return false;
 	pRequest->machine_mode = ZYDIS_MACHINE_MODE_LONG_64;
 	Line line = { 0 };
 	line.Type = Encoded;
@@ -1641,7 +1641,7 @@ bool Asm::InsertNewLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ Zydi
 	ZyanStatus status = ZydisEncoderEncodeInstruction(pRequest, line.Encoded.Raw, &sz);
 	if (ZYAN_SUCCESS(status)) {
 		line.Encoded.Size = sz;
-		Sections.At(SectionIndex).Lines->Insert(LineIndex, line);
+		Sections[SectionIndex].Lines->Insert(LineIndex, line);
 		return true;
 	} else {
 		LOG(Failed, MODULE_REASSEMBLER, "Failed to assemble line: %s\n", ZydisErrorToString(status));
@@ -1650,7 +1650,7 @@ bool Asm::InsertNewLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ Zydi
 }
 
 void Asm::DeleteLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex) {
-	Sections.At(SectionIndex).Lines->Remove(LineIndex);
+	Sections[SectionIndex].Lines->Remove(LineIndex);
 }
 
 void Asm::RemoveData(_In_ DWORD dwRVA, _In_ DWORD dwSize) {
@@ -1661,7 +1661,7 @@ void Asm::RemoveData(_In_ DWORD dwRVA, _In_ DWORD dwSize) {
 		return;
 	}
 
-	Line data = Sections.At(sec).Lines->At(i);
+	Line data = Sections[sec].Lines->At(i);
 	if (data.Type != Embed || data.OldRVA > dwRVA || data.OldRVA + GetLineSize(data) < dwRVA + dwSize) {
 		LOG(Warning, MODULE_REASSEMBLER, "Failed to remove data at range %#x - %#x (this version can be fixed later)\n", dwRVA, dwRVA + dwSize);
 		return;
@@ -1735,7 +1735,7 @@ DWORD GetLineSize(_In_ Line line) {
 size_t Asm::GetNumLines() {
 	size_t ret = 0;
 	for (int i = 0; i < Sections.Size(); i++) {
-		ret += Sections.At(i).Lines->nItems;
+		ret += Sections[i].Lines->nItems;
 	}
 	return ret;
 }
@@ -1759,23 +1759,23 @@ Buffer GenerateRelocSection(Vector<DWORD> Relocations) {
 	if (!Relocations.Size())
 		return ret;
 
-	pReloc->VirtualAddress = (Relocations.At(0) / 0x1000) * 0x1000;
+	pReloc->VirtualAddress = (Relocations[0] / 0x1000) * 0x1000;
 	BYTE RelocOff = 0;
 	for (int i = 0; i < Relocations.Size(); i++) {
 		current = 0b1010000000000000; // DIR64
 
 		// Generate new rva
-		if (pReloc->VirtualAddress + 0x1000 <= Relocations.At(i)) {
+		if (pReloc->VirtualAddress + 0x1000 <= Relocations[i]) {
 			ret.u64Size += sizeof(IMAGE_BASE_RELOCATION);
 			ret.pBytes = reinterpret_cast<BYTE*>(realloc(ret.pBytes, ret.u64Size));
 			RelocOff = ret.u64Size - sizeof(IMAGE_BASE_RELOCATION);
 			pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
 			pReloc->SizeOfBlock = sizeof(IMAGE_BASE_RELOCATION);
-			pReloc->VirtualAddress = (Relocations.At(i) / 0x1000) * 0x1000;
+			pReloc->VirtualAddress = (Relocations[i] / 0x1000) * 0x1000;
 		}
 
 		// Add entry
-		current |= (Relocations.At(i) - pReloc->VirtualAddress) & 0b0000111111111111;
+		current |= (Relocations[i] - pReloc->VirtualAddress) & 0b0000111111111111;
 		ret.u64Size += sizeof(WORD);
 		ret.pBytes = reinterpret_cast<BYTE*>(realloc(ret.pBytes, ret.u64Size));
 		pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);

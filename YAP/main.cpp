@@ -169,7 +169,7 @@ DWORD WINAPI Begin(void* args) {
 			ZydisFormatterInit(&Formatter, ZYDIS_FORMATTER_STYLE_INTEL);
 			Vector<AsmSection> Sections = pAssembly->GetSections();
 			for (DWORD SecIndex = 0, n = Sections.Size(); SecIndex < n; SecIndex++) {
-				Vector<Line>* Lines = Sections.At(SecIndex).Lines;
+				Vector<Line>* Lines = Sections[SecIndex].Lines;
 				for (size_t i = 0, j = Lines->Size(); i < j; i++) {
 					Line line = Lines->At(i);
 					int n = 0;
@@ -207,8 +207,8 @@ DWORD WINAPI Begin(void* args) {
 			char buf[512];
 			for (int i = 0; i < pAssembly->GetDisassembledFunctionRanges().Size(); i++) {
 				WriteFile(hDumped, "------------\n", 13, NULL, NULL);
-				for (int j = 0; j < pAssembly->GetDisassembledFunctionRanges().At(i).Entries.Size(); j++) {
-					int n = snprintf(buf, 512, "%08x: %08x -> %08x\n", pAssembly->GetDisassembledFunctionRanges().At(i).Entries.At(j), pAssembly->GetDisassembledFunctionRanges().At(i).dwStart, pAssembly->GetDisassembledFunctionRanges().At(i).dwStart + pAssembly->GetDisassembledFunctionRanges().At(i).dwSize);
+				for (int j = 0; j < pAssembly->GetDisassembledFunctionRanges()[i].Entries.Size(); j++) {
+					int n = snprintf(buf, 512, "%08x: %08x -> %08x\n", pAssembly->GetDisassembledFunctionRanges()[i].Entries[j], pAssembly->GetDisassembledFunctionRanges()[i].dwStart, pAssembly->GetDisassembledFunctionRanges()[i].dwStart + pAssembly->GetDisassembledFunctionRanges()[i].dwSize);
 					WriteFile(hDumped, buf, n, NULL, NULL);
 				}
 			}
@@ -413,8 +413,8 @@ void Console::read(char* project) {
 	// List VM funcs
 	LOG(Nothing, MODULE_YAP, "\nNum VM funcs: %d\n", Options.VM.VMFuncs.Size());
 	for (int i = 0; i < Options.VM.VMFuncs.Size(); i++) {
-		LOG(Nothing, MODULE_YAP, "Func %d name: %s\n", i + 1, Options.VM.VMFuncs.At(i).Name);
-		LOG(Nothing, MODULE_YAP, "Remove export of func %d: %d\n", i + 1, Options.VM.VMFuncs.At(i).bRemoveExport);
+		LOG(Nothing, MODULE_YAP, "Func %d name: %s\n", i + 1, Options.VM.VMFuncs[i].Name);
+		LOG(Nothing, MODULE_YAP, "Remove export of func %d: %d\n", i + 1, Options.VM.VMFuncs[i].bRemoveExport);
 	}
 }
 

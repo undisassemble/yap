@@ -155,7 +155,7 @@ bool SaveProject() {
 
 	// Write VM funcs
 	for (int i = 0; i < Options.VM.VMFuncs.Size(); i++) {
-		WriteFile(hFile, &Options.VM.VMFuncs.At(i), sizeof(ToVirt_t), NULL, NULL);
+		WriteFile(hFile, &Options.VM.VMFuncs[i], sizeof(ToVirt_t), NULL, NULL);
 	}
 	CloseHandle(hFile);
 	LOG(Success, MODULE_YAP, "Saved project to %s\n", Data.Project);
@@ -345,10 +345,10 @@ void DrawGUI() {
 				wsprintfA(buf, "BtnFn%d", i);
 				ImGui::PushID(buf);
 				wsprintfA(buf, "Function %d", i + 1);
-				char name[sizeof(Options.VM.VMFuncs.At(i).Name)] = { 0 };
-				memcpy(name, Options.VM.VMFuncs.At(i).Name, sizeof(name));
+				char name[sizeof(Options.VM.VMFuncs[i].Name)] = { 0 };
+				memcpy(name, Options.VM.VMFuncs[i].Name, sizeof(name));
 				if (ImGui::InputText(buf, name, sizeof(name))) {
-					ToVirt_t entry = Options.VM.VMFuncs.At(i);
+					ToVirt_t entry = Options.VM.VMFuncs[i];
 					memcpy(entry.Name, name, sizeof(name));
 					Options.VM.VMFuncs.Replace(i, entry);
 				}
@@ -357,9 +357,9 @@ void DrawGUI() {
 				ImGui::SameLine();
 				wsprintfA(buf, "BtnCheck%d", i);
 				ImGui::PushID(buf);
-				bool bSet = Options.VM.VMFuncs.At(i).bRemoveExport;
+				bool bSet = Options.VM.VMFuncs[i].bRemoveExport;
 				if (ImGui::Checkbox("Remove Export", &bSet)) {
-					ToVirt_t entry = Options.VM.VMFuncs.At(i);
+					ToVirt_t entry = Options.VM.VMFuncs[i];
 					entry.bRemoveExport = bSet;
 					Options.VM.VMFuncs.Replace(i, entry);
 				}

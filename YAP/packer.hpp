@@ -145,7 +145,7 @@ private:
 		}
 		return o1;
 	}
-	Gp randreg() { return stack.Size() ? stack.At(rand() % stack.Size()) : rsp; }
+	Gp randreg() { return stack.Size() ? stack[rand() % stack.Size()] : rsp; }
 	Vector<Gp> stack;
 	int randstack(_In_ int nMin = 0, _In_ int nMax = 15);
 	void restorestack(_In_ int n = -1);

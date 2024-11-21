@@ -122,13 +122,13 @@ Buffer PackSection(_In_ Buffer SectionData, _In_ PackerOptions Options) {
 	data.pBytes = reinterpret_cast<BYTE*>(realloc(data.pBytes, data.u64Size));
 
 	// Encode (inverse cause yeah)
-	BYTE key = DecoderProc.At(0).value;
+	BYTE key = DecoderProc[0].value;
 	BYTE nextkey = 0;
 	for (int i = 0; i < data.u64Size; i++) {
 		nextkey = key + data.pBytes[i];
 		nextkey ^= data.pBytes[i];
 		for (int j = DecoderProc.Size() - 1; j > 0; j--) {
-			switch (DecoderProc.At(j).Mnemonic) {
+			switch (DecoderProc[j].Mnemonic) {
 			case DI_XOR:
 				data.pBytes[i] ^= key;
 				break;
@@ -240,10 +240,10 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	Label dcd_loop = pA->newLabel();
 	pA->push(rcx);
 	pA->push(rdx);
-	pA->mov(al, DecoderProc.At(0).value);
+	pA->mov(al, DecoderProc[0].value);
 	pA->bind(dcd_loop);
 	for (int i = 1, n = DecoderProc.Size(); i < n; i++) {
-		switch (DecoderProc.At(i).Mnemonic) {
+		switch (DecoderProc[i].Mnemonic) {
 		case DI_XOR:
 			pA->xor_(byte_ptr(rcx), al);
 			break;
@@ -316,14 +316,14 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	pA->pop(r8);
 	
 	// re-encode thingy madoodle
-	pA->mov(al, DecoderProc.At(0).value);
+	pA->mov(al, DecoderProc[0].value);
 	Label enc_loop = pA->newLabel();
 	pA->mov(r8b, al);
 	pA->bind(enc_loop);
 	pA->add(r8b, ptr(rcx));
 	pA->xor_(r8b, ptr(rcx));
 	for (int i = DecoderProc.Size() - 1; i > 0; i--) {
-		switch (DecoderProc.At(i).Mnemonic) {
+		switch (DecoderProc[i].Mnemonic) {
 		case DI_XOR:
 			pA->xor_(byte_ptr(rcx), al);
 			break;
@@ -411,7 +411,7 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 		a.push(rdx);
 		a.push(rcx);
 		for (int i = 0; i < TLSCallbacks.Size(); i++) {
-			a.mov(rax, TLSCallbacks.At(i));
+			a.mov(rax, TLSCallbacks[i]);
 			a.add(rax, ptr(reloc));
 			a.mov(rcx, qword_ptr(rsp));
 			a.mov(rdx, qword_ptr(rsp, 0x08));
@@ -971,7 +971,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	a.mov(rax, ptr(Reloc));
 	if (ShellcodeData.Relocations.Relocations.Size()) {
 		for (int i = 0, n = ShellcodeData.Relocations.Relocations.Size(); i < n; i++) {
-			a.mov(r10, pPackedBinary->GetBaseAddress() + ShellcodeData.Relocations.Relocations.At(i));
+			a.mov(r10, pPackedBinary->GetBaseAddress() + ShellcodeData.Relocations.Relocations[i]);
 			a.add(r10, rax);
 			a.add(ptr(r10), rax);
 		}
@@ -1587,14 +1587,14 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 
 			// Do jumpers
 			for (int j, i = 0; i < Imports.Size(); i++) {
-				char* name = pOriginal->ReadRVAString(Imports.At(i).Name);
+				char* name = pOriginal->ReadRVAString(Imports[i].Name);
 				if (!lstrcmpA(name, "yap.dll")) {
 					LOG(Info_Extended, MODULE_PACKER, "SDK imported\n");
 					ShellcodeData.RequestedFunctions.iIndex = i;
 					continue;
 				}
 				j = 0;
-				while (pOriginal->ReadRVA<uint64_t>(Imports.At(i).OriginalFirstThunk + sizeof(uint64_t) * j)) {
+				while (pOriginal->ReadRVA<uint64_t>(Imports[i].OriginalFirstThunk + sizeof(uint64_t) * j)) {
 					Offsets.Push(a.offset());
 					a.push(nImports);
 					a.jmp(import_handler);
@@ -1606,7 +1606,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			// Jumpers
 			a.bind(jumper_array);
 			for (int i = 0; i < nImports; i++) {
-				a.dq(a.offset() - Offsets.At(i));
+				a.dq(a.offset() - Offsets[i]);
 			}
 
 			// Pointers
@@ -1622,9 +1622,9 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			a.mov(rax, ptr(rbx));
 			a.pop(rbx);
 			for (int i = 1, n = DecoderProc.Size(); i < n; i++) {
-				switch (DecoderProc.At(i).Mnemonic) {
+				switch (DecoderProc[i].Mnemonic) {
 				case DI_XOR:
-					a.xor_(rax, DecoderProc.At(i).value);
+					a.xor_(rax, DecoderProc[i].value);
 					break;
 				case DI_NOT:
 					a.not_(rax);
@@ -1633,10 +1633,10 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 					a.neg(rax);
 					break;
 				case DI_ADD:
-					a.add(rax, DecoderProc.At(i).value);
+					a.add(rax, DecoderProc[i].value);
 					break;
 				case DI_SUB:
-					a.sub(rax, DecoderProc.At(i).value);
+					a.sub(rax, DecoderProc[i].value);
 				}
 			}
 			a.xchg(ptr(rsp), rax);
@@ -1652,7 +1652,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		int64_t offset = a.offset();
 		a.bind(import_offsets);
 		for (int j, i = 0; i < Imports.Size(); i++) {
-			char* name = pOriginal->ReadRVAString(Imports.At(i).Name);
+			char* name = pOriginal->ReadRVAString(Imports[i].Name);
 			if (!::Options.Packing.bHideIAT && !lstrcmpA(name, "yap.dll")) {
 				LOG(Info_Extended, MODULE_PACKER, "SDK imported\n");
 				ShellcodeData.RequestedFunctions.iIndex = i;
@@ -1662,8 +1662,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 				continue;
 			j = 0;
 			a.dd(0);
-			while (pOriginal->ReadRVA<uint64_t>(Imports.At(i).OriginalFirstThunk + sizeof(uint64_t) * j)) {
-				a.dd(offset + (pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfImage - Imports.At(i).FirstThunk - sizeof(uint64_t) * j));
+			while (pOriginal->ReadRVA<uint64_t>(Imports[i].OriginalFirstThunk + sizeof(uint64_t) * j)) {
+				a.dd(offset + (pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfImage - Imports[i].FirstThunk - sizeof(uint64_t) * j));
 				j++;
 			}
 		}
@@ -1678,7 +1678,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.bind(import_names);
 		for (int j, i = 0; i < Imports.Size(); i++) {
 			j = 0;
-			IMAGE_IMPORT_DESCRIPTOR descriptor = Imports.At(i);
+			IMAGE_IMPORT_DESCRIPTOR descriptor = Imports[i];
 			char* name = pOriginal->ReadRVAString(descriptor.Name);
 			if (!name) {
 				LOG(Failed, MODULE_PACKER, "Failed to read name of imported DLL.\n");
@@ -1687,7 +1687,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			if (ShellcodeData.RequestedFunctions.iIndex != i) a.embed(name, lstrlenA(name) + 1);
 			ZeroMemory(name, lstrlenA(name));
 			uint64_t rva = 0;
-			while ((rva = pOriginal->ReadRVA<uint64_t>(Imports.At(i).OriginalFirstThunk + sizeof(uint64_t) * j))) {
+			while ((rva = pOriginal->ReadRVA<uint64_t>(Imports[i].OriginalFirstThunk + sizeof(uint64_t) * j))) {
 				if (rva & 0x8000000000000000) {
 					if (ShellcodeData.RequestedFunctions.iIndex != i) {
 						LOG(Failed, MODULE_PACKER, "SDK function was imported by ordinal instead of name\n");
@@ -1751,7 +1751,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 					}
 					ZeroMemory(name, lstrlenA(name));
 				}
-				pOriginal->WriteRVA<uint64_t>(Imports.At(i).OriginalFirstThunk + sizeof(uint64_t) * j, 0);
+				pOriginal->WriteRVA<uint64_t>(Imports[i].OriginalFirstThunk + sizeof(uint64_t) * j, 0);
 				j++;
 			}
 		}
@@ -1808,9 +1808,9 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		} else {
 			// Encodes ptr
 			for (int i = DecoderProc.Size() - 1; i > 0; i--) {
-				switch (DecoderProc.At(i).Mnemonic) {
+				switch (DecoderProc[i].Mnemonic) {
 				case DI_XOR:
-					a.xor_(rax, DecoderProc.At(i).value);
+					a.xor_(rax, DecoderProc[i].value);
 					break;
 				case DI_NOT:
 					a.not_(rax);
@@ -1819,10 +1819,10 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 					a.neg(rax);
 					break;
 				case DI_ADD:
-					a.sub(rax, DecoderProc.At(i).value);
+					a.sub(rax, DecoderProc[i].value);
 					break;
 				case DI_SUB:
-					a.add(rax, DecoderProc.At(i).value);
+					a.add(rax, DecoderProc[i].value);
 				}
 			}
 			DecoderProc.Release();
@@ -1879,7 +1879,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 
 			a.bind(data);
 			for (int i = 0; i < Relocations.Size(); i++) {
-				a.dd(Relocations.At(i));
+				a.dd(Relocations[i]);
 			}
 			a.dd(0);
 
@@ -2549,18 +2549,18 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			Label PointerArray = a.newLabel();
 			a.bind(PointerArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
-				a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).dwStart, FunctionRanges.At(i).Entries.Size());
+				a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges[i].dwStart, FunctionRanges[i].Entries.Size());
 			}
 			Label SizeArray = a.newLabel();
 			a.bind(SizeArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
-				a.dd(FunctionRanges.At(i).dwSize, FunctionRanges.At(i).Entries.Size());
+				a.dd(FunctionRanges[i].dwSize, FunctionRanges[i].Entries.Size());
 			}
 			Label EntryArray = a.newLabel();
 			a.bind(EntryArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
-				for (int j = 0; j < FunctionRanges.At(i).Entries.Size(); j++) {
-					a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).Entries.At(j));
+				for (int j = 0; j < FunctionRanges[i].Entries.Size(); j++) {
+					a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges[i].Entries[j]);
 				}
 			}
 			Label CompressedSizes = a.newLabel();
@@ -2570,20 +2570,20 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			int count = 0;
 			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
 				Buffer buf;
-				buf.u64Size = FunctionRanges.At(i).dwSize;
+				buf.u64Size = FunctionRanges[i].dwSize;
 				buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
-				pOriginal->ReadRVA(FunctionRanges.At(i).dwStart, buf.pBytes, buf.u64Size);
+				pOriginal->ReadRVA(FunctionRanges[i].dwStart, buf.pBytes, buf.u64Size);
 				FunctionBodies.Push(PackSection(buf, Options));
 				ZeroMemory(buf.pBytes, buf.u64Size);
 				*reinterpret_cast<DWORD*>(PartialUnpackingHook + 2) = ID;
-				ID += FunctionRanges.At(i).Entries.Size();
-				for (int j = 0; j < FunctionRanges.At(i).Entries.Size(); j++) {
-					memcpy_s(buf.pBytes + FunctionRanges.At(i).Entries.At(j) - FunctionRanges.At(i).dwStart, buf.u64Size - (FunctionRanges.At(i).Entries.At(j) - FunctionRanges.At(i).dwStart), PartialUnpackingHook, sizeof(PartialUnpackingHook));
+				ID += FunctionRanges[i].Entries.Size();
+				for (int j = 0; j < FunctionRanges[i].Entries.Size(); j++) {
+					memcpy_s(buf.pBytes + FunctionRanges[i].Entries[j] - FunctionRanges[i].dwStart, buf.u64Size - (FunctionRanges[i].Entries[j] - FunctionRanges[i].dwStart), PartialUnpackingHook, sizeof(PartialUnpackingHook));
 				}
-				pOriginal->WriteRVA(FunctionRanges.At(i).dwStart, buf.pBytes, buf.u64Size);
+				pOriginal->WriteRVA(FunctionRanges[i].dwStart, buf.pBytes, buf.u64Size);
 				free(buf.pBytes);
-				a.dq(FunctionBodies.At(FunctionBodies.Size() - 1).u64Size, FunctionRanges.At(i).Entries.Size());
-				count += FunctionRanges.At(i).Entries.Size();
+				a.dq(FunctionBodies[FunctionBodies.Size() - 1].u64Size, FunctionRanges[i].Entries.Size());
+				count += FunctionRanges[i].Entries.Size();
 			}
 
 			Label UnloadSegment = a.newLabel();
@@ -2726,9 +2726,9 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 
 			// Write function address
 			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
-				for (int j = 0; j < FunctionRanges.At(i).Entries.Size(); j++) {
-					pOriginal->WriteRVA<uint64_t>(FunctionRanges.At(i).Entries.At(j) + 8, pPackedBinary->GetBaseAddress() + holder.labelOffsetFromBase(LoadSegment) + ShellcodeData.BaseAddress);
-					ShellcodeData.Relocations.Relocations.Push(ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges.At(i).Entries.At(j) + 8);
+				for (int j = 0; j < FunctionRanges[i].Entries.Size(); j++) {
+					pOriginal->WriteRVA<uint64_t>(FunctionRanges[i].Entries[j] + 8, pPackedBinary->GetBaseAddress() + holder.labelOffsetFromBase(LoadSegment) + ShellcodeData.BaseAddress);
+					ShellcodeData.Relocations.Relocations.Push(ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders + FunctionRanges[i].Entries[j] + 8);
 				}
 			}
 
@@ -2792,8 +2792,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 
 			a.bind(Compressed);
 			for (int i = 0; i < FunctionBodies.Size(); i++) {
-				a.embed(FunctionBodies.At(i).pBytes, FunctionBodies.At(i).u64Size);
-				free(FunctionBodies.At(i).pBytes);
+				a.embed(FunctionBodies[i].pBytes, FunctionBodies[i].u64Size);
+				free(FunctionBodies[i].pBytes);
 			}
 			FunctionBodies.Release();
 
@@ -2808,8 +2808,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 	ShellcodeData.LoadedOffset = holder.labelOffsetFromBase(entrypt) + holder.baseAddress();
 	if (holder.hasRelocEntries()) {
 		for (int i = 0; i < holder.relocEntries().size(); i++) {
-			if (holder.relocEntries().at(i)->_relocType == RelocType::kNone) continue;
-			ShellcodeData.Relocations.Relocations.Push(holder.baseAddress() + holder.relocEntries().at(i)->sourceOffset() - pPackedBinary->GetNtHeaders()->x64.OptionalHeader.ImageBase);
+			if (holder.relocEntries()[i]->_relocType == RelocType::kNone) continue;
+			ShellcodeData.Relocations.Relocations.Push(holder.baseAddress() + holder.relocEntries()[i]->sourceOffset() - pPackedBinary->GetNtHeaders()->x64.OptionalHeader.ImageBase);
 		}
 	}
 
@@ -3105,7 +3105,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		shell.u64Size += exports.Size() * sizeof(DWORD);
 		shell.pBytes = reinterpret_cast<BYTE*>(realloc(shell.pBytes, shell.u64Size));
 		for (int i = 0; i < exports.Size(); i++) {
-			*reinterpret_cast<DWORD*>(shell.pBytes + shell.u64Size - sizeof(DWORD) * (exports.Size() - i)) = exports.At(i) + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders;
+			*reinterpret_cast<DWORD*>(shell.pBytes + shell.u64Size - sizeof(DWORD) * (exports.Size() - i)) = exports[i] + ShellcodeData.OldPENewBaseRVA - pOriginal->GetNtHeaders()->x64.OptionalHeader.SizeOfHeaders;
 		}
 
 		// Export names
@@ -3114,7 +3114,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		DWORD rva = Exports.AddressOfNameOrdinals + sizeof(WORD) * names.Size();
 		for (int i = 0; i < names.Size(); i++) {
 			*reinterpret_cast<DWORD*>(shell.pBytes + shell.u64Size - sizeof(DWORD) * (names.Size() - i)) = rva;
-			rva += lstrlenA(names.At(i)) + 1;
+			rva += lstrlenA(names[i]) + 1;
 		}
 
 		// Export ordinals
@@ -3126,10 +3126,10 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 
 		// Export names
 		for (int i = 0; i < names.Size(); i++) {
-			int len = lstrlenA(names.At(i)) + 1;
+			int len = lstrlenA(names[i]) + 1;
 			shell.u64Size += len;
 			shell.pBytes = reinterpret_cast<BYTE*>(realloc(shell.pBytes, shell.u64Size));
-			memcpy(shell.pBytes + shell.u64Size - len, names.At(i), len);
+			memcpy(shell.pBytes + shell.u64Size - len, names[i], len);
 			pNT->OptionalHeader.DataDirectory[0].Size += len;
 		}
 		names.Release();
@@ -3759,7 +3759,7 @@ Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand
 uint64_t ProtectedAssembler::GetStackSize() {
 	uint64_t ret = 0;
 	for (int i = 0, n = stack.Size(); i < n; i++) {
-		ret += stack.At(i).size();
+		ret += stack[i].size();
 	}
 	return ret;
 }
