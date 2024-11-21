@@ -28,6 +28,7 @@ struct DecoderInst {
 Vector<DecoderInst> DecoderProc;
 Vector<uint64_t> TLSCallbacks;
 _ShellcodeData ShellcodeData;
+bool bAsmJitFailed = false;
 
 // Commonly seen section names
 char ValidSectionNames[] = 
@@ -49,6 +50,7 @@ class AsmJitErrorHandler : public ErrorHandler {
 public:
 	void handleError(_In_ Error error, _In_ const char* message, _In_ BaseEmitter* emitter) override {
 		LOG(Failed, MODULE_PACKER, "AsmJit error: %s\n", message);
+		bAsmJitFailed = true;
 	}
 };
 
@@ -544,6 +546,10 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 	// Return data
 	holder.flatten();
 	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
+	if (bAsmJitFailed) {
+		LOG(Failed, MODULE_PACKER, "Failed to generate TLS shellcode\n");
+		return buf;
+	}
 	buf.u64Size = holder.textSection()->buffer().size();
 	buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
 	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
@@ -1294,6 +1300,10 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	// Return data
 	holder.flatten();
 	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
+	if (bAsmJitFailed) {
+		LOG(Failed, MODULE_PACKER, "Failed to generate loader shellcode\n");
+		return buf;
+	}
 	ShellcodeData.GetModuleHandleWOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(ShellcodeData.Labels.GetModuleHandleW);
 	ShellcodeData.GetProcAddressAOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(ShellcodeData.Labels.GetProcAddressA);
 	LOG(Info, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
@@ -1535,7 +1545,6 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 	a.garbage();
 
 	// Handle original PE's imports
-	VirtualizeResult VirtRes;
 	Label InternalRelOff;
 	Vector<IMAGE_IMPORT_DESCRIPTOR> Imports = pOriginal->GetImportedDLLs();
 	if (!Imports.nItems || !Imports.raw.pBytes || !Imports.raw.u64Size) {
@@ -2804,6 +2813,10 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 	// Return data
 	holder.flatten();
 	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
+	if (bAsmJitFailed) {
+		LOG(Failed, MODULE_PACKER, "Failed to generate internal shellcode\n");
+		return buf;
+	}
 	LOG(Info, MODULE_PACKER, "Internal code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	ShellcodeData.LoadedOffset = holder.labelOffsetFromBase(entrypt) + holder.baseAddress();
 	if (holder.hasRelocEntries()) {

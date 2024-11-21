@@ -797,6 +797,9 @@
     <ClInclude Include="icons.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="vm_types.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="LzmaDecode.raw">

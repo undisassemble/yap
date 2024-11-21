@@ -165,6 +165,7 @@ bool SaveProject() {
 bool LoadProject() {
 	char sig[3] = { 0 };
 	DWORD ver = 0;
+	Options.VM.VMFuncs.Release();
 
 	// Open file
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);

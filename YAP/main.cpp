@@ -226,6 +226,12 @@ DWORD WINAPI Begin(void* args) {
 			goto th_exit;
 		}
 
+		// Virtualize
+		if (Options.VM.bEnabled && !Virtualize(pAssembly)) {
+			LOG(Failed, MODULE_YAP, "Failed to virtualize PE\n");
+			goto th_exit;
+		}
+
 		// Fixup
 		if (!pAssembly->FixAddresses()) {
 			LOG(Failed, MODULE_YAP, "Reassembler failed!\n");

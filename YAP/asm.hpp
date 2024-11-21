@@ -52,18 +52,18 @@ struct Line {
 };
 
 struct AsmSection {
-	DWORD OldRVA;
-	DWORD NewRVA;
-	DWORD OldSize;
-	DWORD NewSize;
+	DWORD OldRVA = 0;
+	DWORD NewRVA = 0;
+	DWORD OldSize = 0;
+	DWORD NewSize = 0;
 	Buffer Assembled;
 	Vector<Line>* Lines;
 };
 
 struct FunctionRange {
 	Vector<DWORD> Entries;
-	DWORD dwStart;
-	DWORD dwSize;
+	DWORD dwStart = 0;
+	DWORD dwSize = 0;
 };
 
 DWORD GetLineSize(_In_ Line line);
