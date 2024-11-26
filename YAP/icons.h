@@ -20,6 +20,8 @@
 #define ICON_BOX_ARCHIVE          "\xEF\x86\x87" // F187
 #define ICON_BUG                  "\xEF\x86\x88" // F188
 #define ICON_GEARS                "\xEF\x82\x85" // F085
+#define ICON_DOWNLOAD             "\xEF\x80\x99" // F019
+#define ICON_MOON                 "\xEF\x86\x86" // F186
 
 static const unsigned int icons_compressed_size = 245474;
 static const unsigned int icons_compressed_data[245476/4] =

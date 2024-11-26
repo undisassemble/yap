@@ -227,13 +227,13 @@ void DrawGUI() {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Settings")) {
-			if (ImGui::MenuItem("Auto Update", NULL, &Settings.bCheckForUpdates)) { SaveSettings(); }
+			if (ImGui::MenuItem(ICON_DOWNLOAD " Auto Update", NULL, &Settings.bCheckForUpdates)) { SaveSettings(); }
+			if (ImGui::MenuItem(Settings.bLight ? ICON_MOON " Switch to Dark Mode" : ICON_MOON " Switch to Light Mode", NULL, &Settings.bLight)) { SaveSettings(); ApplyImGuiTheme(); }
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
+			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Feature Help")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Features.md", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
-			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Usage")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Usage.md", NULL, NULL, 0); }
-			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Best Practices")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Usage.md#best-practices", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
 			ImGui::EndMenu();
 		}
@@ -697,6 +697,13 @@ void ApplyImGuiTheme() {
 	style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.0f, 1.0f, 1.0f, 0.699999988079071f);
 	style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.800000011920929f, 0.800000011920929f, 0.800000011920929f, 0.2000000029802322f);
 	style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.800000011920929f, 0.800000011920929f, 0.800000011920929f, 0.3499999940395355f);
+
+	// Invert
+	if (Settings.bLight) {
+		for (int i = 0; i < ImGuiCol_COUNT; i++) {
+			style.Colors[i] = ImVec4(1.f - style.Colors[i].x, 1.f - style.Colors[i].y, 1.f - style.Colors[i].z, style.Colors[i].w);
+		}
+	}
 }
 
 

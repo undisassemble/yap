@@ -381,6 +381,7 @@ struct Options_t {
 };
 
 struct Settings_t {
+	bool bLight = false;
 	bool bCheckForUpdates = true;
 	SpeedSettings_t Opt = PrioAuto;
 	LoggingLevel_t Logging = DEBUG_ONLY(Info_Extended) RELEASE_ONLY(Warning);
