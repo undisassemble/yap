@@ -138,11 +138,6 @@ DWORD WINAPI Begin(void* args) {
 
 	// Select optimization mode
 	bool bResetOptimizations = false;
-	if (Settings.Opt == PrioAuto) {
-		bResetOptimizations = true;
-		LOG(Info, MODULE_YAP, "Prioritizing speed\n");
-		Settings.Opt = PrioSpeed;
-	}
 
 	// Reassembler
 	if (Options.Reassembly.bEnabled) {
@@ -307,7 +302,6 @@ DWORD WINAPI Begin(void* args) {
 
 th_exit:
 	Options = OptionsBackup;
-	if (bResetOptimizations) Settings.Opt = PrioAuto;
 	LOG(Info, MODULE_YAP, "Ending YAP\n");
 	Data.bRunning = false;
 	delete pAssembly;

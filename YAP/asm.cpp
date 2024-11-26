@@ -1269,6 +1269,7 @@ bool Asm::FixAddresses() {
 }
 
 bool Asm::Mutate() {
+	return true;
 	LOG(Info, MODULE_REASSEMBLER, "Beginning mutation\n");
 
 	// Vars
@@ -1301,28 +1302,20 @@ bool Asm::Mutate() {
 					Line first = replacement[0];
 					first.OldRVA = Lines->At(i).OldRVA;
 					replacement.Replace(0, first);
-					if (Settings.Opt == PrioMem) {
-						Lines->Replace(i, replacement);
-						i += replacement.Size() - 1;
-					} else {
-						Overwrite.Merge(replacement);
-					}
+					Overwrite.Merge(replacement);
 					bAppend = false;
 				}
 				replacement.Release();
 			}
 
-			if (Settings.Opt == PrioSpeed && bAppend) {
+			if (bAppend) {
 				Overwrite.Push(Lines->At(i));
 			}
 		}
 
-		// Replace buffer for PrioSpeed
-		if (Settings.Opt == PrioSpeed) {
-			Lines->Release();
-			Lines->nItems = Overwrite.nItems;
-			Lines->raw = Overwrite.raw;
-		}
+		Lines->Release();
+		Lines->nItems = Overwrite.nItems;
+		Lines->raw = Overwrite.raw;
 	}
 
 	LOG(Success, MODULE_REASSEMBLER, "Finished mutation\n");

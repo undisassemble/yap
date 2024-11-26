@@ -17,14 +17,14 @@ using namespace x86;
 // Logging stuff
 #define LOG_SUCCESS "\x1B[32m[+]\x1B[39m "
 #define LOG_INFO "\x1B[36m[?]\x1B[39m "
-#define LOG_INFO_EXTRA LOG_INFO
+#define LOG_INFO_EXTRA  "\x1B[36m[>]\x1B[39m "
 #define LOG_WARNING "\x1B[33m[*]\x1B[39m "
 #define LOG_ERROR "\x1B[31m[-]\x1B[39m "
 #define MODULE_YAP "YAP"
 #define MODULE_VM "VM"
 #define MODULE_PACKER "Packer"
 #define MODULE_REASSEMBLER "ReAsm"
-#define LOG(level, mod, str, ...) if (level <= ::Settings.Logging) { char _log_buf[128]; if (!level && ::Data.bUsingConsole) { snprintf(_log_buf, 128, str, ##__VA_ARGS__); WriteConsoleA(hStdOut, _log_buf, strlen(_log_buf), NULL, NULL); } else if (level && ::Data.bUsingConsole) { snprintf(_log_buf, 128, "%s[" mod "]: \t" str, level == LoggingLevel_t::Failed ? LOG_ERROR : (level == LoggingLevel_t::Success ? LOG_SUCCESS : (level == LoggingLevel_t::Warning ? LOG_WARNING : (level == LoggingLevel_t::Info ? LOG_INFO : LOG_INFO_EXTRA))), ##__VA_ARGS__); WriteConsoleA(hStdOut, _log_buf, strlen(_log_buf), NULL, NULL); } if (level && ::hLogFile) { snprintf(_log_buf, 128, "%s[" mod "]: \t" str, level == LoggingLevel_t::Failed ? "[-] " : (level == LoggingLevel_t::Success ? "[+] " : (level == LoggingLevel_t::Warning ? "[*] " : (level == LoggingLevel_t::Info ? "[?] " : "[?] "))), ##__VA_ARGS__); WriteFile(hLogFile, _log_buf, strlen(_log_buf), NULL, NULL); } }
+#define LOG(level, mod, str, ...) { char _log_buf[128]; if (!level && ::Data.bUsingConsole) { snprintf(_log_buf, 128, str, ##__VA_ARGS__); WriteConsoleA(hStdOut, _log_buf, strlen(_log_buf), NULL, NULL); } else if (level && ::Data.bUsingConsole) { snprintf(_log_buf, 128, "%s[" mod "]: \t" str, level == LoggingLevel_t::Failed ? LOG_ERROR : (level == LoggingLevel_t::Success ? LOG_SUCCESS : (level == LoggingLevel_t::Warning ? LOG_WARNING : (level == LoggingLevel_t::Info ? LOG_INFO : LOG_INFO_EXTRA))), ##__VA_ARGS__); WriteConsoleA(hStdOut, _log_buf, strlen(_log_buf), NULL, NULL); } if (level && ::hLogFile) { snprintf(_log_buf, 128, "%s[" mod "]: \t" str, level == LoggingLevel_t::Failed ? "[-] " : (level == LoggingLevel_t::Success ? "[+] " : (level == LoggingLevel_t::Warning ? "[*] " : (level == LoggingLevel_t::Info ? "[?] " : "[?] "))), ##__VA_ARGS__); WriteFile(hLogFile, _log_buf, strlen(_log_buf), NULL, NULL); } }
 
 // Macros
 #define IMGUI_TOGGLE(str, var) { bool _TEMP_BOOL = var; if(ImGui::Checkbox(str, &_TEMP_BOOL)) { var = _TEMP_BOOL; } } // Allows ImGui::Checkbox to be used with bitfields
@@ -52,12 +52,6 @@ using namespace x86;
 #endif
 
 const int VMMinimumSize = 21;
-
-enum SpeedSettings_t : int {
-	PrioAuto,
-	PrioSpeed,
-	PrioMem
-};
 
 enum LoggingLevel_t : int {
 	Nothing,
@@ -232,8 +226,10 @@ struct Vector {
 	}
 
 	void Release() {
-		raw.Release();
-		nItems = 0;
+		if (!bCannotBeReleased) {
+			raw.Release();
+			nItems = 0;
+		}
 	}
 
 	void Insert(_In_ DWORD i, _In_ T Item) {
@@ -366,6 +362,13 @@ struct Options_t {
 		uint64_t Rebase = 0;
 	} Reassembly;
 
+	struct {
+		bool bDeleteVirtualizedFunctions : 1 = false;
+		BYTE UPXVersionMajor = 4;
+		BYTE UPXVersionMinor = 2;
+		BYTE UPXVersionPatch = 4;
+	} Advanced;
+
 #ifdef _DEBUG
 	struct {
 		bool bDumpAsm : 1 = false;
@@ -383,8 +386,6 @@ struct Options_t {
 struct Settings_t {
 	bool bLight = false;
 	bool bCheckForUpdates = true;
-	SpeedSettings_t Opt = PrioAuto;
-	LoggingLevel_t Logging = DEBUG_ONLY(Info_Extended) RELEASE_ONLY(Warning);
 };
 
 extern Settings_t Settings;

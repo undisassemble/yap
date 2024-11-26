@@ -128,6 +128,8 @@ void LoadSettings() {
 }
 
 bool SaveProject() {
+	if (!Data.Project[0]) return false;
+
 	// Check file ending
 	char* ending = &Data.Project[lstrlenA(Data.Project) - 7];
 	if ((lstrlenA(Data.Project) < 7 || lstrcmpA(ending, ".yaproj")) && lstrlenA(Data.Project) < sizeof(Data.Project) - 8) {
@@ -223,7 +225,7 @@ void DrawGUI() {
 			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
 			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadProject(); }
 			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveProject(); }
-			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save As", "Ctrl + Shift + S")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
+			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save As", "Ctrl + Shift + S") && Data.Project[0]) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Settings")) {
@@ -402,6 +404,22 @@ void DrawGUI() {
 #endif
 
 		if (ImGui::BeginTabItem(ICON_GEARS " Advanced")) {
+			IMGUI_TOGGLE("Delete Virtualized Functions", Options.Advanced.bDeleteVirtualizedFunctions);
+			BYTE MIN = 0;
+			BYTE MAX = 9;
+			ImGui::PushItemWidth(20);
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f, 8.f));
+			ImGui::PushID("UPXVersionMajor");
+			ImGui::DragScalar(".", ImGuiDataType_U8, &Options.Advanced.UPXVersionMajor, 1.f, &MIN, &MAX);
+			ImGui::PopID();
+			ImGui::SameLine();
+			ImGui::PushID("UPXVersionMinor");
+			ImGui::DragScalar(".", ImGuiDataType_U8, &Options.Advanced.UPXVersionMinor, 1.f, &MIN, &MAX);
+			ImGui::PopID();
+			ImGui::SameLine();
+			ImGui::DragScalar("UPX Version", ImGuiDataType_U8, &Options.Advanced.UPXVersionPatch, 1.f, &MIN, &MAX);
+			ImGui::PopStyleVar();
+			ImGui::PopItemWidth();
 			ImGui::EndTabItem();
 		}
 

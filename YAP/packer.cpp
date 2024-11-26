@@ -2937,8 +2937,8 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	pNT->OptionalHeader.SizeOfHeapCommit = pNT->OptionalHeader.SizeOfStackCommit = 0x1000;
 	if (::Options.Packing.Immitate == UPX) {
 		pNT->FileHeader.NumberOfSymbols = 0x21585055; // UPX!
-		pNT->FileHeader.PointerToSymbolTable = 0x0034322E; // .24
-		pNT->FileHeader.TimeDateStamp = 0x34000000; // 4
+		pNT->FileHeader.PointerToSymbolTable = ((::Options.Advanced.UPXVersionPatch + 0x30) << 16) | ((::Options.Advanced.UPXVersionMinor + 0x30) << 8) | 0x2E;
+		pNT->FileHeader.TimeDateStamp = (::Options.Advanced.UPXVersionMajor + 0x30) << 24;
 	}
 	pNT->OptionalHeader.DllCharacteristics = IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE | IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
 	DEBUG_ONLY(if (::Options.Debug.bDisableRelocations) pNT->OptionalHeader.DllCharacteristics &= ~IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE);
