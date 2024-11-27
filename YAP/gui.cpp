@@ -404,22 +404,32 @@ void DrawGUI() {
 #endif
 
 		if (ImGui::BeginTabItem(ICON_GEARS " Advanced")) {
-			IMGUI_TOGGLE("Delete Virtualized Functions", Options.Advanced.bDeleteVirtualizedFunctions);
-			BYTE MIN = 0;
-			BYTE MAX = 9;
-			ImGui::PushItemWidth(20);
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f, 8.f));
-			ImGui::PushID("UPXVersionMajor");
-			ImGui::DragScalar(".", ImGuiDataType_U8, &Options.Advanced.UPXVersionMajor, 1.f, &MIN, &MAX);
-			ImGui::PopID();
-			ImGui::SameLine();
-			ImGui::PushID("UPXVersionMinor");
-			ImGui::DragScalar(".", ImGuiDataType_U8, &Options.Advanced.UPXVersionMinor, 1.f, &MIN, &MAX);
-			ImGui::PopID();
-			ImGui::SameLine();
-			ImGui::DragScalar("UPX Version", ImGuiDataType_U8, &Options.Advanced.UPXVersionPatch, 1.f, &MIN, &MAX);
-			ImGui::PopStyleVar();
-			ImGui::PopItemWidth();
+			if (ImGui::TreeNode("Packer")) {
+				BYTE MIN = 0;
+				BYTE MAX = 9;
+				ImGui::PushItemWidth(20);
+				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f, 8.f));
+				ImGui::PushID("UPXVersionMajor");
+				ImGui::DragScalar(".", ImGuiDataType_U8, &Options.Advanced.UPXVersionMajor, 1.f, &MIN, &MAX);
+				ImGui::PopID();
+				ImGui::SameLine();
+				ImGui::PushID("UPXVersionMinor");
+				ImGui::DragScalar(".", ImGuiDataType_U8, &Options.Advanced.UPXVersionMinor, 1.f, &MIN, &MAX);
+				ImGui::PopID();
+				ImGui::SameLine();
+				ImGui::DragScalar("UPX Version", ImGuiDataType_U8, &Options.Advanced.UPXVersionPatch, 1.f, &MIN, &MAX);
+				ImGui::PopStyleVar();
+				ImGui::PopItemWidth();
+				IMGUI_TOGGLE("Semi-random Section Names", Options.Advanced.bSemiRandomSecNames);
+				IMGUI_TOGGLE("Full-random Section Names", Options.Advanced.bTrueRandomSecNames);
+				ImGui::InputText("Section 1 Name", Options.Advanced.Sec1Name, 9);
+				ImGui::InputText("Section 2 Name", Options.Advanced.Sec2Name, 9);
+				ImGui::TreePop();
+			}
+			if (ImGui::TreeNode("VM")) {
+				IMGUI_TOGGLE("Delete Virtualized Functions", Options.Advanced.bDeleteVirtualizedFunctions);
+				ImGui::TreePop();
+			}
 			ImGui::EndTabItem();
 		}
 

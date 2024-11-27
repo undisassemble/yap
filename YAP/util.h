@@ -364,9 +364,13 @@ struct Options_t {
 
 	struct {
 		bool bDeleteVirtualizedFunctions : 1 = false;
+		bool bTrueRandomSecNames : 1 = false;
+		bool bSemiRandomSecNames : 1 = true;
 		BYTE UPXVersionMajor = 4;
 		BYTE UPXVersionMinor = 2;
 		BYTE UPXVersionPatch = 4;
+		char Sec1Name[9] = { 0 };
+		char Sec2Name[9] = { 0 };
 	} Advanced;
 
 #ifdef _DEBUG
@@ -378,7 +382,6 @@ struct Options_t {
 		bool bGenerateMarks : 1 = false;
 		bool bDisableMutations : 1 = false;
 		bool bDisableRelocations : 1 = false;
-
 	} Debug;
 #endif
 };

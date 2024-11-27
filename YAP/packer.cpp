@@ -2957,25 +2957,35 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		return false;
 	}
 	SecHeader.Misc.VirtualSize = Internal.u64Size + pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders;
-	switch (::Options.Packing.Immitate) {
-	case Themida:
-		memcpy(SecHeader.Name, ".themida", 8);
-		break;
-	case WinLicense:
-		memcpy(SecHeader.Name, ".winlice", 8);
-		break;
-	case UPX:
-		memcpy(SecHeader.Name, "UPX0\0", 8);
-		break;
-	case MPRESS:
-		memcpy(SecHeader.Name, ".MPRESS1\0", 8);
-		break;
-	case Enigma:
-		memcpy(SecHeader.Name, ".enigma1", 8);
-		break;
-	default:
-		memcpy(SecHeader.Name, &ValidSectionNames[(rand() % (sizeof(ValidSectionNames) / 8)) * 8], 8);
-	}
+	
+		switch (::Options.Packing.Immitate) {
+		case Themida:
+			memcpy(SecHeader.Name, ".themida", 8);
+			break;
+		case WinLicense:
+			memcpy(SecHeader.Name, ".winlice", 8);
+			break;
+		case UPX:
+			memcpy(SecHeader.Name, "UPX0\0", 8);
+			break;
+		case MPRESS:
+			memcpy(SecHeader.Name, ".MPRESS1\0", 8);
+			break;
+		case Enigma:
+			memcpy(SecHeader.Name, ".enigma1", 8);
+			break;
+		default:
+			if (::Options.Advanced.bTrueRandomSecNames) {
+				for (int i = 0; i < 8; i++) {
+					SecHeader.Name[i] = rand() & 0xFF;
+				}
+			} else if (::Options.Advanced.bSemiRandomSecNames) {
+				memcpy(SecHeader.Name, &ValidSectionNames[(rand() % (sizeof(ValidSectionNames) / 8)) * 8], 8);
+			} else {
+				memcpy(SecHeader.Name, ::Options.Advanced.Sec1Name, 8);
+			}
+		}
+	
 	pPackedBinary->InsertSection(0, NULL, SecHeader);
 	SecHeader.VirtualAddress += SecHeader.Misc.VirtualSize;
 	SecHeader.VirtualAddress += (SecHeader.VirtualAddress % 0x1000) ? 0x1000 - (SecHeader.VirtualAddress % 0x1000) : 0;
@@ -2997,7 +3007,15 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		memcpy(SecHeader.Name, ".enigma2", 8);
 		break;
 	default:
-		memcpy(SecHeader.Name, &ValidSectionNames[(rand() % (sizeof(ValidSectionNames)) / 8) * 8], 8);
+		if (::Options.Advanced.bTrueRandomSecNames) {
+			for (int i = 0; i < 8; i++) {
+				SecHeader.Name[i] = rand() & 0xFF;
+			}
+		} else if (::Options.Advanced.bSemiRandomSecNames) {
+			memcpy(SecHeader.Name, &ValidSectionNames[(rand() % (sizeof(ValidSectionNames) / 8)) * 8], 8);
+		} else {
+			memcpy(SecHeader.Name, ::Options.Advanced.Sec2Name, 8);
+		}
 	}
 	pNT->OptionalHeader.AddressOfEntryPoint = SecHeader.VirtualAddress;
 
