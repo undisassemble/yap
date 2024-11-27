@@ -385,24 +385,6 @@ void DrawGUI() {
 			ImGui::EndTabItem();
 		}
 
-#ifdef _DEBUG
-		if (ImGui::BeginTabItem(ICON_BUG " Debug")) {
-			IMGUI_TOGGLE("Dump Disassembly", Options.Debug.bDumpAsm);
-			IMGUI_TOGGLE("Dump Individual Sections", Options.Debug.bDumpSections);
-			IMGUI_TOGGLE("Dump Function Ranges", Options.Debug.bDumpFunctions);
-			IMGUI_TOGGLE("Create Breakpoints", Options.Debug.bGenerateBreakpoints);
-			IMGUI_TOGGLE("Wrap Real Instructions in NOPs", Options.Debug.bGenerateMarks);
-			IMGUI_TOGGLE("Disable Mutation", Options.Debug.bDisableMutations);
-			IMGUI_TOGGLE("Disable Relocations", Options.Debug.bDisableRelocations);
-			if (ImGui::TreeNode("Icon Tests")) {
-				ImGui::DebugTextEncoding(ICON_FILE_SHIELD ICON_SHIELD ICON_SHIELD_HALVED ICON_TRIANGLE_EXCLAMATION ICON_CIRCLE_INFO ICON_CIRCLE_QUESTION ICON_FOLDER_OPEN ICON_FILE ICON_FLOPPY_DISK ICON_CODE ICON_MICROCHIP ICON_BOX ICON_BOX_OPEN ICON_BOX_ARCHIVE);
-				ImGui::TreePop();
-			}
-			ImGui::ShowMetricsWindow();
-			ImGui::EndTabItem();
-		}
-#endif
-
 		if (ImGui::BeginTabItem(ICON_GEARS " Advanced")) {
 			if (ImGui::TreeNode("Packer")) {
 				BYTE MIN = 0;
@@ -420,6 +402,8 @@ void DrawGUI() {
 				ImGui::DragScalar("UPX Version", ImGuiDataType_U8, &Options.Advanced.UPXVersionPatch, 1.f, &MIN, &MAX);
 				ImGui::PopStyleVar();
 				ImGui::PopItemWidth();
+				IMGUI_TOGGLE("Fake Symbol Table", Options.Advanced.bFakeSymbols);
+				IMGUI_TOGGLE("Mutate " ICON_TRIANGLE_EXCLAMATION, Options.Advanced.bMutateAssembly);
 				IMGUI_TOGGLE("Semi-random Section Names", Options.Advanced.bSemiRandomSecNames);
 				IMGUI_TOGGLE("Full-random Section Names", Options.Advanced.bTrueRandomSecNames);
 				ImGui::InputText("Section 1 Name", Options.Advanced.Sec1Name, 9);
@@ -432,6 +416,23 @@ void DrawGUI() {
 			}
 			ImGui::EndTabItem();
 		}
+
+#ifdef _DEBUG
+		if (ImGui::BeginTabItem(ICON_BUG " Debug")) {
+			IMGUI_TOGGLE("Dump Disassembly", Options.Debug.bDumpAsm);
+			IMGUI_TOGGLE("Dump Individual Sections", Options.Debug.bDumpSections);
+			IMGUI_TOGGLE("Dump Function Ranges", Options.Debug.bDumpFunctions);
+			IMGUI_TOGGLE("Create Breakpoints", Options.Debug.bGenerateBreakpoints);
+			IMGUI_TOGGLE("Wrap Real Instructions in NOPs", Options.Debug.bGenerateMarks);
+			IMGUI_TOGGLE("Disable Relocations", Options.Debug.bDisableRelocations);
+			if (ImGui::TreeNode("Icon Tests")) {
+				ImGui::DebugTextEncoding(ICON_FILE_SHIELD ICON_SHIELD ICON_SHIELD_HALVED ICON_TRIANGLE_EXCLAMATION ICON_CIRCLE_INFO ICON_CIRCLE_QUESTION ICON_FOLDER_OPEN ICON_FILE ICON_FLOPPY_DISK ICON_CODE ICON_MICROCHIP ICON_BOX ICON_BOX_OPEN ICON_BOX_ARCHIVE);
+				ImGui::TreePop();
+			}
+			ImGui::ShowMetricsWindow();
+			ImGui::EndTabItem();
+		}
+#endif
 
 		if (ImGui::BeginTabItem(ICON_CIRCLE_INFO " Version")) {
 			ImGui::Text("YAP Version: " __YAP_VERSION__);

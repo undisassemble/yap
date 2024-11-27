@@ -594,7 +594,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	}
 
 	// Entry point
-	if (DEBUG_ONLY(!::Options.Debug.bDisableMutations) RELEASE_ONLY(true)) {
+	if (::Options.Advanced.bMutateAssembly) {
 		a.strict();
 		a.jz(_entry);
 		a.garbage();
@@ -666,17 +666,12 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.strict();
 		a.jz(ret);
 		Label skippolicy = a.newLabel();
-#ifdef _DEBUG
-		if (::Options.Debug.bDisableMutations) {
-		a.jmp(skippolicy);
-		} else {
+		if (::Options.Advanced.bMutateAssembly) {
 			a.strict();
 			a.jnz(skippolicy);
+		} else {
+			a.jmp(skippolicy);
 		}
-#else
-		a.strict();
-		a.jnz(skippolicy);
-#endif
 		
 		// Data
 		Label policy = a.newLabel();
@@ -2957,35 +2952,33 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		return false;
 	}
 	SecHeader.Misc.VirtualSize = Internal.u64Size + pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders;
-	
-		switch (::Options.Packing.Immitate) {
-		case Themida:
-			memcpy(SecHeader.Name, ".themida", 8);
-			break;
-		case WinLicense:
-			memcpy(SecHeader.Name, ".winlice", 8);
-			break;
-		case UPX:
-			memcpy(SecHeader.Name, "UPX0\0", 8);
-			break;
-		case MPRESS:
-			memcpy(SecHeader.Name, ".MPRESS1\0", 8);
-			break;
-		case Enigma:
-			memcpy(SecHeader.Name, ".enigma1", 8);
-			break;
-		default:
-			if (::Options.Advanced.bTrueRandomSecNames) {
-				for (int i = 0; i < 8; i++) {
-					SecHeader.Name[i] = rand() & 0xFF;
-				}
-			} else if (::Options.Advanced.bSemiRandomSecNames) {
-				memcpy(SecHeader.Name, &ValidSectionNames[(rand() % (sizeof(ValidSectionNames) / 8)) * 8], 8);
-			} else {
-				memcpy(SecHeader.Name, ::Options.Advanced.Sec1Name, 8);
+	switch (::Options.Packing.Immitate) {
+	case Themida:
+		memcpy(SecHeader.Name, ".themida", 8);
+		break;
+	case WinLicense:
+		memcpy(SecHeader.Name, ".winlice", 8);
+		break;
+	case UPX:
+		memcpy(SecHeader.Name, "UPX0\0", 8);
+		break;
+	case MPRESS:
+		memcpy(SecHeader.Name, ".MPRESS1\0", 8);
+		break;
+	case Enigma:
+		memcpy(SecHeader.Name, ".enigma1", 8);
+		break;
+	default:
+		if (::Options.Advanced.bTrueRandomSecNames) {
+			for (int i = 0; i < 8; i++) {
+				SecHeader.Name[i] = rand() & 0xFF;
 			}
+		} else if (::Options.Advanced.bSemiRandomSecNames) {
+			memcpy(SecHeader.Name, &ValidSectionNames[(rand() % (sizeof(ValidSectionNames) / 8)) * 8], 8);
+		} else {
+			memcpy(SecHeader.Name, ::Options.Advanced.Sec1Name, 8);
 		}
-	
+	}
 	pPackedBinary->InsertSection(0, NULL, SecHeader);
 	SecHeader.VirtualAddress += SecHeader.Misc.VirtualSize;
 	SecHeader.VirtualAddress += (SecHeader.VirtualAddress % 0x1000) ? 0x1000 - (SecHeader.VirtualAddress % 0x1000) : 0;
@@ -3182,7 +3175,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	}
 
 	// Fake data
-	if (::Options.Packing.Immitate != UPX) {
+	if (::Options.Advanced.bFakeSymbols && ::Options.Packing.Immitate != UPX) {
 		pNT->FileHeader.PointerToSymbolTable = SecHeader.PointerToRawData + sizeof(IMAGE_LOAD_CONFIG_DIRECTORY64) + sizeof(IMAGE_DEBUG_DIRECTORY);
 		pNT->FileHeader.NumberOfSymbols = rand();
 	}
@@ -3409,7 +3402,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 
 // Everything in this stub needs to be blocked otherwise it will cause an infinite loop
 void ProtectedAssembler::stub() {
-	DEBUG_ONLY(if (Options.Debug.bDisableMutations) return);
+	if (!Options.Advanced.bMutateAssembly) return;
 	HeldLocks++;
 	DEBUG_ONLY(if (Options.Debug.bGenerateMarks) nop());
 	if (stack.Size()) {
@@ -3424,7 +3417,7 @@ void ProtectedAssembler::stub() {
 }
 
 size_t ProtectedAssembler::garbage() {
-	DEBUG_ONLY(if (Options.Debug.bDisableMutations) return 0);
+	if (!Options.Advanced.bMutateAssembly) return 0;
 	DEBUG_ONLY(if (::Options.Debug.bGenerateMarks) { HeldLocks++;  nop(); xchg(rax, rax); HeldLocks--; });
 	Label randlabel;
 	randlabel = newLabel();
@@ -3570,7 +3563,7 @@ size_t ProtectedAssembler::garbage() {
 }
 
 void ProtectedAssembler::desync() {
-	DEBUG_ONLY(if (Options.Debug.bDisableMutations) return);
+	if (!Options.Advanced.bMutateAssembly) return;
 	HeldLocks++;
 	db(0xEB);
 	block();
@@ -3579,7 +3572,7 @@ void ProtectedAssembler::desync() {
 }
 
 void ProtectedAssembler::desync_jz() {
-	DEBUG_ONLY(if (Options.Debug.bDisableMutations) return);
+	if (!Options.Advanced.bMutateAssembly) return;
 	HeldLocks++;
 	db(0x74);
 	block();
@@ -3588,7 +3581,7 @@ void ProtectedAssembler::desync_jz() {
 }
 
 void ProtectedAssembler::desync_jnz() {
-	DEBUG_ONLY(if (Options.Debug.bDisableMutations) return);
+	if (!Options.Advanced.bMutateAssembly) return;
 	HeldLocks++;
 	db(0x75);
 	block();
@@ -3597,7 +3590,7 @@ void ProtectedAssembler::desync_jnz() {
 }
 
 void ProtectedAssembler::desync_mov(Gpq o0) {
-	DEBUG_ONLY(if (Options.Debug.bDisableMutations) return);
+	if (!Options.Advanced.bMutateAssembly) return;
 	uint64_t dist = 3 + rand() % Options.Packing.MutationLevel * 2;
 	push((dist << 16) + 0xE940);
 	Label after = newLabel();
@@ -3609,9 +3602,8 @@ void ProtectedAssembler::desync_mov(Gpq o0) {
 
 Error ProtectedAssembler::call(Gp o0) {
 	return Assembler::call(o0);
-	if (bWaitingOnEmit || DEBUG_ONLY(Options.Debug.bDisableMutations) RELEASE_ONLY(false)) return Assembler::call(o0);
-	BYTE dist = 0;
-	DEBUG_ONLY(if (!Options.Debug.bDisableMutations)) dist = 64 + (rand() % 192);
+	if (bWaitingOnEmit || !Options.Advanced.bMutateAssembly) return Assembler::call(o0);
+	BYTE dist = 64 + (rand() % 192);
 	push(o0);
 	push(o0);
 	push(o0);
@@ -3634,10 +3626,9 @@ Error ProtectedAssembler::call(Gp o0) {
 
 Error ProtectedAssembler::call(Imm o0) {
 	return Assembler::call(o0);
-	if (bWaitingOnEmit || DEBUG_ONLY(Options.Debug.bDisableMutations) RELEASE_ONLY(false)) return Assembler::call(o0);
+	if (bWaitingOnEmit || !Options.Advanced.bMutateAssembly) return Assembler::call(o0);
 	Gp reg = truerandreg();
-	BYTE dist = 0;
-	DEBUG_ONLY(if (!Options.Debug.bDisableMutations)) dist = 64 + (rand() % 192);
+	BYTE dist = 64 + (rand() % 192);
 	push(o0);
 	push(o0);
 	push(reg);
@@ -3664,11 +3655,10 @@ Error ProtectedAssembler::call(Label o0) {
 
 Error ProtectedAssembler::call(Mem o0) {
 	return Assembler::call(o0);
-	if (bWaitingOnEmit || DEBUG_ONLY(Options.Debug.bDisableMutations) RELEASE_ONLY(false)) return Assembler::call(o0);
+	if (bWaitingOnEmit || !Options.Advanced.bMutateAssembly) return Assembler::call(o0);
 	Gp reg = truerandreg();
 	o0.setSize(8);
-	BYTE dist = 0;
-	DEBUG_ONLY(if (!Options.Debug.bDisableMutations)) dist = 64 + (rand() % 192);
+	BYTE dist = 64 + (rand() % 192);
 	push(o0);
 	push(o0);
 	push(reg);
@@ -3693,7 +3683,7 @@ Error ProtectedAssembler::mov(Gp o0, Imm o1) {
 	return Assembler::mov(o0, o1);
 	if (o0.size() == 4) o0 = o0.r64();
 	if (o0.size() == 1) return Assembler::mov(o0, o1);
-	if (bWaitingOnEmit || DEBUG_ONLY(Options.Debug.bDisableMutations) RELEASE_ONLY(false)) return Assembler::mov(o0, o1);
+	if (bWaitingOnEmit || !Options.Advanced.bMutateAssembly) return Assembler::mov(o0, o1);
 	Blacklist.Push(o0.r64());
 	randstack(0, 7);
 	block();
@@ -3707,7 +3697,7 @@ Error ProtectedAssembler::mov(Gp o0, Imm o1) {
 
 Error ProtectedAssembler::mov(Gp o0, Gp o1) {
 	return Assembler::mov(o0, o1);
-	if (o0.r64() == rsp || o1.r64() == rsp || bWaitingOnEmit || DEBUG_ONLY(Options.Debug.bDisableMutations) RELEASE_ONLY(false) || o0.size() != o1.size()) return Assembler::mov(o0, o1);
+	if (o0.r64() == rsp || o1.r64() == rsp || bWaitingOnEmit || !Options.Advanced.bMutateAssembly || o0.size() != o1.size()) return Assembler::mov(o0, o1);
 
 	if (o0.size() == 4) { o0 = o0.r64(); o1 = o1.r64(); } // replace this
 	if (o0.size() == 1) { o0 = o0.r16(); o1 = o1.r16(); } // this too
@@ -3728,7 +3718,7 @@ Error ProtectedAssembler::mov(Gp o0, Gp o1) {
 Error ProtectedAssembler::mov(Gp o0, Mem o1) {
 	return Assembler::mov(o0, o1);
 	o1.setSize(o0.size());
-	if (bWaitingOnEmit || DEBUG_ONLY(Options.Debug.bDisableMutations) RELEASE_ONLY(false) || o0.size() == 1 || o0.size() == 4) return Assembler::mov(o0, o1);
+	if (bWaitingOnEmit || !Options.Advanced.bMutateAssembly || o0.size() == 1 || o0.size() == 4) return Assembler::mov(o0, o1);
 	
 	randstack(0, 7);
 	if (o1.hasBaseReg() && o1.baseReg() == rsp) o1.addOffset(GetStackSize());
@@ -3742,7 +3732,7 @@ Error ProtectedAssembler::mov(Gp o0, Mem o1) {
 
 Error ProtectedAssembler::mov(Mem o0, Imm o1) {
 	return Assembler::mov(o0, o1);
-	if (bWaitingOnEmit || DEBUG_ONLY(Options.Debug.bDisableMutations) RELEASE_ONLY(false) || o0.size() != 8) return Assembler::mov(o0, o1);
+	if (bWaitingOnEmit || !Options.Advanced.bMutateAssembly || o0.size() != 8) return Assembler::mov(o0, o1);
 	randstack(0, 7);
 	block();
 	push(o1);
@@ -3757,7 +3747,7 @@ Error ProtectedAssembler::mov(Mem o0, Imm o1) {
 Error ProtectedAssembler::mov(Mem o0, Gp o1) {
 	return Assembler::mov(o0, o1);
 	o0.setSize(o1.size());
-	if (bWaitingOnEmit || DEBUG_ONLY(Options.Debug.bDisableMutations) RELEASE_ONLY(false) || (o0.size() != 8 && o0.size() != 2)) return Assembler::mov(o0, o1);
+	if (bWaitingOnEmit || !Options.Advanced.bMutateAssembly || (o0.size() != 8 && o0.size() != 2)) return Assembler::mov(o0, o1);
 	push(o1);
 	return pop(o0);
 }
@@ -3766,7 +3756,7 @@ Error ProtectedAssembler::movzx(Gp o0, Mem o1) {
 	return Assembler::movzx(o0, o1);
 	if (o1.hasBaseReg() && o1.baseReg() == rsp) return Assembler::movzx(o0, o1);
 	o0 = o0.r64();
-	if (bWaitingOnEmit || DEBUG_ONLY(Options.Debug.bDisableMutations) RELEASE_ONLY(false) || o1.size() != 2) return Assembler::movzx(o0, o1);
+	if (bWaitingOnEmit || !Options.Advanced.bMutateAssembly || o1.size() != 2) return Assembler::movzx(o0, o1);
 	push(0);
 	pop(o0);
 	Gp o16 = o0.r16();

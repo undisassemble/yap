@@ -406,7 +406,6 @@ void Console::read(char* project) {
 	LIST(Options.Debug.bDumpFunctions, d);
 	LIST(Options.Debug.bGenerateBreakpoints, d);    
 	LIST(Options.Debug.bGenerateMarks, d);
-	LIST(Options.Debug.bDisableMutations, d);
 	LIST(Options.Debug.bDisableRelocations, d);
 #endif
 #undef LIST

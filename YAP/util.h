@@ -366,6 +366,8 @@ struct Options_t {
 		bool bDeleteVirtualizedFunctions : 1 = false;
 		bool bTrueRandomSecNames : 1 = false;
 		bool bSemiRandomSecNames : 1 = true;
+		bool bFakeSymbols : 1 = true;
+		bool bMutateAssembly : 1 = true;
 		BYTE UPXVersionMajor = 4;
 		BYTE UPXVersionMinor = 2;
 		BYTE UPXVersionPatch = 4;
@@ -380,7 +382,6 @@ struct Options_t {
 		bool bDumpFunctions : 1 = false;
 		bool bGenerateBreakpoints : 1 = false;
 		bool bGenerateMarks : 1 = false;
-		bool bDisableMutations : 1 = false;
 		bool bDisableRelocations : 1 = false;
 	} Debug;
 #endif
