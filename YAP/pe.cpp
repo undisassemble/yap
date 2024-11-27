@@ -312,39 +312,22 @@ void PE::InsertSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_ IMAGE_SECTI
 
 void PE::FixHeaders() {
 	// DOS Header
+	DosHeader.e_magic = IMAGE_DOS_SIGNATURE;
 	DosHeader.e_lfanew = sizeof(IMAGE_DOS_HEADER) + DosStub.u64Size;
 
-	// Raw addresses
-	DWORD Raw = NTHeaders.x64.OptionalHeader.SizeOfHeaders;
+	// Set stuff
+	uint64_t Raw = DosHeader.e_lfanew + (x86 ? sizeof(IMAGE_NT_HEADERS32) : sizeof(IMAGE_NT_HEADERS64)) + sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections;
+	uint64_t RVA = Raw;
 	IMAGE_SECTION_HEADER Header = { 0 };
 	for (int i = 0; i < SectionHeaders.Size(); i++) {
-		Raw += (Raw % NTHeaders.x64.OptionalHeader.FileAlignment) ? NTHeaders.x64.OptionalHeader.FileAlignment - (Raw % NTHeaders.x64.OptionalHeader.FileAlignment) : 0;
+		Raw += (Raw % NTHeaders.x64.OptionalHeader.FileAlignment) ? (NTHeaders.x64.OptionalHeader.FileAlignment - Raw % NTHeaders.x64.OptionalHeader.FileAlignment) : 0;
+		RVA += (RVA % NTHeaders.x64.OptionalHeader.SectionAlignment) ? (NTHeaders.x64.OptionalHeader.SectionAlignment - RVA % NTHeaders.x64.OptionalHeader.SectionAlignment) : 0;
 		Header = SectionHeaders[i];
 		Header.PointerToRawData = Raw;
+		Header.VirtualAddress = RVA;
 		SectionHeaders.Replace(i, Header);
-		Raw += SectionHeaders[i].SizeOfRawData;
-	}
-}
-
-void PE::MoveSections() {
-	uint64_t u64RawAddress = DosHeader.e_lfanew + (x86 ? sizeof(IMAGE_NT_HEADERS32) : sizeof(IMAGE_NT_HEADERS64)) + sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections;
-	uint64_t u64RVA = u64RawAddress;
-
-	IMAGE_SECTION_HEADER Header = { 0 };
-	for (WORD i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
-		// Alignment
-		u64RawAddress += (u64RawAddress % NTHeaders.x64.OptionalHeader.FileAlignment) ? (NTHeaders.x64.OptionalHeader.FileAlignment - u64RawAddress % NTHeaders.x64.OptionalHeader.FileAlignment) : 0;
-		u64RVA += (u64RVA % NTHeaders.x64.OptionalHeader.SectionAlignment) ? (NTHeaders.x64.OptionalHeader.SectionAlignment - u64RVA % NTHeaders.x64.OptionalHeader.SectionAlignment) : 0;
-
-		// Copy addresses
-		Header = SectionHeaders[i];
-		Header.VirtualAddress = u64RVA;
-		Header.PointerToRawData = u64RawAddress;
-		SectionHeaders.Replace(i, Header);
-
-		// Move stuffs
-		u64RVA += Header.Misc.VirtualSize;
-		u64RawAddress += Header.SizeOfRawData;
+		RVA += Header.Misc.VirtualSize;
+		Raw += Header.SizeOfRawData;
 	}
 }
 

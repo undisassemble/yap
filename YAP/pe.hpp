@@ -117,14 +117,9 @@ public:
 	}
 
 	/// <summary>
-	/// Fixes headers
+	/// Fixes headers and moves sections
 	/// </summary>
 	void FixHeaders();
-
-	/// <summary>
-	/// Will move & reorder section data and headers to avoid issues
-	/// </summary>
-	void MoveSections();
 
 	virtual void DeleteSection(_In_ WORD wIndex);
 	void OverwriteSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_opt_ size_t szBytes);
