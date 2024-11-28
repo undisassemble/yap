@@ -1,0 +1,608 @@
+#include "assembler.h"
+
+int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {
+	if (nMin > nMax) return 0;
+	HeldLocks++;
+	Gp temp;
+	int n = nMin == nMax ? nMin : nMin + (rand() % (nMax - nMin));
+	int ret = 0;
+	for (int i = 0; i < n; i++) {
+		// Select register
+		do {
+			temp = truerandreg();
+		} while (stack.Size() < countof(regs) - Blacklist.Size() && (stack.Includes(temp) || Blacklist.Includes(temp.r64())));
+		if (stack.Includes(temp) || Blacklist.Includes(temp.r64())) break;
+		push(temp);
+		stack.Push(temp);
+		ret++;
+
+		// Random push
+		if (rand() & 1) {
+			for (int j = 0, m = 5; j < m; j++) {
+				temp = randreg();
+				stack.Push(temp);
+				ret++;
+				push((rand() & 1) ? 0 : rand());
+				break;
+			}
+		}
+
+		// Random math again
+		for (int j = rand() % MutationLevel; j; j--) {
+			randinst(randreg());
+		}
+	}
+	HeldLocks--;
+	return ret;
+}
+
+void ProtectedAssembler::restorestack(_In_ int n) {
+	if (!stack.Size()) return;
+	HeldLocks++;
+	if (n < 0) {
+		while (stack.Size()) {
+			// Restore register
+			pop(stack.Pop());
+
+			for (int j = rand() % MutationLevel; j; j--) {
+				randinst(randreg());
+			}
+		}
+		stack.Release();
+	}
+	else {
+		for (int i = 0; i < n; i++) {
+			pop(stack.Pop());
+
+			for (int j = rand() % MutationLevel; j; j--) {
+				randinst(randreg());
+			}
+		}
+	}
+	HeldLocks--;
+}
+
+void ProtectedAssembler::randinst(Gp o0) {
+	if (!stack.Includes(o0) || Blacklist.Includes(o0.r64()) || Blacklist.Includes(o0) || o0.size() != 8) return;
+	HeldLocks++;
+	const BYTE sz = 26;
+	const BYTE beg_unsafe = 17;
+	BYTE end = bStrict ? beg_unsafe : sz;
+	Mem peb = ptr(0x60);
+	peb.setSegment(gs);
+	switch (rand() % end) {
+	case 0:
+		lea(o0, ptr(rip, rand()));
+		break;
+	case 1:
+		lea(o0, ptr(truerandreg(), (rand() & 1 ? 1 : -1) * rand()));
+		break;
+	case 2:
+		lea(o0, ptr(truerandreg(), truerandreg(), rand() % 3));
+		break;
+	case 3:
+		lea(o0, ptr(truerandreg(), truerandreg(), rand() % 3, (rand() & 1 ? 1 : -1) * rand()));
+		break;
+	case 4: {
+		BYTE r = 3 + rand() % (MutationLevel * 2);
+		Label j2 = newLabel();
+		jmp(j2);
+		for (; r > 0; r--) db(rand() & 0xFF);
+		bind(j2);
+		break;
+	}
+	case 5:
+		mov(o0, 0);
+		break;
+	case 6:
+		mov(o0, rand());
+		break;
+	case 7:
+		mov(o0, ptr(rsp, rand() % 32));
+		break;
+	case 8:
+		mov(o0, peb);
+		break;
+	case 9: {
+		BYTE r = 3 + rand() % (MutationLevel * 2);
+		Label j2 = newLabel();
+		jbe(j2);
+		jnc(j2);
+		for (; r > 0; r--) db(rand() & 0xFF);
+		bind(j2);
+		break;
+	}
+	case 10: { // In IDA these disassemble as the same instruction, but function differently ;)
+		if (o0.r64() == rax.r64()) {
+			block();
+			xchg(eax, eax);
+		}
+		else {
+			db(0x46);
+			db(0x90);
+		}
+		break;
+	}
+	case 11: {
+		push(truerandreg());
+		xchg(o0, ptr(rsp));
+		pop(o0);
+		break;
+	}
+	case 12:
+		not_(o0);
+		break;
+	case 13: {
+		bool bNeedsValid = false;
+		BYTE valid[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x64, 0x65, 0x66, 0x67, 0x2E, 0x3E, 0xF2, 0xF3 };
+		for (int i = 0, n = 1 + rand() % 14; i < n; i++) {
+			BYTE selected = valid[rand() % sizeof(valid)];
+			if (selected == 0x41 || selected == 0x43 || selected == 0x45 || selected == 0x47 || selected == 0x49 || selected == 0x4B || selected == 0x4D) {
+				// Try again
+				if (i == 13) { i--; continue; }
+
+				// Make room for validating prefix
+				if (!bNeedsValid) n--;
+				bNeedsValid = true;
+			}
+			db(selected);
+		}
+		if (bNeedsValid) {
+			BYTE validators[] = { 0x40, 0x42, 0x44, 0x46, 0x48, 0x4A, 0x4C, 0x4E };
+			db(validators[rand() % sizeof(validators)]);
+		}
+		db(0x90);
+		break;
+	}
+	case 14: {
+		BYTE valid[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x64, 0x65, 0x66, 0x67, 0x2E, 0x3E, 0xF2, 0xF3 };
+		for (int i = 0, n = 1 + rand() % 12; i < n; i++) {
+			BYTE selected = valid[rand() % sizeof(valid)];
+			db(selected);
+		}
+		not_(o0);
+		break;
+	}
+	case 15: {
+		bool bNeedsValid = false;
+		BYTE valid[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x64, 0x65, 0x66, 0x67, 0x2E, 0x3E, 0xF2, 0xF3 };
+		for (int i = 0, n = 1 + rand() % 11; i < n; i++) {
+			BYTE selected = valid[rand() % sizeof(valid)];
+			if (selected == 0x41 || selected == 0x43 || selected == 0x45 || selected == 0x47 || selected == 0x49 || selected == 0x4B || selected == 0x4D) {
+				// Try again
+				if (i == 10) { i--; continue; }
+
+				// Make room for validating prefix
+				if (!bNeedsValid) n--;
+				bNeedsValid = true;
+			}
+			db(selected);
+		}
+		if (bNeedsValid) {
+			BYTE validators[] = { 0x40, 0x42, 0x44, 0x46, 0x48, 0x4A, 0x4C, 0x4E };
+			db(validators[rand() % sizeof(validators)]);
+		}
+		setz(o0.r8());
+		break;
+	}
+	case 16: {
+		bool bNeedsValid = false;
+		BYTE valid[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x64, 0x65, 0x66, 0x67, 0x2E, 0x3E, 0xF2, 0xF3 };
+		for (int i = 0, n = 1 + rand() % 11; i < n; i++) {
+			BYTE selected = valid[rand() % sizeof(valid)];
+			if (selected == 0x41 || selected == 0x43 || selected == 0x45 || selected == 0x47 || selected == 0x49 || selected == 0x4B || selected == 0x4D) {
+				// Try again
+				if (i == 10) { i--; continue; }
+
+				// Make room for validating prefix
+				if (!bNeedsValid) n--;
+				bNeedsValid = true;
+			}
+			db(selected);
+		}
+		if (bNeedsValid) {
+			BYTE validators[] = { 0x40, 0x42, 0x44, 0x46, 0x48, 0x4A, 0x4C, 0x4E };
+			db(validators[rand() % sizeof(validators)]);
+		}
+		setnz(o0.r8());
+		break;
+	}
+	}
+	HeldLocks--;
+}
+
+// Everything in this stub needs to be blocked otherwise it will cause an infinite loop
+void ProtectedAssembler::stub() {
+	if (!bMutate) return;
+	HeldLocks++;
+	DEBUG_ONLY(if (Options.Debug.bGenerateMarks) nop());
+	if (stack.Size()) {
+		LOG(Warning, MODULE_PACKER, "Stub was requested when stack was not empty, ignoring request.\n");
+		return;
+	}
+	randstack(0, MutationLevel);
+	for (int i = 0, n = rand() % MutationLevel; i < n; i++) randinst(randreg());
+	restorestack();
+	DEBUG_ONLY(if (Options.Debug.bGenerateMarks) nop());
+	HeldLocks--;
+}
+
+size_t ProtectedAssembler::garbage() {
+	if (!bMutate) return 0;
+	DEBUG_ONLY(if (::Options.Debug.bGenerateMarks) { HeldLocks++;  nop(); xchg(rax, rax); HeldLocks--; });
+	Label randlabel;
+	randlabel = newLabel();
+	Gp reg;
+	for (int i = 0, n = (1000 / (17 - MutationLevel)) + rand() % (10000 / (17 - MutationLevel)); i < n; i++) {
+	retry:
+		switch (rand() % 46) {
+		case 0:
+			inc(randsize(truerandreg()));
+			break;
+		case 1:
+			dec(randsize(truerandreg()));
+			break;
+		case 2:
+			reg = randsize(truerandreg());
+			xchg(reg, randregofsamesize(reg));
+			break;
+		case 3:
+			reg = randsize(truerandreg());
+			cmp(reg, randregofsamesize(reg));
+			break;
+		case 4:
+			cmp(randsize(truerandreg()), 0);
+			break;
+		case 5:
+			mov(randsize(truerandreg()), rand());
+			break;
+		case 6:
+			mov(randsize(truerandreg()), 0);
+			break;
+		case 7:
+			reg = randsize(truerandreg());
+			mov(reg, randregofsamesize(reg));
+			break;
+		case 8:
+			break;
+		case 9:
+			break;
+		case 10:
+			desync();
+			break;
+		case 11:
+			desync_mov(truerandreg().r64());
+			break;
+		case 12:
+			jz(randlabel);
+			break;
+		case 13:
+			jnz(randlabel);
+			break;
+		case 14:
+			shl(truerandreg(), rand() % 64);
+			break;
+		case 15:
+			shr(truerandreg(), rand() % 64);
+			break;
+		case 16:
+			//mov(truerandreg(), ptr(rip, (rand() & 1 ? -1 : 1) * rand()));
+			break;
+		case 17:
+			//lea((reg = truerandreg()), ptr(rip, (rand() & 1 ? -1 : 1) * rand()));
+			//mov(truerandreg(), ptr(reg));
+			break;
+		case 18:
+			//lea((reg = truerandreg()), ptr(rip, (rand() & 1 ? -1 : 1) * rand()));
+			//mov(truerandreg(), ptr(reg, rand()));
+			break;
+		case 19:
+			break;
+		case 20:
+			break;
+		case 21:
+			break;
+		case 22:
+			break;
+		case 23:
+			break;
+		case 24:
+			break;
+		case 25:
+			break;
+		case 26:
+			reg = randsize(truerandreg());
+			test(reg, reg);
+			break;
+		case 27:
+			cmp(randsize(truerandreg()), rand());
+			break;
+		case 28:
+			xor_(randsize(truerandreg()), rand());
+			break;
+		case 29:
+			reg = randsize(truerandreg());
+			xor_(reg, randregofsamesize(reg));
+			break;
+		case 30:
+			or_(randsize(truerandreg()), rand());
+			break;
+		case 31:
+			reg = randsize(truerandreg());
+			or_(reg, randregofsamesize(reg));
+			break;
+		case 32:
+			not_(randsize(truerandreg()));
+			break;
+		case 33:
+			reg = randsize(truerandreg());
+			sub(reg, randregofsamesize(reg));
+			break;
+		case 34:
+			sub(randsize(truerandreg()), rand());
+			break;
+		case 35:
+			reg = randsize(truerandreg());
+			add(reg, randregofsamesize(reg));
+			break;
+		case 36:
+			add(randsize(truerandreg()), rand());
+			break;
+		case 37:
+			mul(randsize(truerandreg()));
+			break;
+		case 38:
+			lea(truerandreg(), ptr(truerandreg()));
+			break;
+		case 39:
+			lea(truerandreg(), ptr(truerandreg(), truerandreg()));
+			break;
+		case 40:
+			lea(truerandreg(), ptr(truerandreg(), truerandreg(), rand() % 4, rand()));
+			break;
+		case 41:
+			lea(truerandreg(), ptr(truerandreg(), rand()));
+			break;
+		default:
+			if (!i) goto retry;
+			if (!code()->isLabelBound(randlabel)) bind(randlabel);
+			randlabel = newLabel();
+		}
+	}
+	DEBUG_ONLY(if (::Options.Debug.bGenerateMarks) { HeldLocks++;  nop(); xchg(rax, rax); HeldLocks--; });
+	return 0;
+}
+
+void ProtectedAssembler::desync() {
+	if (!bMutate) return;
+	HeldLocks++;
+	db(0xEB);
+	block();
+	inc(eax);
+	HeldLocks--;
+}
+
+void ProtectedAssembler::desync_jz() {
+	if (!bMutate) return;
+	HeldLocks++;
+	db(0x74);
+	block();
+	inc(ebx);
+	HeldLocks--;
+}
+
+void ProtectedAssembler::desync_jnz() {
+	if (!bMutate) return;
+	HeldLocks++;
+	db(0x75);
+	block();
+	inc(ebx);
+	HeldLocks--;
+}
+
+void ProtectedAssembler::desync_mov(Gpq o0) {
+	if (!bMutate) return;
+	uint64_t dist = 3 + rand() % MutationLevel * 2;
+	push((dist << 16) + 0xE940);
+	Label after = newLabel();
+	lea(o0, ptr(after));
+	pop(qword_ptr(o0));
+	bind(after);
+	for (int i = 0; i < dist + 6; i++) db(rand() & 0xFF);
+}
+
+Error ProtectedAssembler::call(Gp o0) {
+	return Assembler::call(o0);
+	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
+	BYTE dist = 64 + (rand() % 192);
+	push(o0);
+	push(o0);
+	push(o0);
+	Label after = newLabel();
+	lea(o0, ptr(after));
+	if (dist) add(o0, dist);
+	mov(ptr(rsp, 0x10), o0);
+	pop(o0);
+	ret();
+	bind(after);
+	for (int i = 0; i < dist; i++) {
+		BYTE byte = 0;
+		do {
+			byte = rand() & 0xFF;
+		} while (byte == 0xC3 || byte == 0xCB || !byte);
+		db(byte);
+	}
+	return 0;
+}
+
+Error ProtectedAssembler::call(Imm o0) {
+	return Assembler::call(o0);
+	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
+	Gp reg = truerandreg();
+	BYTE dist = 64 + (rand() % 192);
+	push(o0);
+	push(o0);
+	push(reg);
+	Label after = newLabel();
+	lea(reg, ptr(after));
+	if (dist) add(reg, dist);
+	mov(ptr(rsp, 0x10), reg);
+	pop(reg);
+	ret();
+	bind(after);
+	for (int i = 0; i < dist; i++) {
+		BYTE byte = 0;
+		do {
+			byte = rand() & 0xFF;
+		} while (byte == 0xC3 || byte == 0xCB || !byte);
+		db(byte);
+	}
+	return 0;
+}
+
+Error ProtectedAssembler::call(Label o0) {
+	return Assembler::call(o0);
+}
+
+Error ProtectedAssembler::call(Mem o0) {
+	return Assembler::call(o0);
+	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
+	Gp reg = truerandreg();
+	o0.setSize(8);
+	BYTE dist = 64 + (rand() % 192);
+	push(o0);
+	push(o0);
+	push(reg);
+	Label after = newLabel();
+	lea(reg, ptr(after));
+	if (dist) add(reg, dist);
+	mov(ptr(rsp, 0x10), reg);
+	pop(reg);
+	ret();
+	bind(after);
+	for (int i = 0; i < dist; i++) {
+		BYTE byte = 0;
+		do {
+			byte = rand() & 0xFF;
+		} while (byte == 0xC3 || byte == 0xCB || !byte);
+		db(byte);
+	}
+	return 0;
+}
+
+Error ProtectedAssembler::mov(Gp o0, Imm o1) {
+	return Assembler::mov(o0, o1);
+	if (o0.size() == 4) o0 = o0.r64();
+	if (o0.size() == 1) return Assembler::mov(o0, o1);
+	if (bWaitingOnEmit || !bMutate) return Assembler::mov(o0, o1);
+	Blacklist.Push(o0.r64());
+	randstack(0, 7);
+	block();
+	push(o1);
+	for (int i = 0, n = o0.size() == 2 ? 4 : 1; i < n; i++) stack.Push(o0);
+	Blacklist.Pop();
+	randstack(0, 7);
+	restorestack();
+	return 0;
+}
+
+Error ProtectedAssembler::mov(Gp o0, Gp o1) {
+	return Assembler::mov(o0, o1);
+	if (o0.r64() == rsp || o1.r64() == rsp || bWaitingOnEmit || !bMutate || o0.size() != o1.size()) return Assembler::mov(o0, o1);
+
+	if (o0.size() == 4) { o0 = o0.r64(); o1 = o1.r64(); } // replace this
+	if (o0.size() == 1) { o0 = o0.r16(); o1 = o1.r16(); } // this too
+
+	Blacklist.Push(o0.r64());
+	Blacklist.Push(o1.r64());
+	randstack(0, 7);
+	block();
+	push(o1);
+	Blacklist.Pop();
+	Blacklist.Pop();
+	stack.Push(o0);
+	randstack(0, 7);
+	restorestack();
+	return 0;
+}
+
+Error ProtectedAssembler::mov(Gp o0, Mem o1) {
+	return Assembler::mov(o0, o1);
+	o1.setSize(o0.size());
+	if (bWaitingOnEmit || !bMutate || o0.size() == 1 || o0.size() == 4) return Assembler::mov(o0, o1);
+
+	randstack(0, 7);
+	if (o1.hasBaseReg() && o1.baseReg() == rsp) o1.addOffset(GetStackSize());
+	block();
+	push(o1);
+	stack.Push(o0);
+	randstack(0, 7);
+	restorestack();
+	return 0;
+}
+
+Error ProtectedAssembler::mov(Mem o0, Imm o1) {
+	return Assembler::mov(o0, o1);
+	if (bWaitingOnEmit || !bMutate || o0.size() != 8) return Assembler::mov(o0, o1);
+	randstack(0, 7);
+	block();
+	push(o1);
+	restorestack(randstack(0, 7));
+	if (o0.hasBaseReg() && o0.baseReg() == rsp) o0.addOffset(GetStackSize());
+	block();
+	pop(o0);
+	restorestack();
+	return 0;
+}
+
+Error ProtectedAssembler::mov(Mem o0, Gp o1) {
+	return Assembler::mov(o0, o1);
+	o0.setSize(o1.size());
+	if (bWaitingOnEmit || !bMutate || (o0.size() != 8 && o0.size() != 2)) return Assembler::mov(o0, o1);
+	push(o1);
+	return pop(o0);
+}
+
+Error ProtectedAssembler::movzx(Gp o0, Mem o1) {
+	return Assembler::movzx(o0, o1);
+	if (o1.hasBaseReg() && o1.baseReg() == rsp) return Assembler::movzx(o0, o1);
+	o0 = o0.r64();
+	if (bWaitingOnEmit || !bMutate || o1.size() != 2) return Assembler::movzx(o0, o1);
+	push(0);
+	pop(o0);
+	Gp o16 = o0.r16();
+	push(o16);
+	push(o16);
+	push(o16);
+	push(o1);
+	return pop(o0);
+}
+
+Error ProtectedAssembler::movzx(Gp o0, Gp o1) {
+	return Assembler::movzx(o0, o1);
+}
+
+Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) {
+	bStrict = true; // temp fix for garbage gen
+	if (!bWaitingOnEmit && !HeldLocks && !bUnprotected) { stub(); bStrict = false; }
+	else { bWaitingOnEmit = false; }
+	return Assembler::_emit(instId, o0, o1, o2, opExt);
+}
+
+uint64_t ProtectedAssembler::GetStackSize() {
+	uint64_t ret = 0;
+	for (int i = 0, n = stack.Size(); i < n; i++) {
+		ret += stack[i].size();
+	}
+	return ret;
+}
+
+Error ProtectedAssembler::ret() {
+	if (stack.Size()) restorestack();
+	return Assembler::ret();
+}
+
+Error ProtectedAssembler::ret(Imm o0) {
+	if (stack.Size()) restorestack();
+	return Assembler::ret(o0);
+}
