@@ -212,6 +212,7 @@ DWORD WINAPI Begin(void* args) {
 #endif
 
 		// Modify
+		bool bNeedsAssembly = Options.Reassembly.bSubstitution;
 		if (Options.Reassembly.bStrip && !pAssembly->Strip()) {
 			LOG(Failed, MODULE_YAP, "Failed to strip PE\n");
 			goto th_exit;
@@ -227,16 +228,21 @@ DWORD WINAPI Begin(void* args) {
 			goto th_exit;
 		}
 
-		// Fixup
-		if (!pAssembly->FixAddresses()) {
-			LOG(Failed, MODULE_YAP, "Reassembler failed!\n");
-			goto th_exit;
-		}
+		// These parts only required if actually assembling
+		if (bNeedsAssembly) {
+			// Fixup
+			if (!pAssembly->FixAddresses()) {
+				LOG(Failed, MODULE_YAP, "Reassembler failed!\n");
+				goto th_exit;
+			}
 
-		// Assemble
-		if (!pAssembly->Assemble()) {
-			LOG(Failed, MODULE_YAP, "Assembly failed!\n");
-			goto th_exit;
+			// Assemble
+			if (!pAssembly->Assemble()) {
+				LOG(Failed, MODULE_YAP, "Assembly failed!\n");
+				goto th_exit;
+			}
+		} else {
+			LOG(Info, MODULE_YAP, "Skipping assembly step as assembly is not modified.\n");
 		}
 
 		// Modify (after assembled)

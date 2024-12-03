@@ -912,7 +912,7 @@ bool Asm::Analyze() {
 						range.dwStart = pLines->At(index).OldRVA;
 					}
 					if (pLines->At(index).OldRVA + GetLineSize(pLines->At(index)) > range.dwStart + range.dwSize) {
-						range.dwSize = (pLines->At(index).OldRVA + GetLineSize(pLines->At(index))) - range.dwStart;
+						range.dwSize = (pLines->At(index).OldRVA + GetLineSize(pLines->At(index))) - range.dwStart - 1;
 					}
 					if (bExit || (pLines->At(index).Type == Decoded && pLines->At(index).Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_RET)) {
 						break;
@@ -931,7 +931,6 @@ bool Asm::Analyze() {
 		Functions.Release();
 
 		// Check for invalid functions
-		int merged = 0;
 		int removed = 0;
 		for (int i = 0; i < FunctionRanges.Size(); i++) {
 			range = FunctionRanges[i];
@@ -940,41 +939,11 @@ bool Asm::Analyze() {
 			for (int j = 0; j < FunctionRanges.Size(); j++) if (j != i) {
 				FunctionRange range2 = FunctionRanges[j];
 				
-				// Combined
-				if (range2.dwStart >= range.dwStart && range2.dwStart + range2.dwSize <= range.dwStart + range.dwSize) {
-					if (range2.dwSize < 17) {
-						range.dwSize = range2.dwStart - range.dwStart;
-						removed++;
-					} else {
-						range.Entries.Push(range2.Entries);
-						merged++;
-					}
-					range2.Entries.Release();
-					FunctionRanges.Replace(i, range);
-					FunctionRanges.Remove(j);
-					if (i > j) i--;
-					j--;
-					continue;
-				}
-
 				// Overlapping
-				if (range2.dwStart >= range.dwStart && range2.dwStart < range.dwStart + range.dwSize) {
-					range.dwSize = range2.dwStart + range2.dwSize - range.dwStart;
-					range.Entries.Push(range2.Entries);
-					range2.Entries.Release();
-					FunctionRanges.Replace(i, range);
-					FunctionRanges.Remove(j);
+				if (range.dwStart <= range2.dwStart && range.dwStart + range.dwSize >= range2.dwStart) {
+					FunctionRanges.Remove(i);
 					i = -1;
-					break;
-				}
-				if (range2.dwStart <= range.dwStart && range2.dwStart + range2.dwSize > range.dwStart) {
-					range.dwSize = range.dwStart + range.dwSize - range2.dwStart;
-					range.dwStart = range2.dwStart;
-					range.Entries.Push(range2.Entries);
-					range2.Entries.Release();
-					FunctionRanges.Replace(i, range);
-					FunctionRanges.Remove(j);
-					i = -1;
+					removed++;
 					break;
 				}
 			}
@@ -1003,15 +972,12 @@ bool Asm::Analyze() {
 						i--;
 						break;
 					}
-					range.Entries.Remove(j);
-					j--;
-					merged--;
 				}
 			}
 		}
 
 		LOG(Info, MODULE_REASSEMBLER, "Found %d compatible functions\n", FunctionRanges.Size());
-		LOG(Info, MODULE_REASSEMBLER, "Merged %d functions, removed %d functions\n", merged, removed);
+		LOG(Info_Extended, MODULE_REASSEMBLER, "Removed %d functions\n", removed);
 	} else {
 		LOG(Info, MODULE_REASSEMBLER, "Skipping function range discovery as results are unused\n");
 	}
