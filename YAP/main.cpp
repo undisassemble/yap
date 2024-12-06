@@ -212,7 +212,7 @@ DWORD WINAPI Begin(void* args) {
 #endif
 
 		// Modify
-		bool bNeedsAssembly = Options.Reassembly.bSubstitution;
+		bool bNeedsAssembly = Options.Reassembly.bSubstitution || (Options.Reassembly.bStrip && pAssembly->NTHeaders.x64.OptionalHeader.DataDirectory[6].Size && pAssembly->NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress);
 		if (Options.Reassembly.bStrip && !pAssembly->Strip()) {
 			LOG(Failed, MODULE_YAP, "Failed to strip PE\n");
 			goto th_exit;

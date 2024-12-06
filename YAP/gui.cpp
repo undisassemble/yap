@@ -279,6 +279,8 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("Prevent PE dumpers and reconstructors from dumping the running process.");
 			IMGUI_TOGGLE("Anti-Debug", Options.Packing.bAntiDebug);
 			ImGui::SetItemTooltip("Prevent debuggers from attaching to process.");
+			IMGUI_TOGGLE("Anti-Patch", Options.Packing.bAntiPatch);
+			ImGui::SetItemTooltip("Verify signature of binary before loading.\n");
 			IMGUI_TOGGLE("Anti-VM", Options.Packing.bAntiVM);
 			ImGui::SetItemTooltip("Prevent app from running in a virtual machine.");
 			ImGui::SameLine();

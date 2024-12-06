@@ -315,6 +315,9 @@ void PE::FixHeaders() {
 	DosHeader.e_magic = IMAGE_DOS_SIGNATURE;
 	DosHeader.e_lfanew = sizeof(IMAGE_DOS_HEADER) + DosStub.u64Size;
 
+	// File header
+
+
 	// Set stuff
 	uint64_t Raw = DosHeader.e_lfanew + (x86 ? sizeof(IMAGE_NT_HEADERS32) : sizeof(IMAGE_NT_HEADERS64)) + sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections;
 	uint64_t RVA = Raw;
@@ -454,7 +457,7 @@ char* PE::ReadRVAString(_In_ DWORD dwRVA) {
 void PE::WriteRVA(_In_ DWORD dwRVA, _In_ void* pData, _In_ size_t szData) {
 	// Verify stuff
 	WORD wSectionIndex = FindSectionByRVA(dwRVA);
-	if (!pData || !szData || wSectionIndex > NTHeaders.x64.FileHeader.NumberOfSections - 1 || !SectionHeaders[wSectionIndex].SizeOfRawData || SectionHeaders[wSectionIndex].VirtualAddress > dwRVA || SectionHeaders[wSectionIndex].VirtualAddress + SectionHeaders[wSectionIndex].Misc.VirtualSize < dwRVA + szData) {
+	if (!pData || !szData || wSectionIndex > NTHeaders.x64.FileHeader.NumberOfSections - 1 || !SectionHeaders[wSectionIndex].SizeOfRawData || SectionHeaders[wSectionIndex].VirtualAddress > dwRVA || SectionHeaders[wSectionIndex].VirtualAddress + SectionHeaders[wSectionIndex].SizeOfRawData < dwRVA + szData) {
 		return;
 	}
 
@@ -464,9 +467,8 @@ void PE::WriteRVA(_In_ DWORD dwRVA, _In_ void* pData, _In_ size_t szData) {
 
 void PE::ReadRVA(_In_ DWORD dwRVA, _Out_ void* pData, _In_ size_t szData) {
 	WORD wSectionIndex = FindSectionByRVA(dwRVA);
-	if (!pData || !szData || wSectionIndex > NTHeaders.x64.FileHeader.NumberOfSections - 1 || !SectionHeaders[wSectionIndex].SizeOfRawData || SectionHeaders[wSectionIndex].VirtualAddress > dwRVA ||
-		SectionHeaders[wSectionIndex].VirtualAddress + SectionHeaders[wSectionIndex].Misc.VirtualSize < dwRVA + szData) {
-		ZeroMemory(pData, szData);
+	if (!pData || !szData || wSectionIndex > NTHeaders.x64.FileHeader.NumberOfSections - 1 || !SectionHeaders[wSectionIndex].SizeOfRawData || SectionHeaders[wSectionIndex].VirtualAddress > dwRVA || SectionHeaders[wSectionIndex].VirtualAddress + SectionHeaders[wSectionIndex].SizeOfRawData < dwRVA + szData) {
+		ZeroMemory(pData, szData); // This region is defaulted to zero anyways so ¯\_(._.)_/¯
 		return;
 	}
 

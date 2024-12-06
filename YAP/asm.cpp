@@ -358,6 +358,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 
 				do {
 					rva = ReadRVA<DWORD>(disp);
+					if (!rva) break;
 					trva = odisp + rva;
 					if (!(trva != 0xCCCCCCCC && trva >= Sections[SectionIndex].OldRVA && trva < Sections[SectionIndex].OldRVA + Sections[SectionIndex].OldSize)) break;
 					if (!JumpTables.Includes(trva)) JumpTables.Push(trva);
@@ -1466,10 +1467,14 @@ bool Asm::Strip() {
 	LOG(Info_Extended, MODULE_REASSEMBLER, "Stripping PE\n");
 	// Debug directory
 	if (NTHeaders.x64.OptionalHeader.DataDirectory[6].Size && NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress) {
-		IMAGE_DEBUG_DIRECTORY debug = ReadRVA<IMAGE_DEBUG_DIRECTORY>(NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress);
-		RemoveData(debug.AddressOfRawData, debug.SizeOfData);
+		DWORD dwSize = NTHeaders.x64.OptionalHeader.DataDirectory[6].Size;
+		for (int i = 0, n = dwSize / sizeof(IMAGE_DEBUG_DIRECTORY); i < n; i++) {
+			IMAGE_DEBUG_DIRECTORY debug = ReadRVA<IMAGE_DEBUG_DIRECTORY>(NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress + sizeof(IMAGE_DEBUG_DIRECTORY) * i);
+			RemoveData(debug.AddressOfRawData, debug.SizeOfData);
+			dwSize += debug.SizeOfData;
+		}
 		RemoveData(NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress, NTHeaders.x64.OptionalHeader.DataDirectory[6].Size);
-		LOG(Info, MODULE_REASSEMBLER, "Removed debug directory (%#x bytes)\n", debug.SizeOfData + NTHeaders.x64.OptionalHeader.DataDirectory[6].Size);
+		LOG(Info, MODULE_REASSEMBLER, "Removed debug directory (%#x bytes)\n", dwSize);
 		NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress = NTHeaders.x64.OptionalHeader.DataDirectory[6].Size = 0;
 	}
 

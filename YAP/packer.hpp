@@ -32,6 +32,9 @@ struct _ShellcodeData {
 	BYTE EntryOff = 0;
 	DWORD GetProcAddressAOff = 0;
 	DWORD GetModuleHandleWOff = 0;
+	DWORD Sha256_InitOff = 0;
+	DWORD Sha256_UpdateOff = 0;
+	DWORD Sha256_FinalOff = 0;
 	bool bUsingTLSCallbacks = false;
 
 	struct {
@@ -87,6 +90,11 @@ struct _ShellcodeData {
 	struct {
 		bool bWasAntiDump : 1 = false;
 	} CarryData;
+
+	struct {
+		Sha256Digest LoaderHash;
+		DWORD dwOffHeaderSum = 0;
+	} AntiPatchData;
 };
 
 struct PackerOptions {

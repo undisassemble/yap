@@ -331,6 +331,7 @@ struct Options_t {
 		bool bOnlyLoadMicrosoft : 1 = false;
 		bool bMarkCritical : 1 = false;
 		bool bAntiDebug : 1 = false;
+		bool bAntiPatch : 1 = false;
 		bool bAntiVM : 1 = false;
 		bool bAllowHyperV : 1 = true;
 		bool bAntiSandbox : 1 = false;

@@ -474,16 +474,64 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 		a.block();
 		a.jz(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress - (rand() & 0xFFFF));
 	}
+	if (::Options.Packing.bAntiPatch) {
+		Label hash = a.newLabel();
+		Label HeaderDigest = a.newLabel();
+		Label LoaderDigest = a.newLabel();
+		Label checksigs = a.newLabel();
+		a.jmp(checksigs);
+		a.garbage();
+		a.bind(HeaderDigest);
+		ShellcodeData.AntiPatchData.dwOffHeaderSum = a.offset();
+		a.db(0, sizeof(Sha256Digest));
+		a.bind(hash);
+		a.db(0, sizeof(CSha256));
+		a.garbage();
+		a.bind(LoaderDigest);
+		a.embed(&ShellcodeData.AntiPatchData.LoaderHash, sizeof(Sha256Digest));
+		a.garbage();
+
+		a.bind(checksigs);
+		a.lea(rcx, ptr(hash));
+		a.push(rcx);
+		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.Sha256_InitOff);
+		a.mov(rcx, ptr(rsp));
+		a.mov(rdx, pPackedBinary->GetBaseAddress());
+		a.add(rdx, ptr(reloc));
+		a.mov(r8, pPackedBinary->NTHeaders.x64.OptionalHeader.SizeOfHeaders);
+		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.Sha256_UpdateOff);
+		a.pop(rcx);
+		a.mov(rdx, rcx);
+		a.add(rdx, sizeof(CSha256)); // rdx -> garbage
+		a.push(rdx);
+		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.Sha256_FinalOff);
+		a.mov(rcx, ptr(rsp)); // rcx -> rdx
+		a.pop(rdx);
+		a.sub(rcx, sizeof(Sha256Digest) + sizeof(CSha256)); // rcx -> HeaderDigest
+		for (int i = 0; i < sizeof(Sha256Digest) / sizeof(QWORD); i++) {
+			a.mov(r8, ptr(rdx));
+			a.sub(r8, 8);
+			a.sub(ptr(rcx), r8);
+			a.add(rdx, ptr(rcx));
+			a.add(rcx, ptr(rcx));
+		}
+		// fuck me (check the thingymadoodle)
+	}
 	if (::Options.Packing.bDelayedEntry) {
 		a.mov(rax, pPackedBinary->GetBaseAddress() + pPackedBinary->SectionHeaders[0].VirtualAddress);
 		a.add(rax, ptr(reloc));
 		if (::Options.Packing.bAntiDebug) {
 			a.cmp(byte_ptr(rax), 0xCC);
+			a.strict();
 			a.mov(rcx, 0);
+			a.strict();
 			a.cmovnz(rcx, rax);
 			a.cmp(word_ptr(rax), 0x03CD);
+			a.strict();
 			a.mov(byte_ptr(rax), 0xC3);
+			a.strict();
 			a.mov(rax, rcx);
+			a.strict();
 			a.cmovz(rax, rsp);
 			a.call(rax);
 			a.mov(byte_ptr(rax), 0x00);
@@ -1306,6 +1354,9 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	}
 	ShellcodeData.GetModuleHandleWOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(ShellcodeData.Labels.GetModuleHandleW);
 	ShellcodeData.GetProcAddressAOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(ShellcodeData.Labels.GetProcAddressA);
+	ShellcodeData.Sha256_InitOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Init);
+	ShellcodeData.Sha256_UpdateOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Update);
+	ShellcodeData.Sha256_FinalOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Final);
 	LOG(Info, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	ShellcodeData.TrueEntryOffset = holder.labelOffsetFromBase(_entry);
 	buf.u64Size = holder.textSection()->buffer().size();
@@ -2930,8 +2981,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	ShellcodeData.ImageBase = pNT->OptionalHeader.ImageBase = pOriginal->GetBaseAddress();
 	pNT->OptionalHeader.MajorOperatingSystemVersion = 4;
 	pNT->OptionalHeader.MajorSubsystemVersion = 6;
-	pNT->OptionalHeader.SizeOfHeaders = pPackedBinary->DosHeader.e_lfanew + sizeof(IMAGE_NT_HEADERS64) + sizeof(IMAGE_SECTION_HEADER);
-	pNT->OptionalHeader.SizeOfHeaders += (pNT->OptionalHeader.SizeOfHeaders % 0x200) ? 0x200 - (pNT->OptionalHeader.SizeOfHeaders % 0x200) : 0;
+	pNT->OptionalHeader.SizeOfHeaders = pPackedBinary->DosHeader.e_lfanew + sizeof(IMAGE_NT_HEADERS64) + sizeof(IMAGE_SECTION_HEADER) * 2;
 	pNT->OptionalHeader.Subsystem = pOriginal->NTHeaders.x64.OptionalHeader.Subsystem;
 	pNT->OptionalHeader.NumberOfRvaAndSizes = 0x10;
 	pNT->OptionalHeader.SizeOfStackReserve = 0x200000;
@@ -2952,7 +3002,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	SecHeader.VirtualAddress += (SecHeader.VirtualAddress % 0x1000) ? 0x1000 - (SecHeader.VirtualAddress % 0x1000) : 0;
 	ShellcodeData.OldPENewBaseRVA = SecHeader.VirtualAddress;
 	ShellcodeData.BaseAddress = ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders;
-	ShellcodeData.bUsingTLSCallbacks = ::Options.Packing.bDelayedEntry || ::Options.Packing.bAntiDebug || (pOriginal->GetTLSCallbacks() && *pOriginal->GetTLSCallbacks());
+	ShellcodeData.bUsingTLSCallbacks = ::Options.Packing.bDelayedEntry || ::Options.Packing.bAntiDebug || ::Options.Packing.bAntiPatch || (pOriginal->GetTLSCallbacks() && *pOriginal->GetTLSCallbacks());
 	Buffer Internal = GenerateInternalShellcode(pOriginal, Options, pPackedBinary);
 	if (!Internal.u64Size || !Internal.pBytes) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate internal shellcode!\n");
@@ -2967,10 +3017,10 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		memcpy(SecHeader.Name, ".winlice", 8);
 		break;
 	case UPX:
-		memcpy(SecHeader.Name, "UPX0\0", 8);
+		memcpy(SecHeader.Name, "UPX0\0\0\0", 8);
 		break;
 	case MPRESS:
-		memcpy(SecHeader.Name, ".MPRESS1\0", 8);
+		memcpy(SecHeader.Name, ".MPRESS1", 8);
 		break;
 	case Enigma:
 		memcpy(SecHeader.Name, ".enigma1", 8);
@@ -2998,7 +3048,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		memcpy(SecHeader.Name, "WinLicen", 8);
 		break;
 	case UPX:
-		memcpy(SecHeader.Name, "UPX1", 8);
+		memcpy(SecHeader.Name, "UPX1\0\0\0", 8);
 		break;
 	case MPRESS:
 		memcpy(SecHeader.Name, ".MPRESS2", 8);
@@ -3021,6 +3071,12 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 
 	// Get shellcode
 	Buffer shell = GenerateLoaderShellcode(pOriginal, Options, pPackedBinary, Internal);
+	if (::Options.Packing.bAntiPatch) {
+		CSha256 sha = { 0 };
+		Sha256_Init(&sha);
+		Sha256_Update(&sha, shell.pBytes, shell.u64Size);
+		Sha256_Final(&sha, (Byte*)&ShellcodeData.AntiPatchData.LoaderHash);
+	}
 	Internal.Release();
 	if (!shell.pBytes || !shell.u64Size) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate loader shellcode!\n");
@@ -3185,6 +3241,19 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	if (::Options.Advanced.bFakeSymbols && ::Options.Packing.Immitate != UPX) {
 		pNT->FileHeader.PointerToSymbolTable = SecHeader.PointerToRawData + sizeof(IMAGE_LOAD_CONFIG_DIRECTORY64) + sizeof(IMAGE_DEBUG_DIRECTORY);
 		pNT->FileHeader.NumberOfSymbols = rand();
+	}
+	pPackedBinary->FixHeaders();
+	
+	// Signature
+	if (::Options.Packing.bAntiPatch) {
+		CSha256 hash = { 0 };
+		Sha256Digest Digest = { 0 };
+		Sha256_Init(&hash);
+		Sha256_Update(&hash, (Byte*)&pPackedBinary->DosHeader, sizeof(IMAGE_DOS_HEADER));
+		Sha256_Update(&hash, pPackedBinary->DosStub.pBytes, pPackedBinary->DosStub.u64Size);
+		Sha256_Update(&hash, (Byte*)&pPackedBinary->NTHeaders.x64, sizeof(IMAGE_NT_HEADERS64));
+		Sha256_Final(&hash, (Byte*)&Digest);
+		pPackedBinary->WriteRVA<Sha256Digest>(pPackedBinary->GetTLSCallbacks()[0] - pPackedBinary->GetBaseAddress() + ShellcodeData.AntiPatchData.dwOffHeaderSum, Digest);
 	}
 
 	if (::Options.Packing.EncodingCounts > 1) {
