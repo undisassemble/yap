@@ -49,8 +49,7 @@ void ProtectedAssembler::restorestack(_In_ int n) {
 			}
 		}
 		stack.Release();
-	}
-	else {
+	} else {
 		for (int i = 0; i < n; i++) {
 			pop(stack.Pop());
 
@@ -65,7 +64,7 @@ void ProtectedAssembler::restorestack(_In_ int n) {
 void ProtectedAssembler::randinst(Gp o0) {
 	if (!stack.Includes(o0) || Blacklist.Includes(o0.r64()) || Blacklist.Includes(o0) || o0.size() != 8) return;
 	HeldLocks++;
-	const BYTE sz = 26;
+	const BYTE sz = 30;
 	const BYTE beg_unsafe = 17;
 	BYTE end = bStrict ? beg_unsafe : sz;
 	Mem peb = ptr(0x60);
@@ -116,8 +115,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 		if (o0.r64() == rax.r64()) {
 			block();
 			xchg(eax, eax);
-		}
-		else {
+		} else {
 			db(0x46);
 			db(0x90);
 		}
@@ -207,6 +205,47 @@ void ProtectedAssembler::randinst(Gp o0) {
 		setnz(o0.r8());
 		break;
 	}
+	
+	// Unsafe instructions
+	case 17:
+		xor_(o0, truerandreg());
+		break;
+	case 18:
+		xor_(o0, rand64() & 0x7FFFFFFF);
+		break;
+	case 19:
+		sub(o0, truerandreg());
+		break;
+	case 20:
+		sub(o0, rand64() & 0x7FFFFFFF);
+		break;
+	case 21:
+		add(o0, truerandreg());
+		break;
+	case 22:
+		add(o0, rand64() & 0x7FFFFFFF);
+		break;
+	case 23:
+		and_(o0, truerandreg());
+		break;
+	case 24:
+		and_(o0, rand64() & 0x7FFFFFFF);
+		break;
+	case 25:
+		or_(o0, truerandreg());
+		break;
+	case 26:
+		or_(o0, rand64() & 0x7FFFFFFF);
+		break;
+	case 27:
+		cmp(o0, truerandreg());
+		break;
+	case 28:
+		cmp(o0, rand64() & 0x7FFFFFFF);
+		break;
+	case 29:
+		test(o0, o0);
+		break;
 	}
 	HeldLocks--;
 }
@@ -583,7 +622,6 @@ Error ProtectedAssembler::movzx(Gp o0, Gp o1) {
 }
 
 Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) {
-	bStrict = true; // temp fix for garbage gen
 	if (!bWaitingOnEmit && !HeldLocks && !bUnprotected) { stub(); bStrict = false; }
 	else { bWaitingOnEmit = false; }
 	return Assembler::_emit(instId, o0, o1, o2, opExt);

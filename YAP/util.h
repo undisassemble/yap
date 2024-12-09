@@ -396,3 +396,5 @@ struct Settings_t {
 extern Settings_t Settings;
 extern Options_t Options;
 #endif // UTIL_STRUCT_ONLY
+
+uint64_t rand64();

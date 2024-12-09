@@ -55,14 +55,6 @@ public:
 	}
 };
 
-uint64_t rand64() {
-	uint64_t ret = rand();
-	ret = ret << 16 | rand();
-	ret = ret << 16 | rand();
-	ret = ret << 16 | rand();
-	return ret;
-}
-
 Sha256Digest Sha256Str(_In_ char* pStr) {
 	CSha256 sha = { 0 };
 	Sha256_Init(&sha);
@@ -3256,6 +3248,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		pPackedBinary->WriteRVA<Sha256Digest>(pPackedBinary->GetTLSCallbacks()[0] - pPackedBinary->GetBaseAddress() + ShellcodeData.AntiPatchData.dwOffHeaderSum, Digest);
 	}
 
+	// Finalize
 	if (::Options.Packing.EncodingCounts > 1) {
 		delete pOriginal;
 	}

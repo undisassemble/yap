@@ -28,6 +28,14 @@ HANDLE hLogFile = NULL;
 HANDLE hStdOut = NULL;
 Asm* pAssembly = NULL;
 
+uint64_t rand64() {
+	uint64_t ret = rand();
+	ret = ret << 16 | rand();
+	ret = ret << 16 | rand();
+	ret = ret << 16 | rand();
+	return ret;
+}
+
 // Main function
 int main(int argc, char** argv) {
 	// General setup
