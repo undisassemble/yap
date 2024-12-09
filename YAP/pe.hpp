@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util.h"
+#include "util.hpp"
 
 enum PEStatus_t : BYTE {
 	Normal = 0,								// No noticed errors

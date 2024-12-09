@@ -1,5 +1,5 @@
 #include "packer.hpp"
-#include "assembler.h"
+#include "assembler.hpp"
 #include "lzma/Aes.h"
 #include "lzma/Sha256.h"
 

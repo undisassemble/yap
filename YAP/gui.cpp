@@ -1,6 +1,6 @@
 #include "gui.hpp"
-#include "font.h"
-#include "icons.h"
+#include "font.hpp"
+#include "icons.hpp"
 #include <d3d11.h>
 #include <dxgi.h>
 #include <stdlib.h>
@@ -10,7 +10,7 @@
 #include "imgui_internal.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
-#include "util.h"
+#include "util.hpp"
 #include "asm.hpp"
 
 static ID3D11Device* g_pd3dDevice = nullptr;

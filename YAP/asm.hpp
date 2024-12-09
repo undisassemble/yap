@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util.h"
+#include "util.hpp"
 #include "pe.hpp"
 
 enum LineType : BYTE {

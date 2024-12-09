@@ -339,10 +339,10 @@
     <ClInclude Include="asmjit\src\asmjit\x86\x86opcode_p.h" />
     <ClInclude Include="asmjit\src\asmjit\x86\x86operand.h" />
     <ClInclude Include="asmjit\src\asmjit\x86\x86rapass_p.h" />
-    <ClInclude Include="assembler.h" />
-    <ClInclude Include="font.h" />
+    <ClInclude Include="assembler.hpp" />
+    <ClInclude Include="font.hpp" />
     <ClInclude Include="gui.hpp" />
-    <ClInclude Include="icons.h" />
+    <ClInclude Include="icons.hpp" />
     <ClInclude Include="imgui\backends\imgui_impl_dx11.h" />
     <ClInclude Include="imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="imgui\imconfig.h" />
@@ -372,7 +372,7 @@
     <ClInclude Include="packer.hpp" />
     <ClInclude Include="pe.hpp" />
     <ClInclude Include="SHA256.raw" />
-    <ClInclude Include="util.h" />
+    <ClInclude Include="util.hpp" />
     <ClInclude Include="vm.hpp" />
     <ClInclude Include="vm_types.hpp" />
     <ClInclude Include="zyasm.hpp" />

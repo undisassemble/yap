@@ -701,7 +701,7 @@
     <ClInclude Include="zydis\dependencies\zycore\include\Zycore\Allocator.h">
       <Filter>Header Files\Vendor</Filter>
     </ClInclude>
-    <ClInclude Include="util.h">
+    <ClInclude Include="util.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lzma\Threads.h">
@@ -794,16 +794,16 @@
     <ClInclude Include="zyasm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="font.h">
+    <ClInclude Include="font.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="icons.h">
+    <ClInclude Include="icons.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="vm_types.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="assembler.h">
+    <ClInclude Include="assembler.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

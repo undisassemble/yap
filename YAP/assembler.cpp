@@ -1,4 +1,4 @@
-#include "assembler.h"
+#include "assembler.hpp"
 
 int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {
 	if (nMin > nMax) return 0;
@@ -64,7 +64,7 @@ void ProtectedAssembler::restorestack(_In_ int n) {
 void ProtectedAssembler::randinst(Gp o0) {
 	if (!stack.Includes(o0) || Blacklist.Includes(o0.r64()) || Blacklist.Includes(o0) || o0.size() != 8) return;
 	HeldLocks++;
-	const BYTE sz = 30;
+	const BYTE sz = 32;
 	const BYTE beg_unsafe = 17;
 	BYTE end = bStrict ? beg_unsafe : sz;
 	Mem peb = ptr(0x60);
@@ -245,6 +245,12 @@ void ProtectedAssembler::randinst(Gp o0) {
 		break;
 	case 29:
 		test(o0, o0);
+		break;
+	case 30:
+		setz(o0);
+		break;
+	case 31:
+		setnz(o0);
 		break;
 	}
 	HeldLocks--;
