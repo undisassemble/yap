@@ -457,8 +457,7 @@ void ProtectedAssembler::desync_mov(Gpq o0) {
 }
 
 Error ProtectedAssembler::call(Gp o0) {
-	return Assembler::call(o0);
-	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
+	if (bWaitingOnEmit || !bMutate || bStrict) return Assembler::call(o0);
 	BYTE dist = 64 + (rand() % 192);
 	push(o0);
 	push(o0);
@@ -481,8 +480,7 @@ Error ProtectedAssembler::call(Gp o0) {
 }
 
 Error ProtectedAssembler::call(Imm o0) {
-	return Assembler::call(o0);
-	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
+	if (bWaitingOnEmit || !bMutate || bStrict) return Assembler::call(o0);
 	Gp reg = truerandreg();
 	BYTE dist = 64 + (rand() % 192);
 	push(o0);
@@ -510,8 +508,7 @@ Error ProtectedAssembler::call(Label o0) {
 }
 
 Error ProtectedAssembler::call(Mem o0) {
-	return Assembler::call(o0);
-	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
+	if (bWaitingOnEmit || !bMutate || bStrict || o0.baseReg() == rsp) return Assembler::call(o0);
 	Gp reg = truerandreg();
 	o0.setSize(8);
 	BYTE dist = 64 + (rand() % 192);
@@ -536,75 +533,48 @@ Error ProtectedAssembler::call(Mem o0) {
 }
 
 Error ProtectedAssembler::mov(Gp o0, Imm o1) {
-	return Assembler::mov(o0, o1);
-	if (o0.size() == 4) o0 = o0.r64();
-	if (o0.size() == 1) return Assembler::mov(o0, o1);
-	if (bWaitingOnEmit || !bMutate) return Assembler::mov(o0, o1);
-	Blacklist.Push(o0.r64());
-	randstack(0, 7);
-	block();
+	// Cause of zero-extending we can safely turn DWORD registers into QWORD ones
+	if (bWaitingOnEmit || !bMutate || o0.size() < 4 || o1.value() > 0x7FFFFFFF) return Assembler::mov(o0, o1);
+	bool j = bStrict;
 	push(o1);
-	for (int i = 0, n = o0.size() == 2 ? 4 : 1; i < n; i++) stack.Push(o0);
-	Blacklist.Pop();
-	randstack(0, 7);
-	restorestack();
-	return 0;
+	bStrict = j;
+	return pop(o0.r64());
 }
 
 Error ProtectedAssembler::mov(Gp o0, Gp o1) {
-	return Assembler::mov(o0, o1);
-	if (o0.r64() == rsp || o1.r64() == rsp || bWaitingOnEmit || !bMutate || o0.size() != o1.size()) return Assembler::mov(o0, o1);
-
-	if (o0.size() == 4) { o0 = o0.r64(); o1 = o1.r64(); } // replace this
-	if (o0.size() == 1) { o0 = o0.r16(); o1 = o1.r16(); } // this too
-
-	Blacklist.Push(o0.r64());
-	Blacklist.Push(o1.r64());
-	randstack(0, 7);
-	block();
+	if (o0.r64() == rsp || o1.r64() == rsp || bWaitingOnEmit || !bMutate || o0.size() != o1.size() || o0.size() == 1 || o0.size() == 4) return Assembler::mov(o0, o1);
+	bool j = bStrict;
 	push(o1);
-	Blacklist.Pop();
-	Blacklist.Pop();
-	stack.Push(o0);
-	randstack(0, 7);
-	restorestack();
-	return 0;
+	bStrict = j;
+	return pop(o0);
 }
 
 Error ProtectedAssembler::mov(Gp o0, Mem o1) {
 	return Assembler::mov(o0, o1);
 	o1.setSize(o0.size());
-	if (bWaitingOnEmit || !bMutate || o0.size() == 1 || o0.size() == 4) return Assembler::mov(o0, o1);
-
-	randstack(0, 7);
-	if (o1.hasBaseReg() && o1.baseReg() == rsp) o1.addOffset(GetStackSize());
-	block();
+	if (bWaitingOnEmit || !bMutate || o0.size() == 1 || o0.size() == 4 || o1.baseReg() == rsp) return Assembler::mov(o0, o1);
+	bool j = bStrict;
 	push(o1);
-	stack.Push(o0);
-	randstack(0, 7);
-	restorestack();
-	return 0;
+	bStrict = j;
+	return pop(o0);
 }
 
 Error ProtectedAssembler::mov(Mem o0, Imm o1) {
 	return Assembler::mov(o0, o1);
 	if (bWaitingOnEmit || !bMutate || o0.size() != 8) return Assembler::mov(o0, o1);
-	randstack(0, 7);
-	block();
+	bool j = bStrict;
 	push(o1);
-	restorestack(randstack(0, 7));
-	if (o0.hasBaseReg() && o0.baseReg() == rsp) o0.addOffset(GetStackSize());
-	block();
-	pop(o0);
-	restorestack();
-	return 0;
+	bStrict = j;
+	return pop(o0);
 }
 
 Error ProtectedAssembler::mov(Mem o0, Gp o1) {
 	return Assembler::mov(o0, o1);
 	o0.setSize(o1.size());
-	if (bWaitingOnEmit || !bMutate || (o0.size() != 8 && o0.size() != 2)) return Assembler::mov(o0, o1);
+	if (bWaitingOnEmit || !bMutate || o1.size() == 1 || o1.size() == 4) return Assembler::mov(o0, o1);
+	bool j = bStrict;
 	push(o1);
+	bStrict = j;
 	return pop(o0);
 }
 
