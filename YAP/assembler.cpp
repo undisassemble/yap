@@ -550,7 +550,6 @@ Error ProtectedAssembler::mov(Gp o0, Gp o1) {
 }
 
 Error ProtectedAssembler::mov(Gp o0, Mem o1) {
-	return Assembler::mov(o0, o1);
 	o1.setSize(o0.size());
 	if (bWaitingOnEmit || !bMutate || o0.size() == 1 || o0.size() == 4 || o1.baseReg() == rsp) return Assembler::mov(o0, o1);
 	bool j = bStrict;
@@ -560,8 +559,7 @@ Error ProtectedAssembler::mov(Gp o0, Mem o1) {
 }
 
 Error ProtectedAssembler::mov(Mem o0, Imm o1) {
-	return Assembler::mov(o0, o1);
-	if (bWaitingOnEmit || !bMutate || o0.size() != 8) return Assembler::mov(o0, o1);
+	if (bWaitingOnEmit || !bMutate || o0.size() != 8 || o0.baseReg() == rsp) return Assembler::mov(o0, o1);
 	bool j = bStrict;
 	push(o1);
 	bStrict = j;
@@ -569,9 +567,8 @@ Error ProtectedAssembler::mov(Mem o0, Imm o1) {
 }
 
 Error ProtectedAssembler::mov(Mem o0, Gp o1) {
-	return Assembler::mov(o0, o1);
 	o0.setSize(o1.size());
-	if (bWaitingOnEmit || !bMutate || o1.size() == 1 || o1.size() == 4) return Assembler::mov(o0, o1);
+	if (bWaitingOnEmit || !bMutate || o1.size() == 1 || o1.size() == 4 || o0.baseReg() == rsp) return Assembler::mov(o0, o1);
 	bool j = bStrict;
 	push(o1);
 	bStrict = j;
