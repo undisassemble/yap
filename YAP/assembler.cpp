@@ -504,7 +504,29 @@ Error ProtectedAssembler::call(Imm o0) {
 }
 
 Error ProtectedAssembler::call(Label o0) {
-	return Assembler::call(o0);
+	if (bWaitingOnEmit || !bMutate || bStrict) return Assembler::call(o0);
+	Gp reg = truerandreg();
+	BYTE dist = 64 + (rand() % 192);
+	push(reg);
+	push(reg);
+	push(reg);
+	Label after = newLabel();
+	lea(reg, ptr(after));
+	if (dist) add(reg, dist);
+	mov(ptr(rsp, 0x10), reg);
+	lea(reg, ptr(o0));
+	mov(ptr(rsp, 0x08), reg);
+	pop(reg);
+	ret();
+	bind(after);
+	for (int i = 0; i < dist; i++) {
+		BYTE byte = 0;
+		do {
+			byte = rand() & 0xFF;
+		} while (byte == 0xC3 || byte == 0xCB || !byte);
+		db(byte);
+	}
+	return 0;
 }
 
 Error ProtectedAssembler::call(Mem o0) {
