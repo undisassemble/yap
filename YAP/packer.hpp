@@ -24,7 +24,6 @@ struct _ShellcodeData {
 	uint64_t BaseAddress = 0;
 	uint64_t OldPENewBaseRVA = 0;
 	uint64_t PaddingNeeded = 0;
-	uint64_t TrueEntryOffset = 0;
 	uint64_t LoadedOffset = 0;
 	uint64_t VMAbs = 0;
 	uint64_t ImageBase = 0;

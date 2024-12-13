@@ -563,6 +563,11 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 		a.lea(rdx, ptr(STI));
 		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.GetProcAddressAOff);
 		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
+		a.mov(r8, rsp);
+		a.and_(r8, 0b1111);
+		a.add(r8, 8);
+		a.sub(rsp, r8);
+		a.push(r8);
 		a.mov(rdx, 17);
 		a.mov(r8, 0);
 		if (::Options.Packing.bDirectSyscalls) {
@@ -583,6 +588,8 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 			a.mov(r9, 0);
 			a.call(rax);
 		}
+		a.pop(r8);
+		a.add(rsp, r8);
 		a.ret();
 	}
 
@@ -626,7 +633,9 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	Label Sha256_Final = a.newLabel();
 
 	// Entry point sigs
-	if (!::Options.Packing.bDelayedEntry) {
+	if (::Options.Packing.bDelayedEntry) {
+		for (int i = 0; i < ShellcodeData.EntryOff; i++) a.db(rand() & 255);
+	} else {
 		switch (::Options.Packing.Immitate) {
 		case ExeStealth:
 			a.db(0xEB);
@@ -634,8 +643,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 			a.embed("ExeStealth V2 Shareware ", sizeof("ExeStealth V2 Shareware "));
 			break;
 		}
-	} else {
-		for (int i = 0; i < ShellcodeData.EntryOff; i++) a.db(rand() & 255);
 	}
 
 	// Entry point
@@ -882,11 +889,18 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
+		a.mov(rcx, rsp);
+		a.and_(rcx, 0b1111);
+		a.add(rcx, 8);
+		a.sub(rsp, rcx);
+		a.push(rcx);
 		a.lea(rcx, ptr(USR));
 		a.push(rsi);
 		a.push(rbx);
 		a.call(rax); // I actually just don't understand why LoadLibraryA crashes here and it's confusing me
 		a.add(rsp, 0x10);
+		a.pop(rcx);
+		a.add(rsp, rcx);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -897,17 +911,44 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.strict();
 		a.jz(ret);
 		a.mov(r12, rax);
+		a.mov(rcx, rsp);
+		a.and_(rcx, 0b1111);
+		a.add(rcx, 8);
+		a.sub(rsp, rcx);
+		a.push(rcx);
 		a.lea(rcx, ptr(PT));
+		a.sub(rsp, 0x20);
 		a.call(r12);
+		a.add(rsp, 0x20);
+		a.pop(rcx);
+		a.add(rsp, rcx);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
 		a.mov(r14, ptr(PT));
 		a.bind(_loop);
+		a.mov(rcx, rsp);
+		a.and_(rcx, 0b1111);
+		a.add(rcx, 8);
+		a.sub(rsp, rcx);
+		a.push(rcx);
 		a.mov(ecx, 5);
+		a.sub(rsp, 0x20);
 		a.call(r13);
+		a.add(rsp, 0x20);
+		a.pop(rcx);
+		a.add(rsp, rcx);
+		a.mov(rcx, rsp);
+		a.and_(rcx, 0b1111);
+		a.add(rcx, 8);
+		a.sub(rsp, rcx);
+		a.push(rcx);
 		a.lea(rcx, ptr(PT));
+		a.sub(rsp, 0x20);
 		a.call(r12);
+		a.add(rsp, 0x20);
+		a.pop(rcx);
+		a.add(rsp, rcx);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(_loop);
@@ -949,11 +990,20 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.mov(edx, ptr(rdx, offsetof(IMAGE_NT_HEADERS64, OptionalHeader.SizeOfHeaders)));
 		a.push(rdx);
 		a.push(rcx);
-		a.mov(r8, 0x40);
 		a.lea(r9, ptr(KRN));
 		a.mov(rsi, rax);
 		a.sub(rsp, 0x18);
+		a.mov(r8, rsp);
+		a.and_(r8, 0b1111);
+		a.add(r8, 8);
+		a.sub(rsp, r8);
+		a.push(r8);
+		a.mov(r8, 0x40);
+		a.sub(rsp, 0x20);
 		a.call(rax);
+		a.add(rsp, 0x20);
+		a.pop(r8);
+		a.add(rsp, r8);
 		a.add(rsp, 0x18);
 		a.pop(rcx);
 		a.pop(rdx);
@@ -1350,7 +1400,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	ShellcodeData.Sha256_UpdateOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Update);
 	ShellcodeData.Sha256_FinalOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Final);
 	LOG(Info, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
-	ShellcodeData.TrueEntryOffset = holder.labelOffsetFromBase(_entry);
 	buf.u64Size = holder.textSection()->buffer().size();
 	buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
 	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
@@ -1445,8 +1494,13 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.jz(ret);
 		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFF);
 		a.mov(edx, 0x1D);
-		a.lea(r8, ptr(data));
 		a.mov(r9d, 4);
+		a.mov(r8, rsp);
+		a.and_(r8, 0b1111);
+		a.add(r8, 8);
+		a.sub(rsp, r8);
+		a.push(r8);
+		a.lea(r8, ptr(data));
 		if (::Options.Packing.bDirectSyscalls) {
 			a.mov(ecx, ptr(rax));
 			a.cmp(ecx, 0xB8D18B4C);
@@ -1457,6 +1511,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		} else {
 			a.call(rax);
 		}
+		a.pop(r8);
+		a.add(rsp, r8);
 	}
 
 	// Masquerading
@@ -1574,16 +1630,34 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
+		a.mov(rcx, rsp);
+		a.and_(rcx, 0b1111);
+		a.add(rcx, 8);
+		a.sub(rsp, rcx);
+		a.push(rcx);
 		a.lea(rcx, ptr(ZRO));
+		a.sub(rsp, 0x20);
 		a.call(rax);
+		a.add(rsp, 0x20);
+		a.pop(rcx);
+		a.add(rsp, rcx);
 		a.mov(rcx, rsi);
 		a.lea(rdx, ptr(SSP));
 		a.call(ShellcodeData.Labels.GetProcAddressA);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
+		a.mov(rcx, rsp);
+		a.and_(rcx, 0b1111);
+		a.add(rcx, 8);
+		a.sub(rsp, rcx);
+		a.push(rcx);
 		a.mov(ecx, BASE_SEARCH_PATH_ENABLE_SAFE_SEARCHMODE | BASE_SEARCH_PATH_PERMANENT);
+		a.sub(rsp, 0x20);
 		a.call(rax);
+		a.add(rsp, 0x20);
+		a.pop(rcx);
+		a.add(rsp, rcx);
 		
 		a.bind(ret);
 	}
@@ -1895,8 +1969,17 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 
 		Label next_name = a.newLabel();
 		a.bind(do_lib);
+		a.mov(rcx, rsp);
+		a.and_(rcx, 0b1111);
+		a.add(rcx, 8);
+		a.sub(rsp, rcx);
+		a.push(rcx);
 		a.mov(rcx, r12);
+		a.sub(rsp, 0x20);
 		a.call(rsi);
+		a.add(rsp, 0x20);
+		a.pop(rcx);
+		a.add(rsp, rcx);
 		a.mov(r14, rax);
 		a.bind(next_name);
 		a.mov(byte_ptr(r12), 0);
@@ -2366,15 +2449,29 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.inc(rax);
 		a.push(rax);
 		a.mov(byte_ptr(r14), 0);
+		a.mov(rcx, rsp);
+		a.and_(rcx, 0b1111);
+		a.add(rcx, 8);
+		a.sub(rsp, rcx);
+		a.push(rcx);
 		a.lea(rcx, ptr(blank));
 		a.sub(rsp, 0x20);
 		a.call(r13);
 		a.add(rsp, 0x20);
-		a.mov(rcx, rax);
+		a.pop(rcx);
+		a.add(rsp, rcx);
 		a.pop(rdx);
-		a.sub(rsp, 0x20);
+		a.mov(rcx, rsp);
+		a.and_(rcx, 0b1111);
+		a.add(rcx, 8);
+		a.sub(rsp, rcx);
+		a.push(rcx);
+		a.mov(rcx, rax);
+		a.sub(rsp, 0x40);
 		a.call(r12);
-		a.add(rsp, 0x20);
+		a.add(rsp, 0x40);
+		a.pop(rcx);
+		a.add(rsp, rcx);
 		a.pop(r15);
 		a.pop(r14);
 		a.pop(r13);
@@ -2891,7 +2988,6 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	}
 
 	srand(GetTickCount64());
-	ShellcodeData.EntryOff = 0x30 + rand() & 0xCF;
 
 	if (::Options.Packing.bAntiDump) {
 		ShellcodeData.CarryData.bWasAntiDump = true;
@@ -2996,6 +3092,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	ShellcodeData.OldPENewBaseRVA = SecHeader.VirtualAddress;
 	ShellcodeData.BaseAddress = ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders;
 	ShellcodeData.bUsingTLSCallbacks = ::Options.Packing.bDelayedEntry || ::Options.Packing.bAntiDebug || ::Options.Packing.bAntiPatch || (pOriginal->GetTLSCallbacks() && *pOriginal->GetTLSCallbacks());
+	ShellcodeData.EntryOff = 0x30 + rand() & 0xCF;
 	Buffer Internal = GenerateInternalShellcode(pOriginal, Options, pPackedBinary);
 	if (!Internal.u64Size || !Internal.pBytes) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate internal shellcode!\n");
