@@ -1395,6 +1395,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 	if (::Options.Packing.bAntiDump) {
 		a.call(ShellcodeData.Labels.RtlZeroMemory);
 	}
+	a.add(rsp, 0x48);
 	a.garbage();
 
 	// Hashing data
