@@ -10,11 +10,12 @@ Almost every single feature is toggleable, and if it's not, the source code is f
 
 Project files can be easily modified using the GUI. You can then use either the GUI or CLI to protect your applications.
 
+
 ## Packer
 
 ### Dynamic Shellcode Generation & Mutation
 
-Each packed application receives it's own unique assembly, preventing signature based detections.
+Each packed application receives it's own unique assembly, preventing signature based detections. It also adds several anti-disassembly techniques to make analysis more difficult.
 
 ### IAT Obfuscation
 
@@ -32,9 +33,14 @@ Instead of unpacking the whole application at once, parts of the code segment ge
 
 Changes some details about the packed executable to cause programs like [Detect It Easy](https://github.com/horsicq/Detect-It-Easy) to believe it uses a different protection system. Currently supported protectors are: Themida/WinLicense, UPX, MPRESS, Enigma, and ExeStealth. (ExeStealth is only available if Delayed Entry Point is disabled).
 
+### SDK & Direct Syscalls
+
+Makes syscalls directly where possible, going around user-mode WINAPI hooks on those functions. Includes a library to allow communication between your code and the packer, which also provides access to some syscall functions.
+
 ### Other
 
-Includes other features like anti-debug, 
+Includes other features like anti-debug, anti-dump, anti-vm, anti-patch, and others.
+
 
 ## Reassembler
 

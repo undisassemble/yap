@@ -2034,7 +2034,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.mov(rax, pOriginal->NTHeaders.x64.OptionalHeader.AddressOfEntryPoint + ShellcodeData.OldPENewBaseRVA + pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders);
 		a.add(rax, ptr(InternalRelOff));
 		if (::Options.Packing.EncodingCounts > 1) {
-			a.xor_(al, al);
+			a.xor_(ecx, ecx);
 			a.strict();
 		}
 		a.call(rax);
@@ -2919,13 +2919,13 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		dupe->Status = Normal;
 		::Options.Packing.EncodingCounts--;
 		if (!Pack(pOriginal, Options, dupe)) {
-			LOG(Failed, MODULE_PACKER, "Packing at depth %i failed\n", ::Options.Packing.EncodingCounts);
+			LOG(Failed, MODULE_PACKER, "Packing at depth %d failed\n", ::Options.Packing.EncodingCounts);
 			delete dupe;
 			return false;
 		}
 		ZeroMemory(&ShellcodeData, sizeof(_ShellcodeData));
 		ShellcodeData.RequestedFunctions.iIndex = -1;
-		LOG(Success, MODULE_PACKER, "Packed at depth %i\n", ::Options.Packing.EncodingCounts);
+		LOG(Success, MODULE_PACKER, "Packed at depth %d\n", ::Options.Packing.EncodingCounts);
 		Options.bVM = false;
 		Options.sMasqueradeAs = NULL;
 		Options.Message = MessageBackup;

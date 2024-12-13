@@ -13,7 +13,7 @@
 #pragma once
 
 #ifndef _WIN64
-#error YAP can only be used on 64-bit binaries!
+#error YAP can only be used on 64-bit Windows binaries!
 #endif
 
 #define WIN32_LEAN_AND_MEAN
@@ -44,7 +44,9 @@ YAP_IMPORT(HMODULE) GetSelf();
 // These all return STATUS_NOT_IMPLEMENTED if not packed and STATUS_NOT_FOUND if the function cannot be found
 // If the NTDLL function is hooked, it will terminate the process
 #ifdef YAP_EDR
+#ifndef STATUS_NOT_IMPLEMENTED
 #define STATUS_NOT_IMPLEMENTED 0xC0000002
+#endif
 YAP_IMPORT(LONG) YAP_NtDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval);
 YAP_IMPORT(LONG) YAP_NtFreeVirtualMemory(HANDLE ProcessHandle, PVOID* BaseAddress, PSIZE_T RegionSize, ULONG FreeType);
 YAP_IMPORT(LONG) YAP_NtAllocateVirtualMemory(HANDLE ProcessHandle, PVOID* BaseAddress, ULONG_PTR ZeroBits, PSIZE_T RegionSize, ULONG AllocationType, ULONG Protect);

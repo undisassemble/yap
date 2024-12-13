@@ -34,8 +34,8 @@ YAP_EXPORT(LONG) YAP_NtTerminateThread(HANDLE ThreadHandle, LONG ExitStatus) { r
 YAP_EXPORT(LONG) YAP_NtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, SIZE_T BufferSize, PSIZE_T NumberOfBytesWritten) { return STATUS_NOT_IMPLEMENTED; }
 YAP_EXPORT(LONG) YAP_NtClose(HANDLE Handle) { return STATUS_NOT_IMPLEMENTED; }
 YAP_EXPORT(LONG) YAP_NtCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, void* ObjectAttributes, HANDLE ProcessHandle, void* ClientId, PCONTEXT ThreadContext, void* InitialTeb, BOOLEAN CreateSuspended) { return STATUS_NOT_IMPLEMENTED; }
-YAP_EXPORT(HANDLE) YAP_GetCurrentThread() { return NULL; }
-YAP_EXPORT(DWORD) YAP_GetCurrentThreadId() { return 0; }
-YAP_EXPORT(HANDLE) YAP_GetCurrentProcess() { return NULL; }
-YAP_EXPORT(DWORD) YAP_GetCurrentProcessId() { return 0; }
-YAP_EXPORT(ULONGLONG) YAP_GetTickCount64() { return 0; }
+YAP_EXPORT(HANDLE) YAP_GetCurrentThread() { return (HANDLE)STATUS_NOT_IMPLEMENTED; }
+YAP_EXPORT(DWORD) YAP_GetCurrentThreadId() { return STATUS_NOT_IMPLEMENTED; }
+YAP_EXPORT(HANDLE) YAP_GetCurrentProcess() { return (HANDLE)STATUS_NOT_IMPLEMENTED; }
+YAP_EXPORT(DWORD) YAP_GetCurrentProcessId() { return STATUS_NOT_IMPLEMENTED; }
+YAP_EXPORT(ULONGLONG) YAP_GetTickCount64() { return STATUS_NOT_IMPLEMENTED; }
