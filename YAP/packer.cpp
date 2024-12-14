@@ -2,6 +2,7 @@
 #include "assembler.hpp"
 #include "lzma/Aes.h"
 #include "lzma/Sha256.h"
+#include "gui.hpp"
 
 BYTE PartialUnpackingHook[] = {
 	0x50,
@@ -897,7 +898,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.lea(rcx, ptr(USR));
 		a.push(rsi);
 		a.push(rbx);
-		a.call(rax); // I actually just don't understand why LoadLibraryA crashes here and it's confusing me
+		a.call(rax);
 		a.add(rsp, 0x10);
 		a.pop(rcx);
 		a.add(rsp, rcx);
@@ -1252,7 +1253,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		Label bad = a.newLabel();
 		Label ret = a.newLabel();
 		a.bind(ShellcodeData.Labels.GetProcAddressA);
-
+		
 		// Asm
 		a.desync();
 		a.push(r12);
@@ -3351,6 +3352,5 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		delete pOriginal;
 	}
 	pPackedBinary->Status = Normal;
-
 	return true;
 }

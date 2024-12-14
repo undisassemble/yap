@@ -295,7 +295,6 @@ struct Data_t {
 	char SaveFileName[MAX_PATH] = { 0 };
 	HWND hWnd = NULL;
 	bool bParsing : 1 = false;
-	bool bWaitingOnFile : 1 = false;
 	bool bUserCancelled : 1 = false;
 	bool bUsingConsole : 1 = false;
 	bool bRunning : 1 = false;
@@ -398,3 +397,12 @@ extern Options_t Options;
 #endif // UTIL_STRUCT_ONLY
 
 uint64_t rand64();
+
+/// <summary>
+/// Similar to MessageBox, opens a modal and waits for user input.
+/// </summary>
+/// <param name="pText">Body of modal</param>
+/// <param name="pTitle">Title of modal</param>
+/// <param name="uType">Buttons to include</param>
+/// <returns>Button pressed</returns>
+int Modal(_In_ char* pText, _In_ char* pTitle = "Error", _In_ UINT uType = MB_OK);

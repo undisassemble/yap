@@ -153,13 +153,15 @@ DWORD WINAPI Begin(void* args) {
 
 		// Disassemble
 		if (!pAssembly->Disassemble()) {
-			LOG(Failed, MODULE_YAP, "Disassembly failed!\n");
+			Modal("Disassembly failed");
+			LOG(Failed, MODULE_YAP, "Disassembly failed\n");
 			goto th_exit;
 		}
 
 		// Analyze
 		if (!pAssembly->Analyze()) {
-			LOG(Failed, MODULE_YAP, "Asm analysis failed!\n");
+			Modal("Asm analysis failed");
+			LOG(Failed, MODULE_YAP, "Asm analysis failed\n");
 			goto th_exit;
 		}
 
@@ -222,16 +224,19 @@ DWORD WINAPI Begin(void* args) {
 		// Modify
 		bool bNeedsAssembly = Options.Reassembly.bSubstitution || (Options.Reassembly.bStrip && pAssembly->NTHeaders.x64.OptionalHeader.DataDirectory[6].Size && pAssembly->NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress);
 		if (Options.Reassembly.bStrip && !pAssembly->Strip()) {
+			Modal("Failed to strip PE");
 			LOG(Failed, MODULE_YAP, "Failed to strip PE\n");
 			goto th_exit;
 		}
 		if (!pAssembly->Mutate()) {
+			Modal("Failed to mutate PE");
 			LOG(Failed, MODULE_YAP, "Failed to mutate PE\n");
 			goto th_exit;
 		}
 
 		// Virtualize
 		if (Options.VM.bEnabled && !Virtualize(pAssembly)) {
+			Modal("Failed to virtualize PE");
 			LOG(Failed, MODULE_YAP, "Failed to virtualize PE\n");
 			goto th_exit;
 		}
@@ -240,13 +245,15 @@ DWORD WINAPI Begin(void* args) {
 		if (bNeedsAssembly) {
 			// Fixup
 			if (!pAssembly->FixAddresses()) {
-				LOG(Failed, MODULE_YAP, "Reassembler failed!\n");
+				Modal("Address fixer failed");
+				LOG(Failed, MODULE_YAP, "Address fixer failed\n");
 				goto th_exit;
 			}
 
 			// Assemble
 			if (!pAssembly->Assemble()) {
-				LOG(Failed, MODULE_YAP, "Assembly failed!\n");
+				Modal("Assembly failed");
+				LOG(Failed, MODULE_YAP, "Assembly failed\n");
 				goto th_exit;
 			}
 		} else {
@@ -278,7 +285,8 @@ DWORD WINAPI Begin(void* args) {
 		Asm* pPacked = new Asm();
 		pPacked->Status = Normal;
 		if (!Pack(pAssembly, PackOpt, pPacked)) {
-			LOG(Failed, MODULE_YAP, "Packer failed!\n");
+			Modal("Failed to pack PE");
+			LOG(Failed, MODULE_YAP, "Packer failed\n");
 			delete pPacked;
 			PackOpt.VMFuncs.Release();
 			goto th_exit;
@@ -292,10 +300,15 @@ DWORD WINAPI Begin(void* args) {
 	LOG(Success, MODULE_YAP, "All modules passed\n");
 	if (Data.hWnd) {
 		do {
-			Data.bWaitingOnFile = true;
-			while (Data.bWaitingOnFile) Sleep(1);
+			while (!OpenFileDialogue(Data.SaveFileName, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, true)) {
+				if (Modal("Failed to get save file name", "Error", MB_RETRYCANCEL) == IDCANCEL) {
+					Data.bUserCancelled = true;
+					break;
+				}
+			}
 			if (!pAssembly->ProduceBinary(Data.SaveFileName)) {
-				LOG(Failed, MODULE_YAP, "Failed to save file!\n");
+				Modal("Failed to save file");
+				LOG(Failed, MODULE_YAP, "Failed to save file\n");
 				goto th_exit;
 			} else {
 				break;
@@ -308,7 +321,8 @@ DWORD WINAPI Begin(void* args) {
 		}
 	} else {
 		if (!pAssembly->ProduceBinary(reinterpret_cast<char*>(args))) {
-			LOG(Failed, MODULE_YAP, "Failed to save file!\n");
+			Modal("Failed to save file");
+			LOG(Failed, MODULE_YAP, "Failed to save file\n");
 		} else {
 			LOG(Info_Extended, MODULE_YAP, "Save to: %s\n", reinterpret_cast<char*>(args));
 		}

@@ -13,6 +13,8 @@
 #include "util.hpp"
 #include "asm.hpp"
 
+
+// Globals
 static ID3D11Device* g_pd3dDevice = nullptr;
 static ID3D11DeviceContext* g_pd3dDeviceContext = nullptr;
 static IDXGISwapChain* g_pSwapChain = nullptr;
@@ -24,7 +26,13 @@ const int height = 560;
 ImGuiWindow* pWindow = NULL;
 extern Asm* pAssembly;
 ImWchar range[] = { 0xE005, 0xF8FF, 0 };
+struct {
+	char* pTitle;
+	char* pText;
+	UINT uType;
+} CurrentModal;
 
+// Forwards
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 DWORD WINAPI WindowThread(void* args);
 void CleanupRenderTarget();
@@ -84,10 +92,12 @@ void SaveSettings() {
 	char path[MAX_PATH];
 	DWORD sz = MAX_PATH;
 	if (!QueryFullProcessImageNameA(GetCurrentProcess(), 0, path, &sz)) {
+		Modal("Failed to save settings");
 		LOG(Failed, MODULE_YAP, "Failed to save settings: %d (%s)\n", GetLastError(), path);
 		return;
 	}
 	if (!PathRemoveFileSpecA(path) || lstrlenA(path) > MAX_PATH - 12) {
+		Modal("Failed to save settings");
 		LOG(Failed, MODULE_YAP, "Failed to save settings (misc)\n");
 		return;
 	}
@@ -96,6 +106,7 @@ void SaveSettings() {
 	// Write settings
 	HANDLE hFile = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
+		Modal("Failed to save settings");
 		LOG(Failed, MODULE_YAP, "Failed to save settings: %d (%s)\n", GetLastError(), path);
 		return;
 	}
@@ -108,10 +119,12 @@ void LoadSettings() {
 	char path[MAX_PATH];
 	DWORD sz = MAX_PATH;
 	if (!QueryFullProcessImageNameA(GetCurrentProcess(), 0, path, &sz)) {
+		Modal("Failed to load settings");
 		LOG(Failed, MODULE_YAP, "Failed to load settings: %d (%s)\n", GetLastError(), path);
 		return;
 	}
 	if (!PathRemoveFileSpecA(path) || lstrlenA(path) > MAX_PATH - 12) {
+		Modal("Failed to load settings");
 		LOG(Failed, MODULE_YAP, "Failed to load settings (misc)\n");
 		return;
 	}
@@ -120,6 +133,7 @@ void LoadSettings() {
 	// Read settings
 	HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
+		Modal("Failed to load settings");
 		LOG(Failed, MODULE_YAP, "Failed to load settings: %d (%s)\n", GetLastError(), path);
 		return;
 	}
@@ -139,7 +153,7 @@ bool SaveProject() {
 	// Open file
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		if (Data.hWnd) MessageBoxA(Data.hWnd, "Failed to save project!", NULL, MB_OK | MB_ICONERROR);
+		Modal("Failed to save project");
 		LOG(Failed, MODULE_YAP, "Failed to save project: %d\n", GetLastError());
 		return false;
 	}
@@ -172,7 +186,7 @@ bool LoadProject() {
 	// Open file
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		if (Data.hWnd) MessageBoxA(Data.hWnd, "Failed to load project!", NULL, MB_OK | MB_ICONERROR);
+		Modal("Failed to load project");
 		LOG(Failed, MODULE_YAP, "Failed to load project: %d\n", GetLastError());
 		Data.Project[0] = 0;
 		return false;
@@ -181,7 +195,7 @@ bool LoadProject() {
 	// Read signature
 	ReadFile(hFile, sig, 3, NULL, NULL);
 	if (memcmp(sig, "YAP", 3)) {
-		if (Data.hWnd) MessageBoxA(Data.hWnd, "Invalid/corrupt project!", NULL, MB_OK | MB_ICONERROR);
+		Modal("Invalid/corrupt project");
 		LOG(Failed, MODULE_YAP, "Invalid/corrupt project\n");
 		CloseHandle(hFile);
 		Data.Project[0] = 0;
@@ -191,7 +205,10 @@ bool LoadProject() {
 	// Read version
 	ReadFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
 	if ((ver & ~__YAP_VERSION_MASK_PATCH__) != (__YAP_VERSION_NUM__ & ~__YAP_VERSION_MASK_PATCH__)) {
-		if (Data.hWnd) MessageBoxA(Data.hWnd, "Version mismatch!", NULL, MB_OK | MB_ICONERROR);
+		Modal("Version mismatch");
+		LOG(Failed, MODULE_YAP, "Version mismatch");
+		LOG(Info_Extended, MODULE_YAP, "Current version: " __YAP_VERSION__ "\n");
+		LOG(Info_Extended, MODULE_YAP, "Project version: %d.%d.%d\n", ver & __YAP_VERSION_MASK_MAJOR__, ver & __YAP_VERSION_MASK_MINOR__, ver & __YAP_VERSION_MASK_PATCH__);
 		CloseHandle(hFile);
 		Data.Project[0] = 0;
 		return false;
@@ -334,9 +351,7 @@ void DrawGUI() {
 			}
 			ImGui::SetItemTooltip("Enables virtualization functionality, requires packer & reassembler to be enabled.");
 			if (ImGui::Button("Add Function (Max 256)")) {
-				if (Options.VM.VMFuncs.Size() >= 256) {
-					MessageBoxA(Data.hWnd, "Maximum number of functions selected!", NULL, MB_ICONINFORMATION | MB_OK);
-				} else {
+				if (Options.VM.VMFuncs.Size() < 256) {
 					ToVirt_t empty;
 					Options.VM.VMFuncs.Push(empty);
 				}
@@ -451,7 +466,7 @@ void DrawGUI() {
 		if (ImGui::Button(ICON_SHIELD_HALVED " Protect")) {
 			char file[MAX_PATH] = { 0 };
 			if (!OpenFileDialogue(file, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, false)) {
-				MessageBoxA(Data.hWnd, "Fatal!", NULL, MB_OK | MB_ICONERROR);
+				Modal("Failed to get file name");
 				LOG(Failed, MODULE_YAP, "Failed to open file dialogue: %d\n", CommDlgExtendedError());
 			} else {
 				pAssembly = new Asm(file);
@@ -466,18 +481,125 @@ void DrawGUI() {
 		ImGui::Text("Doing Magical Things...");
 	}
 
-	ImGui::End();
+	// Modals
+	if (CurrentModal.pText) {
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), 0, ImVec2(0.5f, 0.5f));
+		ImGui::OpenPopup(CurrentModal.pTitle);
+		if (ImGui::BeginPopupModal(CurrentModal.pTitle, NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+			ImGui::Text(CurrentModal.pText);
 
-	// Save file dialogue
-	if (Data.bWaitingOnFile && !Data.bUserCancelled) {
-		while (!OpenFileDialogue(Data.SaveFileName, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, true)) {
-			if (MessageBoxA(Data.hWnd, "Failed to get save file name!", NULL, MB_ICONERROR | MB_RETRYCANCEL) == IDCANCEL) {
-				Data.bUserCancelled = true;
+			// Beautiful, isnt it?
+			switch (CurrentModal.uType) {
+			case MB_OKCANCEL:
+				if (ImGui::Button("OK")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDOK;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDCANCEL;
+				}
 				break;
+			case MB_YESNO:
+				if (ImGui::Button("Yes")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDYES;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("No")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDNO;
+				}
+				break;
+			case MB_YESNOCANCEL:
+				if (ImGui::Button("Yes")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDYES;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("No")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDNO;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDCANCEL;
+				}
+				break;
+			case MB_RETRYCANCEL:
+				if (ImGui::Button("Retry")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDRETRY;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDCANCEL;
+				}
+				break;
+			case MB_CANCELTRYCONTINUE:
+				if (ImGui::Button("Cancel")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDCANCEL;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Try Again")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDTRYAGAIN;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Continue")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDCONTINUE;
+				}
+				break;
+			case MB_ABORTRETRYIGNORE:
+				if (ImGui::Button("Abort")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDABORT;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Retry")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDRETRY;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Ignore")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDIGNORE;
+				}
+				break;
+			case MB_OK:
+				__fallthrough;
+			default:
+				if (ImGui::Button("OK")) {
+					ImGui::CloseCurrentPopup();
+					CurrentModal.pText = NULL;
+					CurrentModal.uType = IDOK;
+				}
 			}
+			ImGui::EndPopup();
 		}
-		Data.bWaitingOnFile = false;
 	}
+
+	ImGui::End();
 	if (!pWindow) pWindow = ImGui::FindWindowByName("YAP");
 }
 
@@ -639,6 +761,26 @@ LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 		}
 	}
 	return ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam) ? TRUE : DefWindowProc(hWnd, uMsg, wParam, lParam);
+}
+
+int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
+	if (!pText || !Data.hWnd) return 0;
+
+	// Wait for other modals
+	HANDLE hMutex = CreateMutexA(NULL, FALSE, "YAP_Modal");
+	WaitForSingleObject(hMutex, INFINITE);
+
+	// Create modal
+	CurrentModal.pText = pText;
+	CurrentModal.pTitle = pTitle;
+	CurrentModal.uType = uType;
+	if (uType == MB_OK) {
+		ReleaseMutex(hMutex);
+		return IDOK;
+	}
+	while (CurrentModal.pText) Sleep(100);
+	ReleaseMutex(hMutex);
+	return CurrentModal.uType;
 }
 
 void ApplyImGuiTheme() {
