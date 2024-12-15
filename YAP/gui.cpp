@@ -206,7 +206,7 @@ bool LoadProject() {
 	ReadFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
 	if ((ver & ~__YAP_VERSION_MASK_PATCH__) != (__YAP_VERSION_NUM__ & ~__YAP_VERSION_MASK_PATCH__)) {
 		Modal("Version mismatch");
-		LOG(Failed, MODULE_YAP, "Version mismatch");
+		LOG(Failed, MODULE_YAP, "Version mismatch\n");
 		LOG(Info_Extended, MODULE_YAP, "Current version: " __YAP_VERSION__ "\n");
 		LOG(Info_Extended, MODULE_YAP, "Project version: %d.%d.%d\n", ver & __YAP_VERSION_MASK_MAJOR__, ver & __YAP_VERSION_MASK_MINOR__, ver & __YAP_VERSION_MASK_PATCH__);
 		CloseHandle(hFile);
@@ -298,11 +298,11 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("Prevent debuggers from attaching to process.");
 			IMGUI_TOGGLE("Anti-Patch", Options.Packing.bAntiPatch);
 			ImGui::SetItemTooltip("Verify signature of binary before loading.\n");
-			IMGUI_TOGGLE("Anti-VM", Options.Packing.bAntiVM);
-			ImGui::SetItemTooltip("Prevent app from running in a virtual machine.");
-			ImGui::SameLine();
-			IMGUI_TOGGLE("Allow Hyper-V", Options.Packing.bAllowHyperV);
-			ImGui::SetItemTooltip("Still run if the detected VM is only MS Hyper-V.");
+			DEBUG_ONLY(IMGUI_TOGGLE("Anti-VM", Options.Packing.bAntiVM));
+			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a virtual machine."));
+			DEBUG_ONLY(ImGui::SameLine());
+			DEBUG_ONLY(IMGUI_TOGGLE("Allow Hyper-V", Options.Packing.bAllowHyperV));
+			DEBUG_ONLY(ImGui::SetItemTooltip("Still run if the detected VM is only MS Hyper-V."));
 			DEBUG_ONLY(IMGUI_TOGGLE("Anti-Sandbox", Options.Packing.bAntiSandbox));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a sandboxed environment."));
 			if (Options.Packing.bDelayedEntry && Options.Packing.Immitate == ExeStealth) Options.Packing.Immitate = YAP;

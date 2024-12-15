@@ -2122,7 +2122,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			a.xor_(ecx, ecx);
 			a.strict();
 		}
-		a.call(rax);
+		a.push(rax);
 		a.garbage();
 		a.ret();
 	}
