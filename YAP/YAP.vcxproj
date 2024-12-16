@@ -83,11 +83,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>lzma;zydis/src;zydis/include/Zydis;zydis/dependencies/zycore/include;asmjit/src/asmjit;zydis/include;imgui;imgui/backends;$(IncludePath)</IncludePath>
     <LibraryPath>../x64/Debug;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>lzma;zydis/src;zydis/include/Zydis;zydis/dependencies/zycore/include;asmjit/src/asmjit;zydis/include;imgui;imgui/backends;$(IncludePath)</IncludePath>
     <LibraryPath>$(LibraryPath)</LibraryPath>
     <CopyCppRuntimeToOutputDir>true</CopyCppRuntimeToOutputDir>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

@@ -13,7 +13,6 @@
 #include "util.hpp"
 #include "asm.hpp"
 
-
 // Globals
 static ID3D11Device* g_pd3dDevice = nullptr;
 static ID3D11DeviceContext* g_pd3dDeviceContext = nullptr;
@@ -27,9 +26,9 @@ ImGuiWindow* pWindow = NULL;
 extern Asm* pAssembly;
 ImWchar range[] = { 0xE005, 0xF8FF, 0 };
 struct {
-	char* pTitle;
-	char* pText;
-	UINT uType;
+	char* pTitle = NULL;
+	char* pText = NULL;
+	UINT uType = 0;
 } CurrentModal;
 
 // Forwards
