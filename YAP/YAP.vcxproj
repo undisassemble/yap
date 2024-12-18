@@ -88,7 +88,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>lzma;zydis/src;zydis/include/Zydis;zydis/dependencies/zycore/include;asmjit/src/asmjit;zydis/include;imgui;imgui/backends;$(IncludePath)</IncludePath>
     <LibraryPath>$(LibraryPath)</LibraryPath>
-    <CopyCppRuntimeToOutputDir>true</CopyCppRuntimeToOutputDir>
+    <CopyCppRuntimeToOutputDir>false</CopyCppRuntimeToOutputDir>
     <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -127,12 +127,15 @@
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <ErrorReporting>None</ErrorReporting>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>d3d11.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
+      <LinkErrorReporting>NoErrorReport</LinkErrorReporting>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -148,6 +151,8 @@
       <Optimization>MaxSpeed</Optimization>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <ErrorReporting>None</ErrorReporting>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -156,6 +161,7 @@
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <AdditionalDependencies>d3d11.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
+      <LinkErrorReporting>NoErrorReport</LinkErrorReporting>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

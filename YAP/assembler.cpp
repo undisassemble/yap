@@ -419,7 +419,7 @@ size_t ProtectedAssembler::garbage() {
 }
 
 void ProtectedAssembler::desync() {
-	if (!bMutate) return;
+	if (!bMutate || bStrict) return;
 	HeldLocks++;
 	db(0xEB);
 	block();
@@ -428,7 +428,7 @@ void ProtectedAssembler::desync() {
 }
 
 void ProtectedAssembler::desync_jz() {
-	if (!bMutate) return;
+	if (!bMutate || bStrict) return;
 	HeldLocks++;
 	db(0x74);
 	block();
@@ -437,7 +437,7 @@ void ProtectedAssembler::desync_jz() {
 }
 
 void ProtectedAssembler::desync_jnz() {
-	if (!bMutate) return;
+	if (!bMutate || bStrict) return;
 	HeldLocks++;
 	db(0x75);
 	block();
