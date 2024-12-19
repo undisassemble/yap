@@ -232,6 +232,9 @@ void DrawGUI() {
 		EndGUI();
 		_exit(0);
 	}
+
+	// Dont do anything if window is not shown
+	if (bMinimized) return;
 	
 	ImGui::Begin("YAP", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar);
 
@@ -461,7 +464,7 @@ void DrawGUI() {
 		}
 
 		ImGui::EndTabBar();
-		ImGui::SetCursorPos(ImVec2(770 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetWindowScrollbarRect(ImGui::GetCurrentWindow(), ImGuiAxis_Y).GetWidth() : 0), 530 + ImGui::GetScrollY()));
+		ImGui::SetCursorPos(ImVec2(770 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] : 0), 530 + ImGui::GetScrollY()));
 		if (ImGui::Button(ICON_SHIELD_HALVED " Protect")) {
 			char file[MAX_PATH] = { 0 };
 			if (!OpenFileDialogue(file, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, false)) {
