@@ -206,8 +206,8 @@ bool LoadProject() {
 	if ((ver & ~__YAP_VERSION_MASK_PATCH__) != (__YAP_VERSION_NUM__ & ~__YAP_VERSION_MASK_PATCH__)) {
 		Modal("Version mismatch");
 		LOG(Failed, MODULE_YAP, "Version mismatch\n");
-		LOG(Info_Extended, MODULE_YAP, "Current version: " __YAP_VERSION__ "\n");
-		LOG(Info_Extended, MODULE_YAP, "Project version: %d.%d.%d\n", ver & __YAP_VERSION_MASK_MAJOR__, ver & __YAP_VERSION_MASK_MINOR__, ver & __YAP_VERSION_MASK_PATCH__);
+		LOG(Info_Extended, MODULE_YAP, "Current version: " __YAP_VERSION__ " " __YAP_BUILD__ "\n");
+		LOG(Info_Extended, MODULE_YAP, "Project version: %d.%d.%d %s\n", ver & __YAP_VERSION_MASK_MAJOR__, ver & __YAP_VERSION_MASK_MINOR__, ver & __YAP_VERSION_MASK_PATCH__, (ver & __YAP_VERSION_MASK_DEBUG__) ? "DEBUG" : "RELEASE");
 		CloseHandle(hFile);
 		Data.Project[0] = 0;
 		return false;
@@ -277,8 +277,8 @@ void DrawGUI() {
 			ImGui::SameLine();
 			IMGUI_TOGGLE("Don't Pack Resources", Options.Packing.bDontCompressRsrc);
 			ImGui::SetItemTooltip("Preserves everything in the resource directory, keeping details such as icons and privileges.");
-			ImGui::SliderInt("Depth", &Options.Packing.EncodingCounts, 1, 10);
-			ImGui::SetItemTooltip("Number of times the application should be packed.\n1: packed app\n2: packed packed app\n3: packed packed packed app\netc.");
+			DEBUG_ONLY(ImGui::SliderInt("Depth", &Options.Packing.EncodingCounts, 1, 10));
+			DEBUG_ONLY(ImGui::SetItemTooltip("Number of times the application should be packed.\n1: packed app\n2: packed packed app\n3: packed packed packed app\netc."));
 			ImGui::SliderInt("Compression Level", &Options.Packing.CompressionLevel, 1, 9);
 			ImGui::SetItemTooltip("How compressed the binary should be.");
 			ImGui::SliderInt("Mutation Level", &Options.Packing.MutationLevel, 1, 5);
@@ -443,6 +443,7 @@ void DrawGUI() {
 			IMGUI_TOGGLE("Dump Function Ranges", Options.Debug.bDumpFunctions);
 			IMGUI_TOGGLE("Create Breakpoints", Options.Debug.bGenerateBreakpoints);
 			IMGUI_TOGGLE("Wrap Real Instructions in NOPs", Options.Debug.bGenerateMarks);
+			IMGUI_TOGGLE("Strict Mutation", Options.Debug.bStrictMutation);
 			IMGUI_TOGGLE("Disable Relocations", Options.Debug.bDisableRelocations);
 			if (ImGui::TreeNode("Icon Tests")) {
 				ImGui::DebugTextEncoding(ICON_FILE_SHIELD ICON_SHIELD ICON_SHIELD_HALVED ICON_TRIANGLE_EXCLAMATION ICON_CIRCLE_INFO ICON_CIRCLE_QUESTION ICON_FOLDER_OPEN ICON_FILE ICON_FLOPPY_DISK ICON_CODE ICON_MICROCHIP ICON_BOX ICON_BOX_OPEN ICON_BOX_ARCHIVE);

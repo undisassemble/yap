@@ -66,7 +66,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 	HeldLocks++;
 	const BYTE sz = 32;
 	const BYTE beg_unsafe = 17;
-	BYTE end = bStrict ? beg_unsafe : sz;
+	BYTE end = (bStrict DEBUG_ONLY(|| Options.Debug.bStrictMutation)) ? beg_unsafe : sz;
 	Mem peb = ptr(0x60);
 	peb.setSegment(gs);
 	switch (rand() % end) {

@@ -1024,7 +1024,13 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		
 		// Compress data
 		Buffer compressed = PackSection(pOriginal->SectionData[i], Options);
-		LOG(Info, MODULE_PACKER, "Packed section %.8s (%lld)\n", pOriginal->SectionHeaders[i].Name, (int64_t)compressed.u64Size - pOriginal->SectionHeaders[i].SizeOfRawData);
+		LOG(Info_Extended, MODULE_PACKER, "Packed section %.8s (%lld)\n", pOriginal->SectionHeaders[i].Name, (int64_t)compressed.u64Size - pOriginal->SectionHeaders[i].SizeOfRawData);
+		if (compressed.u64Size > _UI32_MAX) {
+			LOG(Failed, MODULE_PACKER, "Packed section size was too large\n");
+			LOG(Info_Extended, MODULE_PACKER, "Size: %p bytes\n", compressed.u64Size);
+			LOG(Info_Extended, MODULE_PACKER, "Max size: %p bytes\n", _UI32_MAX);
+			return buf;
+		}
 		Copied.OverwriteSection(i, compressed.pBytes, compressed.u64Size);
 		NumPacked++;
 	}
@@ -1399,7 +1405,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	ShellcodeData.Sha256_InitOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Init);
 	ShellcodeData.Sha256_UpdateOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Update);
 	ShellcodeData.Sha256_FinalOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Final);
-	LOG(Info, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
+	LOG(Info_Extended, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	buf.u64Size = holder.textSection()->buffer().size();
 	buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
 	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
@@ -2960,7 +2966,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		LOG(Failed, MODULE_PACKER, "Failed to generate internal shellcode\n");
 		return buf;
 	}
-	LOG(Info, MODULE_PACKER, "Internal code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
+	LOG(Info_Extended, MODULE_PACKER, "Internal code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	ShellcodeData.LoadedOffset = holder.labelOffsetFromBase(entrypt) + holder.baseAddress();
 	if (holder.hasRelocEntries()) {
 		for (int i = 0; i < holder.relocEntries().size(); i++) {

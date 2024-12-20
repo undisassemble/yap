@@ -383,6 +383,7 @@ struct Options_t {
 		bool bGenerateBreakpoints : 1 = false;
 		bool bGenerateMarks : 1 = false;
 		bool bDisableRelocations : 1 = false;
+		bool bStrictMutation : 1 = false;
 	} Debug;
 #endif
 };
