@@ -79,7 +79,7 @@ SRes PackingProgress(ICompressProgressPtr p, UInt64 inSize, UInt64 outSize) { re
 
 Buffer PackSection(_In_ Buffer SectionData, _In_ PackerOptions Options) {
 	Buffer data = { 0 };
-	data.u64Size = SectionData.u64Size;
+	data.u64Size = SectionData.u64Size * 1.1 + 0x4000;
 	data.pBytes = reinterpret_cast<BYTE*>(malloc(data.u64Size));
 
 	// Gen algorithm
@@ -113,7 +113,14 @@ Buffer PackSection(_In_ Buffer SectionData, _In_ PackerOptions Options) {
 	alloc.Alloc = Alloc;
 	alloc.Free = Free;
 	size_t propssz = LZMA_PROPS_SIZE;
-	LzmaEncode(data.pBytes, &data.u64Size, SectionData.pBytes, SectionData.u64Size, &props, ShellcodeData.UnpackData.EncodedProp, &propssz, 0, &progress, &alloc, &alloc);
+	SRes res = LzmaEncode(data.pBytes, &data.u64Size, SectionData.pBytes, SectionData.u64Size, &props, ShellcodeData.UnpackData.EncodedProp, &propssz, 0, &progress, &alloc, &alloc);
+	if (res != SZ_OK) {
+		LOG(Failed, MODULE_PACKER, "Failed to compress data (%d)\n", res);
+		free(data.pBytes);
+		data.pBytes = NULL;
+		data.u64Size = 0;
+		return data;
+	}
 	data.pBytes = reinterpret_cast<BYTE*>(realloc(data.pBytes, data.u64Size));
 
 	// Encode (inverse cause yeah)
@@ -1017,13 +1024,13 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	Label VirtualAddrs = a.newLabel();
 	PE Copied(pOriginal);
 
-	BYTE* workspace = reinterpret_cast<BYTE*>(malloc(0xFFFFFF));
 	DWORD NumPacked = 0;
 	for (WORD i = 0, n = pOriginal->SectionHeaders.Size(); i < n; i++) {
 		if (!pOriginal->SectionHeaders[i].Misc.VirtualSize || !pOriginal->SectionHeaders[i].SizeOfRawData) continue;
 		
 		// Compress data
 		Buffer compressed = PackSection(pOriginal->SectionData[i], Options);
+		if (!compressed.pBytes || !compressed.u64Size) return buf;
 		LOG(Info_Extended, MODULE_PACKER, "Packed section %.8s (%lld)\n", pOriginal->SectionHeaders[i].Name, (int64_t)compressed.u64Size - pOriginal->SectionHeaders[i].SizeOfRawData);
 		if (compressed.u64Size > _UI32_MAX) {
 			LOG(Failed, MODULE_PACKER, "Packed section size was too large\n");
@@ -1034,7 +1041,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		Copied.OverwriteSection(i, compressed.pBytes, compressed.u64Size);
 		NumPacked++;
 	}
-	free(workspace);
 	a.mov(rsi, 0);
 	a.lea(rcx, ptr(CompressedSections));
 	a.mov(rbp, pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA);
@@ -1062,6 +1068,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	Label InternalShell = a.newLabel();
 	ULONG sz = 0;
 	Buffer CompressedInternal = PackSection(InternalShellcode, Options);
+	if (!CompressedInternal.pBytes || !CompressedInternal.u64Size) return buf;
 	a.lea(rcx, ptr(InternalShell));
 	a.mov(rdx, CompressedInternal.u64Size);
 	a.mov(r8, pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders);

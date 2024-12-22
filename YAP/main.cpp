@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
 		CloseHandle(hProc);
 	}
 	
-	// Setup UI (CLI not yet implimented)
+	// Setup UI
 	if (!Data.bUsingConsole && argc < 3) {
 		RELEASE_ONLY(FreeConsole());
 		DEBUG_ONLY(Data.bUsingConsole = true); // Makes the console visible in debug builds

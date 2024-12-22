@@ -125,7 +125,7 @@ int main() {
 		} else {
 			TerminateProcess(pi.hProcess, 0);
 			TerminateThread(hThread, 0);
-			printf("\r" LOG_WARNING "%s crashed/froze, or wait function failed\n", paths[i]);
+			printf("\r" LOG_ERROR "%s crashed/froze\n", paths[i]);
 			strcpy(temp, paths[i]);
 			strcat(temp, "/Yap.log.txt");
 			CopyFile("Yap.log.txt", temp, FALSE);
