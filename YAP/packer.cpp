@@ -2130,12 +2130,12 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 	if (pOriginal->NTHeaders.x64.OptionalHeader.AddressOfEntryPoint) {
 		a.mov(rax, pOriginal->NTHeaders.x64.OptionalHeader.AddressOfEntryPoint + ShellcodeData.OldPENewBaseRVA + pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders);
 		a.add(rax, ptr(InternalRelOff));
-		if (::Options.Packing.EncodingCounts > 1) {
-			a.xor_(ecx, ecx);
-			a.strict();
-		}
 		a.push(rax);
 		a.garbage();
+		if (::Options.Packing.EncodingCounts > 1) {
+			a.xor_(eax, eax);
+			a.strict();
+		}
 		a.ret();
 	}
 

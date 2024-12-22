@@ -9,6 +9,12 @@ CMakeFiles
 Makefile
 *.cmake
 
+# Other stuff
+out.exe
+tester.exe
+YAP.log.txt
+yap.config
+
 # User-specific files
 *.rsuser
 *.suo
