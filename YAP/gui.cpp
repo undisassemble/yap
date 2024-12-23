@@ -142,6 +142,10 @@ void LoadSettings() {
 
 bool SaveProject() {
 	if (!Data.Project[0]) return false;
+	if (Data.Project[0] == ' ') {
+		LOG(Info, MODULE_YAP, "No project file is selected.\n");
+		return true;
+	}
 
 	// Check file ending
 	char* ending = &Data.Project[lstrlenA(Data.Project) - 7];
@@ -265,6 +269,11 @@ void DrawGUI() {
 	if (!Data.Project[0]) {
 		ImGui::SetCursorPos(ImVec2((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Create or select a project file").x) / 2, (ImGui::GetWindowSize().y - ImGui::GetTextLineHeight()) / 2));
 		ImGui::Text("Create or select a project file");
+		ImGui::SetCursorPos(ImVec2((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Continue without project >>>").x) / 2, (ImGui::GetWindowSize().y + ImGui::GetTextLineHeight()) / 2));
+		if (ImGui::TextLink("Continue without project >>>")) {
+			Data.Project[0] = ' ';
+			Data.Project[1] = 0;
+		}
 	}
 
 	// Configuration menu
@@ -277,8 +286,8 @@ void DrawGUI() {
 			ImGui::SameLine();
 			IMGUI_TOGGLE("Don't Pack Resources", Options.Packing.bDontCompressRsrc);
 			ImGui::SetItemTooltip("Preserves everything in the resource directory, keeping details such as icons and privileges.");
-			DEBUG_ONLY(ImGui::SliderInt("Depth", &Options.Packing.EncodingCounts, 1, 10));
-			DEBUG_ONLY(ImGui::SetItemTooltip("Number of times the application should be packed.\n1: packed app\n2: packed packed app\n3: packed packed packed app\netc."));
+			ImGui::SliderInt("Depth", &Options.Packing.EncodingCounts, 1, 10);
+			ImGui::SetItemTooltip("Number of times the application should be packed.\n1: packed app\n2: packed packed app\n3: packed packed packed app\netc.");
 			ImGui::SliderInt("Compression Level", &Options.Packing.CompressionLevel, 1, 9);
 			ImGui::SetItemTooltip("How compressed the binary should be.");
 			ImGui::SliderInt("Mutation Level", &Options.Packing.MutationLevel, 1, 5);
@@ -437,6 +446,11 @@ void DrawGUI() {
 		}
 
 #ifdef _DEBUG
+		if (ImGui::BeginTabItem(ICON_BUG " Style Editor")) {
+			ImGui::ShowStyleEditor();
+			ImGui::EndTabItem();
+		}
+
 		if (ImGui::BeginTabItem(ICON_BUG " Debug")) {
 			IMGUI_TOGGLE("Dump Disassembly", Options.Debug.bDumpAsm);
 			IMGUI_TOGGLE("Dump Individual Sections", Options.Debug.bDumpSections);
@@ -446,7 +460,7 @@ void DrawGUI() {
 			IMGUI_TOGGLE("Strict Mutation", Options.Debug.bStrictMutation);
 			IMGUI_TOGGLE("Disable Relocations", Options.Debug.bDisableRelocations);
 			if (ImGui::TreeNode("Icon Tests")) {
-				ImGui::DebugTextEncoding(ICON_FILE_SHIELD ICON_SHIELD ICON_SHIELD_HALVED ICON_TRIANGLE_EXCLAMATION ICON_CIRCLE_INFO ICON_CIRCLE_QUESTION ICON_FOLDER_OPEN ICON_FILE ICON_FLOPPY_DISK ICON_CODE ICON_MICROCHIP ICON_BOX ICON_BOX_OPEN ICON_BOX_ARCHIVE);
+				ImGui::DebugTextEncoding(ICON_FILE_SHIELD ICON_SHIELD ICON_SHIELD_HALVED ICON_TRIANGLE_EXCLAMATION ICON_CIRCLE_INFO ICON_CIRCLE_QUESTION ICON_FOLDER_OPEN ICON_FILE ICON_FLOPPY_DISK ICON_CODE ICON_MICROCHIP ICON_BOX ICON_BOX_OPEN ICON_BOX_ARCHIVE ICON_BUG);
 				ImGui::TreePop();
 			}
 			ImGui::ShowMetricsWindow();
@@ -867,6 +881,7 @@ void ApplyImGuiTheme() {
 	style.Colors[ImGuiCol_TableBorderLight] = ImVec4(0.2274509817361832f, 0.2274509817361832f, 0.2470588237047195f, 1.0f);
 	style.Colors[ImGuiCol_TableRowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 	style.Colors[ImGuiCol_TableRowBgAlt] = ImVec4(1.0f, 1.0f, 1.0f, 0.05999999865889549f);
+	style.Colors[ImGuiCol_TextLink] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 	style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
 	style.Colors[ImGuiCol_DragDropTarget] = ImVec4(1.0f, 1.0f, 0.0f, 0.8999999761581421f);
 	style.Colors[ImGuiCol_NavHighlight] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
