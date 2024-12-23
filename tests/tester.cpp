@@ -36,16 +36,16 @@ const char* paths[] = {
 DWORD WINAPI SpinnerThread(char* name) {
 	int time = 0;
 	while (1) {
-		printf("\r| %s... (%d)", name, time / 1000);
+		printf("\r\x1B[35m[|]\x1B[39m %s... (%d)", name, time / 1000);
 		Sleep(100);
 		time += 100;
-		printf("\r/ %s... (%d)", name, time / 1000);
+		printf("\r\x1B[35m[/]\x1B[39m %s... (%d)", name, time / 1000);
 		Sleep(100);
 		time += 100;
-		printf("\r- %s... (%d)", name, time / 1000);
+		printf("\r\x1B[35m[-]\x1B[39m %s... (%d)", name, time / 1000);
 		Sleep(100);
 		time += 100;
-		printf("\r\\ %s... (%d)", name, time / 1000);
+		printf("\r\x1B[35m[\\]\x1B[39m %s... (%d)", name, time / 1000);
 		Sleep(100);
 		time += 100;
 	}
