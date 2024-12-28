@@ -7,7 +7,7 @@
 #include <ctime>
 #include <Psapi.h>
 #include <Shlwapi.h>
-#include "imgui_internal.h"
+#include <imgui_internal.h>
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
 #include "util.hpp"

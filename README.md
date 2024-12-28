@@ -8,13 +8,13 @@ Protector for 64-bit windows PE's (exe, dll).
 A full list of features can be seen [here](Features.md).
 
 
-## Building
+## Building (requires [vcpkg](https://learn.microsoft.com/en-us/vcpkg/get_started/get-started-msbuild?pivots=shell-cmd#1---set-up-vcpkg))
 
 Clone repo:
 ```
 git clone https://github.com/undisassemble/yap.git
 cd yap
-git submodule update --init --recursive
+vcpkg install
 ```
 
 ### Visual Studio (Recommended)
@@ -25,14 +25,6 @@ git submodule update --init --recursive
 ### CMake
 
 ```
-cmake . -DCMAKE_BUILD_TYPE=Release
+cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake
 make
 ```
-
-
-## Libraries
-
-- [LZMA](https://www.7-zip.org/sdk.html)
-- [Zydis](https://github.com/zyantific/zydis)
-- [AsmJit](https://asmjit.com/)
-- [ImGui](https://github.com/ocornut/imgui)

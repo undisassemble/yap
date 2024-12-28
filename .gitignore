@@ -14,6 +14,7 @@ out.exe
 tester.exe
 YAP.log.txt
 yap.config
+vcpkg_installed
 
 # User-specific files
 *.rsuser

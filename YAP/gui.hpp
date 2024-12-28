@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 #include <Windows.h>
-#include "imgui/imgui.h"
-#include "imgui/imgui_internal.h"
+#include <imgui.h>
+#include <imgui_internal.h>
 
 void InitGUI();
 bool BeginGUI();

@@ -9,8 +9,8 @@
 #include <winternl.h>
 typedef uint64_t QWORD;
 #ifndef UTIL_STRUCT_ONLY
-#include <asmjit.h>
-#include "Zydis/Zydis.h"
+#include <asmjit/asmjit.h>
+#include <Zydis/Zydis.h>
 using namespace asmjit;
 using namespace x86;
 
