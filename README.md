@@ -17,14 +17,6 @@ cd yap
 vcpkg install
 ```
 
-### Visual Studio (Recommended)
-
+Build with Visual Studio:
 1. Set config to `Release x64`
 2. Build solution
-
-### CMake
-
-```
-cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake
-make
-```
