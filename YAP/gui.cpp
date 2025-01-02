@@ -240,7 +240,7 @@ void DrawGUI() {
 	// Dont do anything if window is not shown
 	if (bMinimized) return;
 	
-	ImGui::Begin("YAP", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar);
+	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar);
 
 	// Menu bar
 	if (ImGui::BeginMenuBar()) {
@@ -616,8 +616,8 @@ void DrawGUI() {
 		}
 	}
 
+	if (!pWindow) pWindow = ImGui::GetCurrentWindow();
 	ImGui::End();
-	if (!pWindow) pWindow = ImGui::FindWindowByName("YAP");
 }
 
 bool BeginGUI() {
@@ -631,7 +631,7 @@ bool BeginGUI() {
 	WindowClass.lpfnWndProc = (WNDPROC)WndProc;
 	WindowClass.hInstance = GetModuleHandle(NULL);
 	WindowClass.style = CS_CLASSDC;
-	WindowClass.lpszClassName = "YAP";
+	WindowClass.lpszClassName = "Yet Another Packer";
 	if (!RegisterClassExA(&WindowClass)) {
 		return (bInitialized = false);
 	}
@@ -639,8 +639,8 @@ bool BeginGUI() {
 	// Create window
 	if (!(Data.hWnd = CreateWindowExA(
 		0,
-		"YAP",
-		"YAP",
+		"Yet Another Packer",
+		"Yet Another Packer",
 		0,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
@@ -651,7 +651,7 @@ bool BeginGUI() {
 		GetModuleHandleA(NULL),
 		NULL
 	))) {
-		UnregisterClassA("YAP", GetModuleHandleA(NULL));
+		UnregisterClassA("Yet Another Packer", GetModuleHandleA(NULL));
 		return (bInitialized = false);
 	}
 	SetWindowLongA(Data.hWnd, GWL_STYLE, 0);
@@ -669,7 +669,7 @@ bool BeginGUI() {
 	// Create rendering thread
 	if (!CreateThread(0, 0, WindowThread, 0, 0, 0)) {
 		EndGUI();
-		UnregisterClassA("YAP", GetModuleHandleA(NULL));
+		UnregisterClassA("Yet Another Packer", GetModuleHandleA(NULL));
 		return false;
 	}
 
