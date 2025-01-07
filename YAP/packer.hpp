@@ -66,6 +66,7 @@ struct _ShellcodeData {
 		RequestedFunction GetCurrentProcessId;
 		RequestedFunction GetCurrentProcess;
 		RequestedFunction GetTickCount64;
+		RequestedFunction GetStdHandle;
 	} RequestedFunctions;
 
 	struct {

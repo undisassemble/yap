@@ -1859,6 +1859,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 							CHECK_IMPORT(GetCurrentProcessId);
 							CHECK_IMPORT(GetCurrentProcess);
 							CHECK_IMPORT(GetTickCount64);
+							CHECK_IMPORT(GetStdHandle);
 							if (pRequest) {
 								pRequest->bRequested = true;
 								pRequest->dwRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
@@ -2075,6 +2076,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 	LOAD_IMPORT(GetCurrentProcess);
 	LOAD_IMPORT(GetCurrentProcessId);
 	LOAD_IMPORT(GetTickCount64);
+	LOAD_IMPORT(GetStdHandle);
 #undef LOAD_IMPORT
 
 	// Mark as loaded
@@ -2254,6 +2256,27 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.add(rax, rcx);
 		a.mov(eax, dword_ptr(rax, rdx, 2));
 		a.add(rax, rcx);
+		a.ret();
+	}
+
+	// GetStdHandle
+	if (ShellcodeData.RequestedFunctions.GetStdHandle.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.GetStdHandle.Func);
+		a.mov(rdx, PEB);
+		a.mov(rdx, ptr(rdx, 0x20));
+		a.mov(r8, ptr(rdx, 0x20));
+		a.mov(rax, INVALID_HANDLE_VALUE);
+		a.cmp(ecx, STD_INPUT_HANDLE);
+		a.strict();
+		a.cmovz(rax, r8);
+		a.add(r8, 8);
+		a.cmp(ecx, STD_OUTPUT_HANDLE);
+		a.strict();
+		a.cmovz(rax, r8);
+		a.add(r8, 8);
+		a.cmp(ecx, STD_ERROR_HANDLE);
+		a.strict();
+		a.cmovz(rax, r8);
 		a.ret();
 	}
 

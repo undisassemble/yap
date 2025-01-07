@@ -294,9 +294,9 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
 			IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT);
 			ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT.");
-			DEBUG_ONLY(ImGui::SameLine());
-			DEBUG_ONLY(IMGUI_TOGGLE("API Emulation", Options.Packing.bAPIEmulation));
-			DEBUG_ONLY(ImGui::SetItemTooltip("Emulate some simple WINAPI functions.\n"));
+			ImGui::SameLine();
+			IMGUI_TOGGLE("API Emulation", Options.Packing.bAPIEmulation);
+			ImGui::SetItemTooltip("Emulate some simple WINAPI functions.\n");
 			IMGUI_TOGGLE("Delayed Entry Point", Options.Packing.bDelayedEntry);
 			ImGui::SetItemTooltip("Changes the entry point of the application during runtime.");
 			IMGUI_TOGGLE("DLL Sideloading Mitigations", Options.Packing.bMitigateSideloading);
