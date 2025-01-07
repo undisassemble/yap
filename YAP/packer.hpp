@@ -53,37 +53,19 @@ struct _ShellcodeData {
 	} UnpackData;
 
 	struct {
+		// SDK
 		int iIndex = -1;
 		RequestedFunction CheckForDebuggers;
 		RequestedFunction GetSelf;
-		RequestedFunction YAP_NtDelayExecution;
-		RequestedFunction YAP_NtFreeVirtualMemory;
-		RequestedFunction YAP_NtAllocateVirtualMemory;
-		RequestedFunction YAP_NtGetContextThread;
-		RequestedFunction YAP_NtGetNextProcess;
-		RequestedFunction YAP_NtGetNextThread;
-		RequestedFunction YAP_NtOpenProcess;
-		RequestedFunction YAP_NtOpenThread;
-		RequestedFunction YAP_NtProtectVirtualMemory;
-		RequestedFunction YAP_NtReadVirtualMemory;
-		RequestedFunction YAP_NtResumeThread;
-		RequestedFunction YAP_NtResumeProcess;
-		RequestedFunction YAP_NtSetContextThread;
-		RequestedFunction YAP_NtSetInformationProcess;
-		RequestedFunction YAP_NtSetInformationThread;
-		RequestedFunction YAP_NtSetThreadExecutionState;
-		RequestedFunction YAP_NtSuspendProcess;
-		RequestedFunction YAP_NtSuspendThread;
-		RequestedFunction YAP_NtTerminateProcess;
-		RequestedFunction YAP_NtTerminateThread;
-		RequestedFunction YAP_NtWriteVirtualMemory;
-		RequestedFunction YAP_NtClose;
-		RequestedFunction YAP_NtCreateThread;
-		RequestedFunction YAP_GetCurrentThread;
-		RequestedFunction YAP_GetCurrentThreadId;
-		RequestedFunction YAP_GetCurrentProcess;
-		RequestedFunction YAP_GetCurrentProcessId;
-		RequestedFunction YAP_GetTickCount64;
+
+		// Emulated
+		int iKernel32 = -1;
+		int iNtDLL = -1;
+		RequestedFunction GetCurrentThread;
+		RequestedFunction GetCurrentThreadId;
+		RequestedFunction GetCurrentProcessId;
+		RequestedFunction GetCurrentProcess;
+		RequestedFunction GetTickCount64;
 	} RequestedFunctions;
 
 	struct {

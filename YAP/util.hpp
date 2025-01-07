@@ -335,6 +335,7 @@ struct Options_t {
 		bool bAllowHyperV : 1 = true;
 		bool bAntiSandbox : 1 = false;
 		bool bHideIAT : 1 = false;
+		bool bAPIEmulation : 1 = false;
 		bool bDelayedEntry : 1 = false;
 		bool bDontCompressRsrc : 1 = true;
 		bool bDirectSyscalls : 1 = false;

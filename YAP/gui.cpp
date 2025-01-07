@@ -294,6 +294,9 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
 			IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT);
 			ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT.");
+			DEBUG_ONLY(ImGui::SameLine());
+			DEBUG_ONLY(IMGUI_TOGGLE("API Emulation", Options.Packing.bAPIEmulation));
+			DEBUG_ONLY(ImGui::SetItemTooltip("Emulate some simple WINAPI functions.\n"));
 			IMGUI_TOGGLE("Delayed Entry Point", Options.Packing.bDelayedEntry);
 			ImGui::SetItemTooltip("Changes the entry point of the application during runtime.");
 			IMGUI_TOGGLE("DLL Sideloading Mitigations", Options.Packing.bMitigateSideloading);
@@ -307,8 +310,8 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("Prevent PE dumpers and reconstructors from dumping the running process.");
 			IMGUI_TOGGLE("Anti-Debug", Options.Packing.bAntiDebug);
 			ImGui::SetItemTooltip("Prevent debuggers from attaching to process.");
-			IMGUI_TOGGLE("Anti-Patch", Options.Packing.bAntiPatch);
-			ImGui::SetItemTooltip("Verify signature of binary before loading.\n");
+			DEBUG_ONLY(IMGUI_TOGGLE("Anti-Patch", Options.Packing.bAntiPatch));
+			DEBUG_ONLY(ImGui::SetItemTooltip("Verify signature of binary before loading.\n"));
 			DEBUG_ONLY(IMGUI_TOGGLE("Anti-VM", Options.Packing.bAntiVM));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a virtual machine."));
 			DEBUG_ONLY(ImGui::SameLine());

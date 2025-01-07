@@ -1795,13 +1795,18 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.bind(import_offsets);
 		for (int j, i = 0; i < Imports.Size(); i++) {
 			char* name = pOriginal->ReadRVAString(Imports[i].Name);
-			if (!::Options.Packing.bHideIAT && !lstrcmpA(name, "yap.dll")) {
+			if (!::Options.Packing.bHideIAT && !_stricmp(name, "yap.dll")) {
 				LOG(Info_Extended, MODULE_PACKER, "SDK imported\n");
 				ShellcodeData.RequestedFunctions.iIndex = i;
 				continue;
 			}
 			if (i == ShellcodeData.RequestedFunctions.iIndex)
 				continue;
+			if (!_stricmp(name, "kernel32.dll")) {
+				ShellcodeData.RequestedFunctions.iKernel32 = i;
+			} else if (!_stricmp(name, "ntdll.dll")) {
+				ShellcodeData.RequestedFunctions.iNtDLL = i;
+			}
 			j = 0;
 			a.dd(0);
 			while (pOriginal->ReadRVA<uint64_t>(Imports[i].OriginalFirstThunk + sizeof(uint64_t) * j)) {
@@ -1830,6 +1835,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			ZeroMemory(name, lstrlenA(name));
 			uint64_t rva = 0;
 			while ((rva = pOriginal->ReadRVA<uint64_t>(Imports[i].OriginalFirstThunk + sizeof(uint64_t) * j))) {
+
+#define CHECK_IMPORT(_name) else if (!lstrcmpA(name, #_name)) pRequest = &ShellcodeData.RequestedFunctions._name
 				if (rva & 0x8000000000000000) {
 					if (ShellcodeData.RequestedFunctions.iIndex != i) {
 						LOG(Failed, MODULE_PACKER, "SDK function was imported by ordinal instead of name\n");
@@ -1844,44 +1851,30 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 						return buf;
 					}
 					if (ShellcodeData.RequestedFunctions.iIndex != i) {
-						a.embed(&Sha256Str(name), sizeof(Sha256Digest));
+						Sha256Digest digest = Sha256Str(name);
+						if (ShellcodeData.RequestedFunctions.iKernel32 == i || ShellcodeData.RequestedFunctions.iNtDLL == i) {
+							RequestedFunction* pRequest = NULL;
+							if (!lstrcmpA(name, "GetCurrentThread")) pRequest = &ShellcodeData.RequestedFunctions.GetCurrentThread;
+							CHECK_IMPORT(GetCurrentThreadId);
+							CHECK_IMPORT(GetCurrentProcessId);
+							CHECK_IMPORT(GetCurrentProcess);
+							CHECK_IMPORT(GetTickCount64);
+							if (pRequest) {
+								pRequest->bRequested = true;
+								pRequest->dwRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
+								pRequest->Func = a.newLabel();
+								ZeroMemory(&digest, sizeof(Sha256Digest));
+								LOG(Success, MODULE_PACKER, "Emulating function at %#x\n", pRequest->dwRVA);
+							}
+						}
+						a.embed(&digest, sizeof(Sha256Digest));
 					} else {
 						RequestedFunction* pRequest = NULL;
 						
 						// Get request name
-#define CHECK_IMPORT(_name) else if (!lstrcmpA(name, #_name)) pRequest = &ShellcodeData.RequestedFunctions._name
 						if (!lstrcmpA(name, "CheckForDebuggers")) pRequest = &ShellcodeData.RequestedFunctions.CheckForDebuggers;
 						CHECK_IMPORT(GetSelf);
-						CHECK_IMPORT(YAP_NtDelayExecution);
-						CHECK_IMPORT(YAP_NtFreeVirtualMemory);
-						CHECK_IMPORT(YAP_NtAllocateVirtualMemory);
-						CHECK_IMPORT(YAP_NtGetContextThread);
-						CHECK_IMPORT(YAP_NtGetNextProcess);
-						CHECK_IMPORT(YAP_NtGetNextThread);
-						CHECK_IMPORT(YAP_NtOpenProcess);
-						CHECK_IMPORT(YAP_NtOpenThread);
-						CHECK_IMPORT(YAP_NtProtectVirtualMemory);
-						CHECK_IMPORT(YAP_NtReadVirtualMemory);
-						CHECK_IMPORT(YAP_NtResumeThread);
-						CHECK_IMPORT(YAP_NtResumeProcess);
-						CHECK_IMPORT(YAP_NtSetContextThread);
-						CHECK_IMPORT(YAP_NtSetInformationProcess);
-						CHECK_IMPORT(YAP_NtSetInformationThread);
-						CHECK_IMPORT(YAP_NtSetThreadExecutionState);
-						CHECK_IMPORT(YAP_NtSuspendProcess);
-						CHECK_IMPORT(YAP_NtSuspendThread);
-						CHECK_IMPORT(YAP_NtTerminateProcess);
-						CHECK_IMPORT(YAP_NtTerminateThread);
-						CHECK_IMPORT(YAP_NtWriteVirtualMemory);
-						CHECK_IMPORT(YAP_NtClose);
-						CHECK_IMPORT(YAP_NtCreateThread);
-						CHECK_IMPORT(YAP_GetCurrentThread);
-						CHECK_IMPORT(YAP_GetCurrentThreadId);
-						CHECK_IMPORT(YAP_GetCurrentProcessId);
-						CHECK_IMPORT(YAP_GetCurrentProcess);
-						CHECK_IMPORT(YAP_GetTickCount64);
 						else LOG(Warning, MODULE_PACKER, "Unrecognized SDK import: \'%s\'\n", name);
-#undef CHECK_IMPORT
 
 						// Apply request
 						if (pRequest) {
@@ -1893,6 +1886,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 					}
 					ZeroMemory(name, lstrlenA(name));
 				}
+#undef CHECK_IMPORT
+
 				pOriginal->WriteRVA<uint64_t>(Imports[i].OriginalFirstThunk + sizeof(uint64_t) * j, 0);
 				j++;
 			}
@@ -1925,6 +1920,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		Label do_lib = a.newLabel();
 		Label next = a.newLabel();
 		Label done = a.newLabel();
+		Label skiptest = a.newLabel();
 		a.bind(do_item);
 		a.mov(r15, ptr(rdi));
 		a.and_(r15, 0xFFFFFFFF);
@@ -1938,11 +1934,19 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.strict();
 		a.jz(ret);
 		a.mov(rcx, r14);
+		a.mov(rdx, ptr(r12));
+		a.add(rdx, ptr(r12, 0x08));
+		a.add(rdx, ptr(r12, 0x10));
+		a.add(rdx, ptr(r12, 0x18));
+		a.test(rdx, rdx);
+		a.strict();
+		a.jz(skiptest);
 		a.mov(rdx, r12);
 		a.call(ShellcodeData.Labels.GetProcAddressA);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
+		a.bind(skiptest);
 		if (!::Options.Packing.bHideIAT) {
 			a.mov(r8, r13);
 			a.sub(r8, r15);
@@ -2066,34 +2070,11 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 #define LOAD_IMPORT(name) if (ShellcodeData.RequestedFunctions.name.bRequested) { a.lea(rax, ptr(ShellcodeData.RequestedFunctions.name.Func)); a.mov(rcx, pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders + ShellcodeData.RequestedFunctions.name.dwRVA); a.add(rcx, ptr(InternalRelOff)); a.mov(qword_ptr(rcx), rax); }
 	LOAD_IMPORT(CheckForDebuggers);
 	LOAD_IMPORT(GetSelf);
-	LOAD_IMPORT(YAP_NtDelayExecution);
-	LOAD_IMPORT(YAP_NtFreeVirtualMemory);
-	LOAD_IMPORT(YAP_NtAllocateVirtualMemory);
-	LOAD_IMPORT(YAP_NtGetContextThread);
-	LOAD_IMPORT(YAP_NtGetNextProcess);
-	LOAD_IMPORT(YAP_NtGetNextThread);
-	LOAD_IMPORT(YAP_NtOpenProcess);
-	LOAD_IMPORT(YAP_NtOpenThread);
-	LOAD_IMPORT(YAP_NtProtectVirtualMemory);
-	LOAD_IMPORT(YAP_NtReadVirtualMemory);
-	LOAD_IMPORT(YAP_NtResumeThread);
-	LOAD_IMPORT(YAP_NtResumeProcess);
-	LOAD_IMPORT(YAP_NtSetContextThread);
-	LOAD_IMPORT(YAP_NtSetInformationProcess);
-	LOAD_IMPORT(YAP_NtSetInformationThread);
-	LOAD_IMPORT(YAP_NtSetThreadExecutionState);
-	LOAD_IMPORT(YAP_NtSuspendProcess);
-	LOAD_IMPORT(YAP_NtSuspendThread);
-	LOAD_IMPORT(YAP_NtTerminateProcess);
-	LOAD_IMPORT(YAP_NtTerminateThread);
-	LOAD_IMPORT(YAP_NtWriteVirtualMemory);
-	LOAD_IMPORT(YAP_NtClose);
-	LOAD_IMPORT(YAP_NtCreateThread);
-	LOAD_IMPORT(YAP_GetCurrentThread);
-	LOAD_IMPORT(YAP_GetCurrentThreadId);
-	LOAD_IMPORT(YAP_GetCurrentProcess);
-	LOAD_IMPORT(YAP_GetCurrentProcessId);
-	LOAD_IMPORT(YAP_GetTickCount64);
+	LOAD_IMPORT(GetCurrentThread);
+	LOAD_IMPORT(GetCurrentThreadId);
+	LOAD_IMPORT(GetCurrentProcess);
+	LOAD_IMPORT(GetCurrentProcessId);
+	LOAD_IMPORT(GetTickCount64);
 #undef LOAD_IMPORT
 
 	// Mark as loaded
@@ -2493,8 +2474,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 	}
 
 	// GetTickCount64
-	if (ShellcodeData.RequestedFunctions.YAP_GetTickCount64.bRequested) {
-		a.bind(ShellcodeData.RequestedFunctions.YAP_GetTickCount64.Func);
+	if (ShellcodeData.RequestedFunctions.GetTickCount64.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.GetTickCount64.Func);
 		a.mov(ecx, ptr(0x7FFE0004));
 		a.shl(rcx, 0x20);
 		a.mov(rax, ptr(0x7FFE0320));
@@ -2612,43 +2593,16 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.ret();
 	}
 
-	// NTDLL thingies
-#define CODE_IMPORT(name) if (ShellcodeData.RequestedFunctions.YAP_##name.bRequested) { Label next = a.newLabel(); Label NTD = a.newLabel(); a.bind(NTD); a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)); Label ID = a.newLabel(); a.bind(ID); a.dd(0); Label FNN = a.newLabel(); a.bind(FNN); a.embed(&Sha256Str(#name), sizeof(Sha256Digest)); Label RTA = a.newLabel(); a.bind(RTA); a.dq(rand64()); Label NotFound = a.newLabel(); a.bind(ShellcodeData.RequestedFunctions.YAP_##name.Func); a.pop(qword_ptr(RTA)); a.push(rcx); Label skipresolve = a.newLabel(); a.mov(eax, ptr(ID)); a.test(eax, eax); a.strict(); a.jnz(skipresolve); a.push(rdx); a.push(r8); a.push(r9); a.lea(rcx, ptr(NTD)); a.call(ShellcodeData.Labels.GetModuleHandleW); a.mov(rcx, rax); a.lea(rdx, ptr(FNN)); a.call(ShellcodeData.Labels.GetProcAddressA); a.test(rax, rax); a.strict(); a.jz(NotFound); a.pop(r9); a.pop(r8); a.pop(rdx); a.mov(ecx, ptr(rax)); a.mov(r11, 0); a.cmp(ecx, 0xB8D18B4C);  a.strict(); a.lea(rcx, ptr(next)); a.strict(); a.cmovne(rcx, r11); a.jmp(rcx); a.bind(next); a.mov(eax, ptr(rax, 4)); a.mov(ptr(ID), eax); a.bind(skipresolve); a.pop(r10); a.syscall(); a.jmp(qword_ptr(RTA)); a.bind(NotFound); a.mov(rax, 0xC0000225); a.jmp(qword_ptr(RTA)); }
-	CODE_IMPORT(NtDelayExecution);
-	CODE_IMPORT(NtFreeVirtualMemory);
-	CODE_IMPORT(NtAllocateVirtualMemory);
-	CODE_IMPORT(NtGetContextThread);
-	CODE_IMPORT(NtGetNextProcess);
-	CODE_IMPORT(NtGetNextThread);
-	CODE_IMPORT(NtOpenProcess);
-	CODE_IMPORT(NtOpenThread);
-	CODE_IMPORT(NtProtectVirtualMemory);
-	CODE_IMPORT(NtReadVirtualMemory);
-	CODE_IMPORT(NtResumeThread);
-	CODE_IMPORT(NtResumeProcess);
-	CODE_IMPORT(NtSetContextThread);
-	CODE_IMPORT(NtSetInformationProcess);
-	CODE_IMPORT(NtSetInformationThread);
-	CODE_IMPORT(NtSetThreadExecutionState);
-	CODE_IMPORT(NtSuspendProcess);
-	CODE_IMPORT(NtSuspendThread);
-	CODE_IMPORT(NtTerminateProcess);
-	CODE_IMPORT(NtTerminateThread);
-	CODE_IMPORT(NtWriteVirtualMemory);
-	CODE_IMPORT(NtClose);
-	CODE_IMPORT(NtCreateThread);
-#undef CODE_IMPORT
-
-	// YAP_GetCurrentThread
-	if (ShellcodeData.RequestedFunctions.YAP_GetCurrentThread.bRequested) {
-		a.bind(ShellcodeData.RequestedFunctions.YAP_GetCurrentThread.Func);
+	// GetCurrentThread
+	if (ShellcodeData.RequestedFunctions.GetCurrentThread.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.GetCurrentThread.Func);
 		a.mov(rax, 0xFFFFFFFFFFFFFFFE);
 		a.ret();
 	}
 
-	// YAP_GetCurrentThreadId
-	if (ShellcodeData.RequestedFunctions.YAP_GetCurrentThreadId.bRequested) {
-		a.bind(ShellcodeData.RequestedFunctions.YAP_GetCurrentThreadId.Func);
+	// GetCurrentThreadId
+	if (ShellcodeData.RequestedFunctions.GetCurrentThreadId.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.GetCurrentThreadId.Func);
 		Mem TEB = qword_ptr(0x30);
 		TEB.setSegment(gs);
 		a.mov(rax, TEB);
@@ -2656,16 +2610,16 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.ret();
 	}
 
-	// YAP_GetCurrentProcess
-	if (ShellcodeData.RequestedFunctions.YAP_GetCurrentProcess.bRequested) {
-		a.bind(ShellcodeData.RequestedFunctions.YAP_GetCurrentProcess.Func);
+	// GetCurrentProcess
+	if (ShellcodeData.RequestedFunctions.GetCurrentProcess.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.GetCurrentProcess.Func);
 		a.mov(rax, 0xFFFFFFFFFFFFFFFF);
 		a.ret();
 	}
 	
-	// YAP_GetCurrentProcessId
-	if (ShellcodeData.RequestedFunctions.YAP_GetCurrentProcessId.bRequested) {
-		a.bind(ShellcodeData.RequestedFunctions.YAP_GetCurrentProcessId.Func);
+	// GetCurrentProcessId
+	if (ShellcodeData.RequestedFunctions.GetCurrentProcessId.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.GetCurrentProcessId.Func);
 		Mem TEB = qword_ptr(0x30);
 		TEB.setSegment(gs);
 		a.mov(rax, TEB);
