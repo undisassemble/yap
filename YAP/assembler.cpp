@@ -612,9 +612,16 @@ uint64_t ProtectedAssembler::GetStackSize() {
 
 Error ProtectedAssembler::ret() {
 	if (stack.Size()) restorestack();
-	return Assembler::ret();
+	if (bWaitingOnEmit || !bMutate) return Assembler::ret();
+	Gp reg = truerandreg();
+	push(reg);
+	mov(reg, qword_ptr(0x7FFE02F8));
+	xchg(qword_ptr(rsp), reg);
+	pop(qword_ptr(rip));
+	dq(rand64());
 }
 
+// I doubt I will ever use this one
 Error ProtectedAssembler::ret(Imm o0) {
 	if (stack.Size()) restorestack();
 	return Assembler::ret(o0);
