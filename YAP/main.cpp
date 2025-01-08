@@ -273,27 +273,16 @@ DWORD WINAPI Begin(void* args) {
 	// Pack
 	if (Options.Packing.bEnabled) {
 		LOG(Info, MODULE_YAP, "Starting packer\n");
-		PackerOptions PackOpt = { 0 };
-		PackOpt.Message = Options.Packing.Message[0] ? Options.Packing.Message : NULL;
-		PackOpt.bVM = Options.VM.bEnabled;
-		for (int i = 0, n = Options.VM.VMFuncs.Size(); i < n; i++) {
-			PackOpt.VMFuncs.Push(0);
-		}
-		if (Options.Packing.bEnableMasquerade) {
-			PackOpt.sMasqueradeAs = Options.Packing.Masquerade;
-		}
 		Asm* pPacked = new Asm();
 		pPacked->Status = Normal;
-		if (!Pack(pAssembly, PackOpt, pPacked)) {
+		if (!Pack(pAssembly, pPacked)) {
 			Modal("Failed to pack PE");
 			LOG(Failed, MODULE_YAP, "Packer failed\n");
 			delete pPacked;
-			PackOpt.VMFuncs.Release();
 			goto th_exit;
 		}
 		delete pAssembly;
 		pAssembly = pPacked;
-		PackOpt.VMFuncs.Release();
 	}
 
 	// Save file

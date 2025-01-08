@@ -82,13 +82,6 @@ struct _ShellcodeData {
 	} AntiPatchData;
 };
 
-struct PackerOptions {
-	bool bVM : 1;
-	char* Message = NULL;
-	char* sMasqueradeAs = NULL;
-	Vector<DWORD> VMFuncs;
-};
-
-bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBinary);
+bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary);
 
 #include "vm.hpp"
