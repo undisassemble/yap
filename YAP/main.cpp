@@ -16,10 +16,8 @@ namespace Console {
 	void buildversion();
 	void create(char* project);
 	void version(char* project);
-	void read(char* project);
 	void protect(char* project, char* input, char* output = NULL);
 }
-
 
 Options_t Options;
 Settings_t Settings;
@@ -117,8 +115,6 @@ int main(int argc, char** argv) {
 			Console::create(argv[1]);
 		} else if (!lstrcmpA(argv[2], "version")) {
 			Console::version(argv[1]);
-		} else if (!lstrcmpA(argv[2], "read")) {
-			Console::read(argv[1]);
 		} else if (!lstrcmpA(argv[2], "protect")) {
 			if (argc < 4) {
 				LOG(Failed, MODULE_YAP, "Not enough arguments for command protect\n");
@@ -329,10 +325,9 @@ void Console::help(char* name) {
 	LOG(Nothing, MODULE_YAP, "Usage: %s PROJECT COMMAND\n\n", name);
 
 	LOG(Nothing, MODULE_YAP, "COMMANDS\n");
-	LOG(Nothing, MODULE_YAP, "\tcreate\t\tCreate project\n");
-	LOG(Nothing, MODULE_YAP, "\tversion\t\tGet version of project\n");
-	LOG(Nothing, MODULE_YAP, "\tread\t\tOutput configuration options from project\n");
-	LOG(Nothing, MODULE_YAP, "\tprotect INPUT [OUTPUT]\tProtect a file\n\n");
+	LOG(Nothing, MODULE_YAP, "\tcreate\t\t\t\tCreate project\n");
+	LOG(Nothing, MODULE_YAP, "\tversion\t\t\t\tGet version of project\n");
+	LOG(Nothing, MODULE_YAP, "\tprotect INPUT [OUTPUT]\t\tProtect a file\n\n");
 
 	LOG(Nothing, MODULE_YAP, "ALTERNATIVE COMMANDS\n");
 	LOG(Nothing, MODULE_YAP, "%s --version\tGet build info\n", name);
@@ -373,66 +368,6 @@ void Console::version(char* project) {
 	}
 
 	CloseHandle(hFile);
-}
-
-void Console::read(char* project) {
-	if (lstrlenA(project) + 1 > MAX_PATH) {
-		LOG(Failed, MODULE_YAP, "Cannot handle project files with names longer than MAX_PATH characters (%d bytes)!\n", MAX_PATH);
-		return;
-	}
-	memcpy(Data.Project, project, lstrlenA(project) + 1);
-	
-	// Load project
-	if (!LoadProject()) return;
-
-	LOG(Nothing, MODULE_YAP, "\nOptions for %s\n\n", project);
-	// List values
-#define LIST(name, type_id) LOG(Nothing, MODULE_YAP, "%s = %" #type_id "\n", #name, name)
-	LIST(Options.Packing.bEnabled, d);
-	LIST(Options.Packing.bAntiDump, d);
-	LIST(Options.Packing.bEnableMasquerade, d);
-	LIST(Options.Packing.bNukeHeaders, d);
-	LIST(Options.Packing.bMitigateSideloading, d);
-	LIST(Options.Packing.bOnlyLoadMicrosoft, d);
-	LIST(Options.Packing.bMarkCritical, d);
-	LIST(Options.Packing.bAntiDebug, d);
-	LIST(Options.Packing.bAntiVM, d);
-	LIST(Options.Packing.bAllowHyperV, d);
-	LIST(Options.Packing.bAntiSandbox, d);
-	LIST(Options.Packing.bHideIAT, d);
-	LIST(Options.Packing.bDelayedEntry, d);
-	LIST(Options.Packing.bDontCompressRsrc, d);
-	LIST(Options.Packing.bDirectSyscalls, d);
-	LIST(Options.Packing.bPartialUnpacking, d);
-	LIST(Options.Packing.CompressionLevel, d);
-	LIST(Options.Packing.Immitate, d);
-	LIST(Options.Packing.Masquerade, s);
-	LIST(Options.Packing.Message, );
-	LIST(Options.Packing.MutationLevel, d);
-	LIST(Options.Packing.EncodingCounts, d);
-	LIST(Options.VM.bEnabled, d);
-	LIST(Options.VM.bVirtEntry, d);
-	LIST(Options.Reassembly.bEnabled, d);
-	LIST(Options.Reassembly.bStrip, d);
-	LIST(Options.Reassembly.bStripDOSStub, d);
-	LIST(Options.Reassembly.bSubstitution, d);
-	LIST(Options.Reassembly.Rebase, p);
-#ifdef _DEBUG
-	LIST(Options.Debug.bDumpAsm, d);
-	LIST(Options.Debug.bDumpSections, d);
-	LIST(Options.Debug.bDumpFunctions, d);
-	LIST(Options.Debug.bGenerateBreakpoints, d);    
-	LIST(Options.Debug.bGenerateMarks, d);
-	LIST(Options.Debug.bDisableRelocations, d);
-#endif
-#undef LIST
-
-	// List VM funcs
-	LOG(Nothing, MODULE_YAP, "\nNum VM funcs: %d\n", Options.VM.VMFuncs.Size());
-	for (int i = 0; i < Options.VM.VMFuncs.Size(); i++) {
-		LOG(Nothing, MODULE_YAP, "Func %d name: %s\n", i + 1, Options.VM.VMFuncs[i].Name);
-		LOG(Nothing, MODULE_YAP, "Remove export of func %d: %d\n", i + 1, Options.VM.VMFuncs[i].bRemoveExport);
-	}
 }
 
 void Console::protect(char* project, char* input, char* output) {
