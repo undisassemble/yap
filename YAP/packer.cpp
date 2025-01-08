@@ -1802,10 +1802,12 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			}
 			if (i == ShellcodeData.RequestedFunctions.iIndex)
 				continue;
-			if (!_stricmp(name, "kernel32.dll")) {
-				ShellcodeData.RequestedFunctions.iKernel32 = i;
-			} else if (!_stricmp(name, "ntdll.dll")) {
-				ShellcodeData.RequestedFunctions.iNtDLL = i;
+			if (::Options.Packing.bAPIEmulation) {
+				if (!_stricmp(name, "kernel32.dll")) {
+					ShellcodeData.RequestedFunctions.iKernel32 = i;
+				} else if (!_stricmp(name, "ntdll.dll")) {
+					ShellcodeData.RequestedFunctions.iNtDLL = i;
+				}
 			}
 			j = 0;
 			a.dd(0);
@@ -1852,7 +1854,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 					}
 					if (ShellcodeData.RequestedFunctions.iIndex != i) {
 						Sha256Digest digest = Sha256Str(name);
-						if (ShellcodeData.RequestedFunctions.iKernel32 == i || ShellcodeData.RequestedFunctions.iNtDLL == i) {
+						if (::Options.Packing.bAPIEmulation && (ShellcodeData.RequestedFunctions.iKernel32 == i || ShellcodeData.RequestedFunctions.iNtDLL == i)) {
 							RequestedFunction* pRequest = NULL;
 							if (!lstrcmpA(name, "GetCurrentThread")) pRequest = &ShellcodeData.RequestedFunctions.GetCurrentThread;
 							CHECK_IMPORT(GetCurrentThreadId);
@@ -1943,6 +1945,11 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.strict();
 		a.jz(skiptest);
 		a.mov(rdx, r12);
+		if (::Options.Packing.bHideIAT) {
+			a.mov(r8, 1);
+			a.ror(r8, 1);
+			a.or_(rcx, r8);
+		}
 		a.call(ShellcodeData.Labels.GetProcAddressA);
 		a.test(rax, rax);
 		a.strict();
@@ -1953,7 +1960,19 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			a.sub(r8, r15);
 			a.mov(qword_ptr(r8), rax);
 		} else {
+			Label obfuscate_ptr = a.newLabel();
+			Label end_obfuscation = a.newLabel();
+			a.mov(r8, 1);
+			a.ror(r8, 1);
+			a.and_(r8, rax);
+			a.strict();
+			a.jz(obfuscate_ptr);
+			a.not_(r8);
+			a.and_(rax, r8);
+			a.jmp(end_obfuscation);
+
 			// Encodes ptr
+			a.bind(obfuscate_ptr);
 			for (int i = DecoderProc.Size() - 1; i > 0; i--) {
 				switch (DecoderProc[i].Mnemonic) {
 				case DI_XOR:
@@ -1977,6 +1996,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			a.mov(rax, r13);
 			a.sub(rax, holder.labelOffset(import_array) - holder.labelOffset(jumper_array));
 			a.sub(rax, ptr(rax));
+
+			a.bind(end_obfuscation);
 			a.lea(r8, ptr(import_offsets));
 			a.sub(r8, r15);
 			a.mov(qword_ptr(r8), rax);
@@ -2291,10 +2312,25 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		Label found = a.newLabel();
 		Label bad = a.newLabel();
 		Label ret = a.newLabel();
+		Label shit;
+		if (::Options.Packing.bHideIAT) {
+			shit = a.newLabel();
+			a.bind(shit);
+			a.db(0);
+		}
 		a.bind(ShellcodeData.Labels.GetProcAddressA);
 
 		// Asm
 		a.desync();
+		if (::Options.Packing.bHideIAT) {
+			a.mov(r8, 1);
+			a.ror(r8, 1);
+			a.and_(r8, rcx);
+			a.strict();
+			a.setnz(ptr(shit));
+			a.not_(r8);
+			a.and_(rcx, r8);
+		}
 		a.push(r12);
 		a.push(r13);
 		a.push(r14);
@@ -2408,6 +2444,66 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		DEBUG_ONLY(if (::Options.Debug.bGenerateBreakpoints) a.int3());
 		a.mov(eax, 0);
 		a.bind(ret);
+		if (::Options.Packing.bHideIAT) {
+			Label dontcheck = a.newLabel();
+			Label failed = a.newLabel();
+
+			// Verify need to check
+			a.cmp(byte_ptr(shit), 0);
+			a.strict();
+			a.jz(dontcheck);
+			a.test(rax, rax);
+			a.strict();
+			a.jz(dontcheck);
+
+			// Get dll base
+			a.mov(rcx, rax);
+			a.mov(r8, 0xFFF);
+			a.not_(r8);
+			a.and_(rcx, r8);
+			a.add(rcx, 0x1000);
+			Label base_loop = a.newLabel();
+			a.bind(base_loop);
+			a.sub(rcx, 0x1000);
+			a.cmp(word_ptr(rcx), IMAGE_DOS_SIGNATURE);
+			a.strict();
+			a.jnz(base_loop);
+
+			// Get section header
+			a.mov(edx, ptr(rcx, offsetof(IMAGE_DOS_HEADER, e_lfanew)));
+			a.mov(r8, 0);
+			a.mov(r8w, ptr(rcx, rdx, 0, offsetof(IMAGE_NT_HEADERS64, FileHeader) + offsetof(IMAGE_FILE_HEADER, NumberOfSections)));
+			a.lea(rdx, ptr(rcx, rdx, 0, sizeof(IMAGE_NT_HEADERS64)));
+			Label getheader_loop = a.newLabel();
+			a.bind(getheader_loop);
+			a.test(r8, r8);
+			a.strict();
+			a.jz(failed);
+			a.mov(r9d, ptr(rdx, offsetof(IMAGE_SECTION_HEADER, VirtualAddress)));
+			a.add(r9, rcx);
+			a.cmp(rax, r9);
+			a.strict();
+			a.jl(failed);
+			a.mov(ebx, ptr(rdx, offsetof(IMAGE_SECTION_HEADER, Misc.VirtualSize)));
+			a.add(r9, rbx);
+			a.dec(r8);
+			a.add(rdx, sizeof(IMAGE_SECTION_HEADER));
+			a.cmp(rax, r9);
+			a.strict();
+			a.jg(getheader_loop);
+			a.sub(rdx, sizeof(IMAGE_SECTION_HEADER));
+			a.mov(r9d, ptr(rdx, offsetof(IMAGE_SECTION_HEADER, Characteristics)));
+			a.and_(r9d, IMAGE_SCN_MEM_EXECUTE);
+			a.strict();
+			a.jnz(dontcheck);
+
+			a.bind(failed);
+			a.mov(r8, 1);
+			a.ror(r8, 1);
+			a.or_(rax, r8);
+
+			a.bind(dontcheck);
+		}
 		a.pop(rbp);
 		a.pop(rsi);
 		a.pop(rbx);
@@ -2446,11 +2542,13 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.mov(rcx, rax);
 		a.push(rcx);
 		a.lea(rdx, ptr(GPA));
+		if (::Options.Packing.bHideIAT) a.mov(sil, ptr(shit));
 		a.call(ShellcodeData.Labels.GetProcAddressA);
 		a.mov(r12, rax);
 		a.pop(rcx);
 		a.lea(rdx, ptr(LLA));
 		a.call(ShellcodeData.Labels.GetProcAddressA);
+		if (::Options.Packing.bHideIAT) a.mov(ptr(shit), sil);
 		a.mov(r13, rax);
 		a.pop(rax);
 		a.lea(r14, ptr(blank));
@@ -3084,10 +3182,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 	ShellcodeData.bUsingTLSCallbacks = ::Options.Packing.bDelayedEntry || ::Options.Packing.bAntiDebug || ::Options.Packing.bAntiPatch || (pOriginal->GetTLSCallbacks() && *pOriginal->GetTLSCallbacks());
 	ShellcodeData.EntryOff = 0x30 + rand() & 0xCF;
 	Buffer Internal = GenerateInternalShellcode(pOriginal, Options, pPackedBinary);
-	if (!Internal.u64Size || !Internal.pBytes) {
-		LOG(Failed, MODULE_PACKER, "Failed to generate internal shellcode!\n");
-		return false;
-	}
+	if (!Internal.u64Size || !Internal.pBytes) return false;
 	SecHeader.Misc.VirtualSize = Internal.u64Size + pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders;
 	switch (::Options.Packing.Immitate) {
 	case Themida:
@@ -3158,10 +3253,7 @@ bool Pack(_In_ Asm* pOriginal, _In_ PackerOptions Options, _Out_ Asm* pPackedBin
 		Sha256_Final(&sha, (Byte*)&ShellcodeData.AntiPatchData.LoaderHash);
 	}
 	Internal.Release();
-	if (!shell.pBytes || !shell.u64Size) {
-		LOG(Failed, MODULE_PACKER, "Failed to generate loader shellcode!\n");
-		return false;
-	}
+	if (!shell.pBytes || !shell.u64Size) return false;
 
 	// TLS callback
 	IMAGE_TLS_DIRECTORY64 TLSDataDir = { 0 };
