@@ -29,7 +29,7 @@ struct _ShellcodeData {
 	uint64_t ImageBase = 0;
 	uint64_t MessageBoxAddr = 0;
 	BYTE EntryOff = 0;
-	DWORD GetProcAddressAOff = 0;
+	DWORD GetProcAddressOff = 0;
 	DWORD GetModuleHandleWOff = 0;
 	DWORD Sha256_InitOff = 0;
 	DWORD Sha256_UpdateOff = 0;
@@ -43,7 +43,7 @@ struct _ShellcodeData {
 	struct {
 		Label GetModuleHandleW;
 		Label GetProcAddressByOrdinal;
-		Label GetProcAddressA;
+		Label GetProcAddress;
 		Label RtlZeroMemory;
 		Label RelocDiff;
 	} Labels;
@@ -67,6 +67,9 @@ struct _ShellcodeData {
 		RequestedFunction GetCurrentProcess;
 		RequestedFunction GetTickCount64;
 		RequestedFunction GetStdHandle;
+		RequestedFunction GetLastError;
+		RequestedFunction SetLastError;
+		RequestedFunction GetProcAddress;
 	} RequestedFunctions;
 
 	struct {

@@ -282,10 +282,10 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	pA->call(ShellcodeData.Labels.GetModuleHandleW);
 	pA->mov(rcx, rax);
 	pA->lea(rdx, ptr(HF));
-	pA->call(ShellcodeData.Labels.GetProcAddressA);
+	pA->call(ShellcodeData.Labels.GetProcAddress);
 	pA->mov(ptr(ptr_HeapFree), rax);
 	pA->lea(rdx, ptr(HA));
-	pA->call(ShellcodeData.Labels.GetProcAddressA);
+	pA->call(ShellcodeData.Labels.GetProcAddress);
 	pA->mov(ptr(ptr_HeapAlloc), rax);
 	pA->pop(r9);
 	pA->pop(rcx);
@@ -568,7 +568,7 @@ Buffer GenerateTLSShellcode(_In_ PackerOptions Options, _In_ PE* pPackedBinary, 
 		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.GetModuleHandleWOff);
 		a.mov(rcx, rax);
 		a.lea(rdx, ptr(STI));
-		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.GetProcAddressAOff);
+		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.GetProcAddressOff);
 		a.mov(::Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
 		a.mov(r8, rsp);
 		a.and_(r8, 0b1111);
@@ -627,7 +627,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	a.bMutate = a.bSubstitute = ::Options.Advanced.bMutateAssembly;
 	a.MutationLevel = ::Options.Packing.MutationLevel;
 	ShellcodeData.Labels.GetModuleHandleW = a.newLabel();
-	ShellcodeData.Labels.GetProcAddressA = a.newLabel();
+	ShellcodeData.Labels.GetProcAddress = a.newLabel();
 	ShellcodeData.Labels.RtlZeroMemory = a.newLabel();
 	Mem PEB = ptr(0x60);
 	PEB.setSegment(gs);
@@ -720,7 +720,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.call(ShellcodeData.Labels.GetModuleHandleW);
 		a.mov(rcx, rax);
 		a.lea(rdx, ptr(SIP));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -785,7 +785,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.call(ShellcodeData.Labels.GetModuleHandleW);
 		a.mov(rcx, rax);
 		a.lea(rdx, ptr(GCT));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -885,14 +885,14 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.mov(rcx, rax);
 		a.push(rcx);
 		a.lea(rdx, ptr(SLP));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
 		a.mov(r13, rax);
 		a.pop(rcx);
 		a.lea(rdx, ptr(LLA));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -913,7 +913,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.jz(ret);
 		a.mov(rcx, rax);
 		a.lea(rdx, ptr(GCP));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -986,7 +986,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		a.jz(ret);
 		a.mov(rcx, rax);
 		a.lea(rdx, ptr(VRT));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -1256,7 +1256,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 	GenerateUnpackingAlgorithm(&a, unpack);
 	DecoderProc.Release();
 
-	// GetProcAddressA
+	// GetProcAddress
 	{
 		// Labels
 		Label loop = a.newLabel();
@@ -1264,7 +1264,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		Label found = a.newLabel();
 		Label bad = a.newLabel();
 		Label ret = a.newLabel();
-		a.bind(ShellcodeData.Labels.GetProcAddressA);
+		a.bind(ShellcodeData.Labels.GetProcAddress);
 		
 		// Asm
 		a.desync();
@@ -1408,7 +1408,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PackerOptions Options, _
 		return buf;
 	}
 	ShellcodeData.GetModuleHandleWOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(ShellcodeData.Labels.GetModuleHandleW);
-	ShellcodeData.GetProcAddressAOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(ShellcodeData.Labels.GetProcAddressA);
+	ShellcodeData.GetProcAddressOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(ShellcodeData.Labels.GetProcAddress);
 	ShellcodeData.Sha256_InitOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Init);
 	ShellcodeData.Sha256_UpdateOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Update);
 	ShellcodeData.Sha256_FinalOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Final);
@@ -1445,7 +1445,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 	if (::Options.Packing.bPartialUnpacking) LoadSegment = a.newLabel();
 	ShellcodeData.Labels.GetModuleHandleW = a.newLabel();
 	ShellcodeData.Labels.GetProcAddressByOrdinal = a.newLabel();
-	ShellcodeData.Labels.GetProcAddressA = a.newLabel();
+	ShellcodeData.Labels.GetProcAddress = a.newLabel();
 	ShellcodeData.Labels.RtlZeroMemory = a.newLabel();
 
 	// PEB memory thingy (gs:[0x60])
@@ -1501,7 +1501,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.jz(ret);
 		a.mov(rcx, rax);
 		a.lea(rdx, ptr(SIP));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -1639,7 +1639,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.mov(rcx, rax);
 		a.mov(rsi, rax);
 		a.lea(rdx, ptr(DIR));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -1656,7 +1656,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.add(rsp, rcx);
 		a.mov(rcx, rsi);
 		a.lea(rdx, ptr(SSP));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -1862,6 +1862,9 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 							CHECK_IMPORT(GetCurrentProcess);
 							CHECK_IMPORT(GetTickCount64);
 							CHECK_IMPORT(GetStdHandle);
+							CHECK_IMPORT(GetLastError);
+							CHECK_IMPORT(SetLastError);
+							CHECK_IMPORT(GetProcAddress);
 							if (pRequest) {
 								pRequest->bRequested = true;
 								pRequest->dwRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
@@ -1908,7 +1911,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.jz(ret);
 		a.mov(rcx, rax);
 		a.lea(rdx, ptr(LLA));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -1950,7 +1953,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			a.ror(r8, 1);
 			a.or_(rcx, r8);
 		}
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
@@ -2098,6 +2101,9 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 	LOAD_IMPORT(GetCurrentProcessId);
 	LOAD_IMPORT(GetTickCount64);
 	LOAD_IMPORT(GetStdHandle);
+	LOAD_IMPORT(GetLastError);
+	LOAD_IMPORT(SetLastError);
+	LOAD_IMPORT(GetProcAddress);
 #undef LOAD_IMPORT
 
 	// Mark as loaded
@@ -2140,6 +2146,25 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			a.xor_(eax, eax);
 			a.strict();
 		}
+		a.ret();
+	}
+
+	// GetLastError/SetLastError
+	if (ShellcodeData.RequestedFunctions.GetLastError.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.GetLastError.Func);
+		Mem TEB = ptr(0x30);
+		TEB.setSegment(gs);
+		a.mov(rax, TEB);
+		a.mov(eax, ptr(rax, 0x68));
+		a.ret();
+	}
+	if (ShellcodeData.RequestedFunctions.SetLastError.bRequested) {
+		a.bind(ShellcodeData.RequestedFunctions.SetLastError.Func);
+		Mem TEB = ptr(0x30);
+		TEB.setSegment(gs);
+		a.mov(rax, TEB);
+		a.mov(ptr(rax, 0x68), ecx);
+		a.mov(rax, 0);
 		a.ret();
 	}
 
@@ -2304,7 +2329,41 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 	// Sha256
 	#include "SHA256.raw"
 
-	// GetProcAddressA
+	// GetProcAddress (emulated)
+	if (ShellcodeData.RequestedFunctions.GetProcAddress.bRequested) {
+		Label sum = a.newLabel();
+		a.bind(sum);
+		a.db(0, sizeof(Sha256Digest));
+
+		a.bind(ShellcodeData.RequestedFunctions.GetProcAddress.Func);
+		a.and_(rcx, ~(1 << 64));
+		a.push(rcx);
+		a.push(rdx);
+		a.lea(rcx, ptr(hash));
+		a.mov(rdx, sizeof(CSha256));
+		a.call(ShellcodeData.Labels.RtlZeroMemory);
+		a.lea(rcx, ptr(hash));
+		a.call(Sha256_Init);
+		a.mov(r8, 0);
+		a.dec(r8);
+		a.pop(rdx);
+		Label strlen_loop = a.newLabel();
+		a.bind(strlen_loop);
+		a.inc(r8);
+		a.cmp(byte_ptr(rdx, r8), 0);
+		a.strict();
+		a.jnz(strlen_loop);
+		a.lea(rcx, ptr(hash));
+		a.call(Sha256_Update);
+		a.lea(rcx, ptr(hash));
+		a.lea(rdx, ptr(sum));
+		a.call(Sha256_Final);
+		a.pop(rcx);
+		a.lea(rdx, ptr(sum));
+		a.jmp(ShellcodeData.Labels.GetProcAddress);
+	}
+
+	// GetProcAddress
 	{
 		// Labels
 		Label loop = a.newLabel();
@@ -2318,7 +2377,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 			a.bind(shit);
 			a.db(0);
 		}
-		a.bind(ShellcodeData.Labels.GetProcAddressA);
+		a.bind(ShellcodeData.Labels.GetProcAddress);
 
 		// Asm
 		a.desync();
@@ -2543,11 +2602,11 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.push(rcx);
 		a.lea(rdx, ptr(GPA));
 		if (::Options.Packing.bHideIAT) a.mov(sil, ptr(shit));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.mov(r12, rax);
 		a.pop(rcx);
 		a.lea(rdx, ptr(LLA));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		if (::Options.Packing.bHideIAT) a.mov(ptr(shit), sil);
 		a.mov(r13, rax);
 		a.pop(rax);
@@ -2668,7 +2727,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ PackerOptions Options
 		a.call(ShellcodeData.Labels.GetModuleHandleW);
 		a.mov(rcx, rax);
 		a.lea(rdx, ptr(GCT));
-		a.call(ShellcodeData.Labels.GetProcAddressA);
+		a.call(ShellcodeData.Labels.GetProcAddress);
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
