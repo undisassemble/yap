@@ -617,6 +617,9 @@ bool BeginGUI() {
 	glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, 1);
 	GLFWwindow* pWindow = glfwCreateWindow(width, height, "Yet Another Packer", NULL, NULL);
 	Data.hWnd = glfwGetWin32Window(pWindow);
+	int x, y, mon_x, mon_y;
+	glfwGetMonitorWorkarea(glfwGetPrimaryMonitor(), &x, &y, &mon_x, &mon_y);
+	glfwSetWindowPos(pWindow, x + (mon_x - width) / 2, y + (mon_y - height) / 2);
 	glfwMakeContextCurrent(pWindow);
 	glfwSwapInterval(1);
 	ImGui_ImplGlfw_InitForOpenGL(pWindow, true);
@@ -646,6 +649,28 @@ bool BeginGUI() {
 				glfwSetWindowPos(pWindow, x, y);
 			}
 		}
+		
+		if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
+			// Ctrl + N
+			if (ImGui::IsKeyDown(ImGuiKey_N)) {
+				OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
+				SaveProject();
+			}
+
+			// Ctrl + O
+			if (ImGui::IsKeyDown(ImGuiKey_O)) {
+				OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false);
+				LoadProject();
+			}
+
+			// Ctrl + (Shift) + S
+			if (ImGui::IsKeyDown(ImGuiKey_S)) {
+				if (ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift)) {
+					OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
+				}
+				SaveProject();
+			}
+		}
 
 		// Render
 		ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -667,41 +692,6 @@ bool BeginGUI() {
 	glfwTerminate();
 	bInitialized = false;
 	return true;
-}
-
-// Message handler
-LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	switch (uMsg) {
-	case WM_QUIT:
-	case WM_DESTROY:
-	case WM_CLOSE:
-		// EndGUI();
-		break;
-	case WM_SHOWWINDOW:
-		bMinimized = wParam == FALSE;
-		break;
-	case WM_KEYDOWN:
-		if (!(lParam & KF_REPEAT) && (GetAsyncKeyState(VK_CONTROL) & 0x8000)) {
-			switch (wParam) {
-			case 0x53: // S
-				if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
-					OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
-					SaveProject();
-				} else {
-					SaveProject();
-				}
-				break;
-			case 0x4E: // N
-				OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
-				SaveProject();
-				break;
-			case 0x4F: // O
-				OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false);
-				LoadProject();
-			}
-		}
-	}
-	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
 int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
