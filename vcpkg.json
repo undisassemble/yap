@@ -1,7 +1,8 @@
 {
   "dependencies": [
+    "asmjit",
     "imgui",
     "zydis",
-    "asmjit"
+    "glfw3"
   ]
 }

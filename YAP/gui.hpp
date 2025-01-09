@@ -5,7 +5,6 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
-void InitGUI();
 bool BeginGUI();
 void ApplyImGuiTheme();
 bool LoadProject();

@@ -48,12 +48,6 @@
     <ClCompile Include="assembler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="imgui_impl_win32.cpp">
-      <Filter>Source Files\Vendor</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui_impl_dx11.cpp">
-      <Filter>Source Files\Vendor</Filter>
-    </ClCompile>
     <ClCompile Include="lzma\Threads.c">
       <Filter>Source Files\Vendor</Filter>
     </ClCompile>
@@ -85,6 +79,12 @@
       <Filter>Source Files\Vendor</Filter>
     </ClCompile>
     <ClCompile Include="lzma\LzFindOpt.c">
+      <Filter>Source Files\Vendor</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui_impl_opengl3.cpp">
+      <Filter>Source Files\Vendor</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui_impl_glfw.cpp">
       <Filter>Source Files\Vendor</Filter>
     </ClCompile>
   </ItemGroup>
@@ -128,12 +128,6 @@
     <ClInclude Include="assembler.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="imgui_impl_win32.h">
-      <Filter>Header Files\Vendor</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui_impl_dx11.h">
-      <Filter>Header Files\Vendor</Filter>
-    </ClInclude>
     <ClInclude Include="lzma\Alloc.h">
       <Filter>Header Files\Vendor</Filter>
     </ClInclude>
@@ -174,6 +168,15 @@
       <Filter>Header Files\Vendor</Filter>
     </ClInclude>
     <ClInclude Include="lzma\Sha256.h">
+      <Filter>Header Files\Vendor</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui_impl_opengl3_loader.h">
+      <Filter>Header Files\Vendor</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui_impl_glfw.h">
+      <Filter>Header Files\Vendor</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui_impl_opengl3.h">
       <Filter>Header Files\Vendor</Filter>
     </ClInclude>
   </ItemGroup>

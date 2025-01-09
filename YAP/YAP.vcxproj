@@ -177,8 +177,8 @@
     <ClCompile Include="asm.cpp" />
     <ClCompile Include="assembler.cpp" />
     <ClCompile Include="gui.cpp" />
-    <ClCompile Include="imgui_impl_dx11.cpp" />
-    <ClCompile Include="imgui_impl_win32.cpp" />
+    <ClCompile Include="imgui_impl_glfw.cpp" />
+    <ClCompile Include="imgui_impl_opengl3.cpp" />
     <ClCompile Include="lzma\Aes.c" />
     <ClCompile Include="lzma\AesOpt.c" />
     <ClCompile Include="lzma\Alloc.c" />
@@ -202,8 +202,9 @@
     <ClInclude Include="font.hpp" />
     <ClInclude Include="gui.hpp" />
     <ClInclude Include="icons.hpp" />
-    <ClInclude Include="imgui_impl_dx11.h" />
-    <ClInclude Include="imgui_impl_win32.h" />
+    <ClInclude Include="imgui_impl_glfw.h" />
+    <ClInclude Include="imgui_impl_opengl3.h" />
+    <ClInclude Include="imgui_impl_opengl3_loader.h" />
     <ClInclude Include="LzmaDec_DecodeReal.raw" />
     <ClInclude Include="lzma\7zTypes.h" />
     <ClInclude Include="lzma\7zWindows.h" />

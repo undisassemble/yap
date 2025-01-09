@@ -70,7 +70,6 @@ int main(int argc, char** argv) {
 		DEBUG_ONLY(Data.bUsingConsole = true); // Makes the console visible in debug builds
 		DEBUG_ONLY(SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING));
 		DEBUG_ONLY(hStdOut = GetStdHandle(STD_OUTPUT_HANDLE));
-		InitGUI();
 
 		// Handle files dropped on top of executable
 		if (argc == 2) {

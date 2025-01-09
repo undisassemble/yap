@@ -1,28 +1,24 @@
+#define GLFW_EXPOSE_NATIVE_WIN32
 #include "gui.hpp"
 #include "font.hpp"
 #include "icons.hpp"
-#include <d3d11.h>
-#include <dxgi.h>
+#include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 #include <stdlib.h>
 #include <ctime>
 #include <Psapi.h>
 #include <Shlwapi.h>
 #include <imgui_internal.h>
-#include "imgui_impl_win32.h"
-#include "imgui_impl_dx11.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 #include "util.hpp"
 #include "asm.hpp"
 
 // Globals
-static ID3D11Device* g_pd3dDevice = nullptr;
-static ID3D11DeviceContext* g_pd3dDeviceContext = nullptr;
-static IDXGISwapChain* g_pSwapChain = nullptr;
-static ID3D11RenderTargetView* g_mainRenderTargetView = nullptr;
-IDXGIOutput* g_pOutput = NULL;
 bool bMinimized = false, bOpen = true, bInitialized = false;
 const int width = 850;
 const int height = 560;
-ImGuiWindow* pWindow = NULL;
+ImGuiWindow* pImGuiWindow = NULL;
 extern Asm* pAssembly;
 ImWchar range[] = { 0xE005, 0xF8FF, 0 };
 struct {
@@ -33,29 +29,6 @@ struct {
 
 // Forwards
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-DWORD WINAPI WindowThread(void* args);
-void CleanupRenderTarget();
-void CreateRenderTarget();
-void CleanupDeviceD3D();
-bool CreateDeviceD3D(HWND hWnd);
-void EndGUI();
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-void InitGUI() {
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO();
-	io.ConfigFlags = ImGuiConfigFlags_NavEnableKeyboard;
-	io.IniFilename = NULL;
-	ApplyImGuiTheme();
-	io.Fonts->Clear();
-	io.FontDefault = NULL;
-	io.Fonts->AddFontFromMemoryCompressedTTF(font_compressed_data, font_compressed_size, 16.f);
-	ImFontConfig config;
-	config.MergeMode = true;
-	config.GlyphMinAdvanceX = 16.f;
-	io.Fonts->AddFontFromMemoryCompressedTTF(icons_compressed_data, icons_compressed_size, 16.f, &config, range);
-	io.Fonts->Build();
-}
 
 // Opens file dialogue
 bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo) {
@@ -231,14 +204,8 @@ bool LoadProject() {
 }
 
 void DrawGUI() {
-	// End if window is closed
-	if (!bOpen) {
-		EndGUI();
-		_exit(0);
-	}
-
-	// Dont do anything if window is not shown
-	if (bMinimized) return;
+// Dont do anything if window is not shown
+	if (!bOpen || bMinimized) return;
 	
 	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar);
 
@@ -619,7 +586,7 @@ void DrawGUI() {
 		}
 	}
 
-	if (!pWindow) pWindow = ImGui::GetCurrentWindow();
+	if (!pImGuiWindow) pImGuiWindow = ImGui::GetCurrentWindow();
 	ImGui::End();
 }
 
@@ -628,124 +595,78 @@ bool BeginGUI() {
 		return false;
 	bInitialized = true;
 
-	// Register class
-	WNDCLASSEXA WindowClass = { 0 };
-	WindowClass.cbSize = sizeof(WNDCLASSEXA);
-	WindowClass.lpfnWndProc = (WNDPROC)WndProc;
-	WindowClass.hInstance = GetModuleHandle(NULL);
-	WindowClass.style = CS_CLASSDC;
-	WindowClass.lpszClassName = "Yet Another Packer";
-	if (!RegisterClassExA(&WindowClass)) {
-		return (bInitialized = false);
-	}
+	// Initialize
+	if (!glfwInit()) return false;
+	if (!ImGui::CreateContext()) return false;
+	ImGuiIO& io = ImGui::GetIO();
+	io.ConfigFlags = ImGuiConfigFlags_NavEnableKeyboard;
+	io.IniFilename = NULL;
+	ApplyImGuiTheme();
+	io.Fonts->Clear();
+	io.FontDefault = NULL;
+	io.Fonts->AddFontFromMemoryCompressedTTF(font_compressed_data, font_compressed_size, 16.f);
+	ImFontConfig config;
+	config.MergeMode = true;
+	config.GlyphMinAdvanceX = 16.f;
+	io.Fonts->AddFontFromMemoryCompressedTTF(icons_compressed_data, icons_compressed_size, 16.f, &config, range);
+	if (!io.Fonts->Build()) return false;
 
 	// Create window
-	if (!(Data.hWnd = CreateWindowExA(
-		0,
-		"Yet Another Packer",
-		"Yet Another Packer",
-		0,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		width,
-		height,
-		NULL,
-		NULL,
-		GetModuleHandleA(NULL),
-		NULL
-	))) {
-		UnregisterClassA("Yet Another Packer", GetModuleHandleA(NULL));
-		return (bInitialized = false);
-	}
-	SetWindowLongA(Data.hWnd, GWL_STYLE, 0);
-	ShowWindow(Data.hWnd, SW_SHOW);
+	glfwWindowHint(GLFW_RESIZABLE, 0);
+	glfwWindowHint(GLFW_DECORATED, 0);
+	glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, 1);
+	GLFWwindow* pWindow = glfwCreateWindow(width, height, "Yet Another Packer", NULL, NULL);
+	Data.hWnd = glfwGetWin32Window(pWindow);
+	glfwMakeContextCurrent(pWindow);
+	glfwSwapInterval(1);
+	ImGui_ImplGlfw_InitForOpenGL(pWindow, true);
+	ImGui_ImplOpenGL3_Init();
 
-	// Setup ImGui
-	CreateDeviceD3D(Data.hWnd);
-	ImGui_ImplWin32_Init(Data.hWnd);
-	ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
-	CleanupRenderTarget();
-	g_pSwapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
-	g_pSwapChain->GetContainingOutput(&g_pOutput);
-	CreateRenderTarget();
-
-	// Create rendering thread
-	if (!CreateThread(0, 0, WindowThread, 0, 0, 0)) {
-		EndGUI();
-		UnregisterClassA("Yet Another Packer", GetModuleHandleA(NULL));
-		return false;
-	}
-
-	// Handle message queue
-	MSG msg;
-	while (bInitialized) {
-		while (bInitialized && PeekMessage(&msg, Data.hWnd, 0, 0, 1)) {
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-		if (!ImGui::IsMouseDown(0)) {
-			g_pOutput->WaitForVBlank();
-		}
-	}
-	return true;
-}
-
-void MoveWindow(int x, int y, bool bRelative) {
-	if (bRelative) {
-		RECT WindowRect;
-		GetWindowRect(Data.hWnd, &WindowRect);
-		x += WindowRect.left;
-		y += WindowRect.top;
-	}
-	SetWindowPos(Data.hWnd, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-}
-
-void EndGUI() {
-	if (!bInitialized)
-		return;
-	bInitialized = false;
-	pWindow = (ImGuiWindow*)1;
-	ImGui_ImplDX11_Shutdown();
-	ImGui_ImplWin32_Shutdown();
-	CleanupDeviceD3D();
-}
-
-// Window thread
-DWORD WINAPI WindowThread(void* args) {
-	while (bInitialized) {
-		// Setup frame
-		ImGui_ImplDX11_NewFrame();
-		ImGui_ImplWin32_NewFrame();
+	// Main loop
+	while (bOpen && !glfwWindowShouldClose(pWindow)) {
+		// Prepare
+		glfwPollEvents();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui_ImplOpenGL3_NewFrame();
 		ImGui::NewFrame();
 
-		if (pWindow) {
+		if (pImGuiWindow) {
 			// Minimize window
-			if (pWindow->Collapsed) {
-				if (!bMinimized) {
-					ShowWindow(Data.hWnd, SW_MINIMIZE);
-				}
-				ImGui::SetWindowCollapsed(pWindow, false);
+			if (pImGuiWindow->Collapsed) {
+				glfwIconifyWindow(pWindow);
 			}
 
 			// Move window
-			if (pWindow->Pos.x != 0 || pWindow->Pos.y != 0) {
-				MoveWindow((int)pWindow->Pos.x, (int)pWindow->Pos.y, true);
+			if (pImGuiWindow->Pos.x != 0 || pImGuiWindow->Pos.y != 0) {
+				int x = 0;
+				int y = 0;
+				glfwGetWindowPos(pWindow, &x, &y);
+				x += pImGuiWindow->Pos.x;
+				y += pImGuiWindow->Pos.y;
+				glfwSetWindowPos(pWindow, x, y);
 			}
 		}
 
 		// Render
 		ImGui::SetNextWindowPos(ImVec2(0, 0));
 		ImGui::SetNextWindowSize(ImVec2(width, height));
+		ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
 		DrawGUI();
 
 		// Finish frame
 		ImGui::Render();
-		g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, NULL);
-		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-		g_pSwapChain->Present(1, 0);
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		glfwSwapBuffers(pWindow);
 	}
-	EndGUI();
-	return 0;
+
+	// Shutdown
+	glfwDestroyWindow(pWindow);
+	pImGuiWindow = (ImGuiWindow*)1;
+	ImGui_ImplGlfw_Shutdown();
+	ImGui_ImplOpenGL3_Shutdown();
+	glfwTerminate();
+	bInitialized = false;
+	return true;
 }
 
 // Message handler
@@ -754,7 +675,7 @@ LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	case WM_QUIT:
 	case WM_DESTROY:
 	case WM_CLOSE:
-		EndGUI();
+		// EndGUI();
 		break;
 	case WM_SHOWWINDOW:
 		bMinimized = wParam == FALSE;
@@ -780,7 +701,7 @@ LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 			}
 		}
 	}
-	return ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam) ? TRUE : DefWindowProc(hWnd, uMsg, wParam, lParam);
+	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
 int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
@@ -807,7 +728,7 @@ void ApplyImGuiTheme() {
 	ImGuiStyle& style = ImGui::GetStyle();
 
 	style.Alpha = 1.0f;
-	style.DisabledAlpha = 0.6000000238418579f;
+	style.DisabledAlpha = 0.6f;
 	style.WindowPadding = ImVec2(8.0f, 8.0f);
 	style.WindowRounding = 0.0f;
 	style.WindowBorderSize = 1.0f;
@@ -898,61 +819,4 @@ void ApplyImGuiTheme() {
 			style.Colors[i] = ImVec4(1.f - style.Colors[i].x, 1.f - style.Colors[i].y, 1.f - style.Colors[i].z, style.Colors[i].w);
 		}
 	}
-}
-
-
-/***** IMGUI PROVIDED DX11 FUNCTIONS *****/
-
-bool CreateDeviceD3D(HWND hWnd)
-{
-	// Setup swap chain
-	DXGI_SWAP_CHAIN_DESC sd;
-	ZeroMemory(&sd, sizeof(sd));
-	sd.BufferCount = 2;
-	sd.BufferDesc.Width = 0;
-	sd.BufferDesc.Height = 0;
-	sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	sd.BufferDesc.RefreshRate.Numerator = 60;
-	sd.BufferDesc.RefreshRate.Denominator = 1;
-	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	sd.OutputWindow = hWnd;
-	sd.SampleDesc.Count = 1;
-	sd.SampleDesc.Quality = 0;
-	sd.Windowed = TRUE;
-	sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-	UINT createDeviceFlags = 0;
-	//createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
-	D3D_FEATURE_LEVEL featureLevel;
-	const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
-	HRESULT res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
-	if (res == DXGI_ERROR_UNSUPPORTED) // Try high-performance WARP software driver if hardware is not available.
-		res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
-	if (res != S_OK)
-		return false;
-
-	CreateRenderTarget();
-	return true;
-}
-
-void CleanupDeviceD3D()
-{
-	CleanupRenderTarget();
-	if (g_pSwapChain) { g_pSwapChain->Release(); g_pSwapChain = nullptr; }
-	if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
-	if (g_pd3dDevice) { g_pd3dDevice->Release(); g_pd3dDevice = nullptr; }
-}
-
-void CreateRenderTarget()
-{
-	ID3D11Texture2D* pBackBuffer;
-	g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-	g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_mainRenderTargetView);
-	pBackBuffer->Release();
-}
-
-void CleanupRenderTarget()
-{
-	if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
 }
