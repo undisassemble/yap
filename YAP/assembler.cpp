@@ -614,9 +614,13 @@ Error ProtectedAssembler::ret() {
 	if (stack.Size()) restorestack();
 	if (bWaitingOnEmit || !bMutate) return Assembler::ret();
 	Gp reg = truerandreg();
+	bool j = bStrict;
 	push(reg);
+	bStrict = j;
 	mov(reg, qword_ptr(0x7FFE02F8));
+	bStrict = j;
 	xchg(qword_ptr(rsp), reg);
+	bStrict = j;
 	pop(qword_ptr(rip));
 	dq(rand64());
 }

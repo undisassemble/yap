@@ -218,11 +218,6 @@ void DrawGUI() {
 			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save As", "Ctrl + Shift + S") && Data.Project[0]) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("Settings")) {
-			if (ImGui::MenuItem(ICON_DOWNLOAD " Auto Update", NULL, &Settings.bCheckForUpdates)) { SaveSettings(); }
-			if (ImGui::MenuItem(Settings.bLight ? ICON_MOON " Switch to Dark Mode" : ICON_MOON " Switch to Light Mode", NULL, &Settings.bLight)) { SaveSettings(); ApplyImGuiTheme(); }
-			ImGui::EndMenu();
-		}
 		if (ImGui::BeginMenu("About")) {
 			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Feature Help")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Features.md", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
@@ -720,7 +715,7 @@ void ApplyImGuiTheme() {
 	style.Alpha = 1.0f;
 	style.DisabledAlpha = 0.6f;
 	style.WindowPadding = ImVec2(8.0f, 8.0f);
-	style.WindowRounding = 0.0f;
+	style.WindowRounding = 10.0f;
 	style.WindowBorderSize = 1.0f;
 	style.WindowMinSize = ImVec2(32.0f, 32.0f);
 	style.WindowTitleAlign = ImVec2(0.0f, 0.5f);
