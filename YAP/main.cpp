@@ -6,8 +6,8 @@
 #include <TlHelp32.h>
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <Psapi.h>
 #include <time.h>
+#include <varargs.h>
 
 // Forward declares
 DWORD WINAPI Begin(void* args);
@@ -404,4 +404,56 @@ void Console::protect(char* project, char* input, char* output) {
 
 	pAssembly = new Asm(input);
 	Begin(TrueOutput);
+}
+
+void LOG(LoggingLevel_t level, char* mod, char* str, ...) {
+	va_list args;
+	char buffer[MAX_PATH];
+	va_start(args, str);
+	vsnprintf(buffer, sizeof(buffer), str, args);
+	va_end(args);
+	if (::Data.bUsingConsole) {
+		if (level) {
+			switch (level) {
+			case Failed:
+				printf(LOG_ERROR);
+				break;
+			case Success:
+				printf(LOG_SUCCESS);
+				break;
+			case Warning:
+				printf(LOG_WARNING);
+				break;
+			case Info:
+				printf(LOG_INFO);
+				break;
+			case Info_Extended:
+				printf(LOG_INFO_EXTRA);
+			}
+			printf("[%s]: \t", mod);
+		}
+		printf(buffer);
+	}
+
+	if (level && hLogFile) {
+		switch (level) {
+		case Failed:
+			WriteFile(hLogFile, "[-] [", 5, NULL, NULL);
+			break;
+		case Success:
+			WriteFile(hLogFile, "[+] [", 5, NULL, NULL);
+			break;
+		case Warning:
+			WriteFile(hLogFile, "[*] [", 5, NULL, NULL);
+			break;
+		case Info:
+			WriteFile(hLogFile, "[?] [", 5, NULL, NULL);
+			break;
+		case Info_Extended:
+			WriteFile(hLogFile, "[>] [", 5, NULL, NULL);
+		}
+		WriteFile(hLogFile, mod, strlen(mod), NULL, NULL);
+		WriteFile(hLogFile, "]: \t", 4, NULL, NULL);
+		WriteFile(hLogFile, buffer, strlen(buffer), NULL, NULL);
+	}
 }
