@@ -27,9 +27,6 @@ struct {
 	UINT uType = 0;
 } CurrentModal;
 
-// Forwards
-LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
 // Opens file dialogue
 bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo) {
 	// Initialize struct
@@ -207,10 +204,11 @@ void DrawGUI() {
 // Dont do anything if window is not shown
 	if (!bOpen || bMinimized) return;
 	
-	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar);
+	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar);
 
 	// Menu bar
 	if (ImGui::BeginMenuBar()) {
+		//ImGui::Text("Yet Another Packer    |");
 		if (ImGui::BeginMenu("File")) {
 			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
 			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadProject(); }
@@ -221,9 +219,13 @@ void DrawGUI() {
 		if (ImGui::BeginMenu("About")) {
 			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Feature Help")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Features.md", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
-			if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
+			if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { Modal("MIT License\n\nCopyright (c) 2024-2025 undisassemble\nCopyright (c) 2014-2025 Omar Cornut\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.", ICON_CIRCLE_INFO " License", MB_OK); }
 			ImGui::EndMenu();
 		}
+		ImGui::SetCursorPos(ImVec2((width - ImGui::CalcTextSize("Yet Another Packer").x) / 2, 0));
+		ImGui::Text("Yet Another Packer");
+		if (ImGui::CollapseButton(ImGui::GetCurrentWindow()->GetID("#COLLAPSE"), ImVec2(802, 3))) { ImGui::GetCurrentWindow()->Collapsed = !ImGui::GetCurrentWindow()->Collapsed; }
+		if (ImGui::CloseButton(ImGui::GetCurrentWindow()->GetID("#CLOSE"), ImVec2(824, 3))) { bOpen = false; }
 		ImGui::EndMenuBar();
 	}
 	
@@ -434,12 +436,16 @@ void DrawGUI() {
 #endif
 
 		if (ImGui::BeginTabItem(ICON_CIRCLE_INFO " Version")) {
-			ImGui::Text("YAP Version: " __YAP_VERSION__);
-			ImGui::Text("ImGui Version: " IMGUI_VERSION);
-			ImGui::Text("Zydis Version: %d.%d.%d", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
-			ImGui::Text("AsmJit Version: %d.%d.%d", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
+			ImGui::SeparatorText("Version information");
+			ImGui::Text("YAP: " __YAP_VERSION__);
+			ImGui::Text("ImGui: " IMGUI_VERSION);
+			ImGui::Text("Zydis: %d.%d.%d", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
+			ImGui::Text("AsmJit: %d.%d.%d", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
+			ImGui::Text("GLFW: %s", glfwGetVersionString());
+			ImGui::Text("OpenGL: %s", glGetString(GL_VERSION));
+			ImGui::SeparatorText("Build information");
 			ImGui::Text("Build: " __YAP_BUILD__);
-			ImGui::Text("Build Time: " __DATE__ " " __TIME__);
+			ImGui::Text("Time: " __DATE__ " @ " __TIME__);
 			ImGui::EndTabItem();
 		}
 
