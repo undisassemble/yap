@@ -12,7 +12,7 @@ Makefile
 # Other stuff
 out.exe
 tester.exe
-YAP.log.txt
+yap.log.txt
 yap.config
 vcpkg_installed
 

@@ -38,7 +38,7 @@ uint64_t rand64() {
 int main(int argc, char** argv) {
 	// General setup
 	srand(time(NULL));
-	hLogFile = CreateFile("YAP.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	hLogFile = CreateFile("yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hLogFile || hLogFile == INVALID_HANDLE_VALUE) {
 		LOG(Failed, MODULE_YAP, "Failed to open logging file: %d\n", GetLastError());
 	}

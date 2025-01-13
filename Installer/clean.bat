@@ -1,0 +1,1 @@
+del asmjit.dll glfw3.dll yap.dll YAP.exe yap.h Zydis.dll
