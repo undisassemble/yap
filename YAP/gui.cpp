@@ -212,8 +212,10 @@ void DrawGUI() {
 		if (ImGui::BeginMenu("File")) {
 			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
 			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadProject(); }
+			if (!Data.Project[0]) ImGui::BeginDisabled();
 			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveProject(); }
-			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save As", "Ctrl + Shift + S") && Data.Project[0]) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
+			if (!Data.Project[0]) ImGui::EndDisabled();
+			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save As", "Ctrl + Shift + S")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
@@ -229,19 +231,8 @@ void DrawGUI() {
 		ImGui::EndMenuBar();
 	}
 	
-	// Select file menu
-	if (!Data.Project[0]) {
-		ImGui::SetCursorPos(ImVec2((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Create or select a project file").x) / 2, (ImGui::GetWindowSize().y - ImGui::GetTextLineHeight()) / 2));
-		ImGui::Text("Create or select a project file");
-		ImGui::SetCursorPos(ImVec2((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Continue without project >>>").x) / 2, (ImGui::GetWindowSize().y + ImGui::GetTextLineHeight()) / 2));
-		if (ImGui::TextLink("Continue without project >>>")) {
-			Data.Project[0] = ' ';
-			Data.Project[1] = 0;
-		}
-	}
-
 	// Configuration menu
-	else if (!Data.bRunning) {
+	if (!Data.bRunning) {
 		ImGui::BeginTabBar("#Tabs");
 
 		if (ImGui::BeginTabItem(ICON_BOX_ARCHIVE " Packing")) {

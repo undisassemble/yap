@@ -84,12 +84,14 @@
     <IncludePath>lzma;zydis/src;zydis/include/Zydis;zydis/dependencies/zycore/include;asmjit/src/asmjit;zydis/include;imgui;imgui/backends;$(IncludePath)</IncludePath>
     <LibraryPath>$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <TargetName>YAPClient</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>lzma;zydis/src;zydis/include/Zydis;zydis/dependencies/zycore/include;asmjit/src/asmjit;zydis/include;imgui;imgui/backends;$(IncludePath)</IncludePath>
     <LibraryPath>$(LibraryPath)</LibraryPath>
     <CopyCppRuntimeToOutputDir>false</CopyCppRuntimeToOutputDir>
     <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <TargetName>YAPClient</TargetName>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
     <VcpkgEnableManifest>true</VcpkgEnableManifest>
@@ -140,7 +142,7 @@
       <ErrorReporting>None</ErrorReporting>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>d3d11.lib;shlwapi.lib;OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
@@ -164,7 +166,7 @@
       <ErrorReporting>None</ErrorReporting>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>

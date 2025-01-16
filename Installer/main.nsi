@@ -18,7 +18,8 @@ Section
 	File asmjit.dll
 	File glfw3.dll
 	File Zydis.dll
-	File YAP.exe
+	File YAPClient.exe
+	File yap.bat
 	File yap.dll
 	File yap.h
 	
@@ -36,7 +37,8 @@ Section "Uninstall"
 	Delete $INSTDIR\asmjit.dll
 	Delete $INSTDIR\glfw3.dll
 	Delete $INSTDIR\Zydis.dll
-	Delete $INSTDIR\YAP.exe
+	Delete $INSTDIR\YAPClient.exe
+	Delete $INSTDIR\yap.bat
 	Delete $INSTDIR\yap.dll
 	Delete $INSTDIR\yap.h
 	Delete $INSTDIR\yap.log.txt

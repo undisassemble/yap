@@ -3,20 +3,20 @@
 #include "pe.hpp"
 #include "packer.hpp"
 #include "gui.hpp"
-#include <TlHelp32.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <time.h>
 #include <varargs.h>
+#include <GLFW/glfw3.h>
 
 // Forward declares
 DWORD WINAPI Begin(void* args);
 namespace Console {
-	void help(char* name);
+	void help(wchar_t* name);
 	void buildversion();
-	void create(char* project);
-	void version(char* project);
-	void protect(char* project, char* input, char* output = NULL);
+	void version();
+	void protect(wchar_t* input, wchar_t* output = NULL);
+	void SetupConsole();
 }
 
 Options_t Options;
@@ -35,93 +35,75 @@ uint64_t rand64() {
 }
 
 // Main function
-int main(int argc, char** argv) {
+int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR lpCmdLine, _In_ int nShowCmd) {
 	// General setup
 	srand(time(NULL));
 	hLogFile = CreateFile("yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hLogFile || hLogFile == INVALID_HANDLE_VALUE) {
-		LOG(Failed, MODULE_YAP, "Failed to open logging file: %d\n", GetLastError());
+		LOG(Failed, MODULE_YAP, "Failed to open logging file (%d)\n", GetLastError());
 	}
 	LoadSettings();
-
-	// Find out if parent process is cmd.exe
-	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	PROCESSENTRY32 peEntry = { 0 };
-	DWORD dwPID = GetCurrentProcessId();
-	peEntry.dwSize = sizeof(PROCESSENTRY32);
-	if (Process32First(hSnap, &peEntry)) {
-		do {
-			if (peEntry.th32ProcessID == dwPID) break;
-		} while (Process32Next(hSnap, &peEntry));
-	}
-	CloseHandle(hSnap);
-	if (peEntry.th32ProcessID == dwPID) {
-		HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, peEntry.th32ParentProcessID);
-		char Name[MAX_PATH];
-		DWORD szName = MAX_PATH;
-		QueryFullProcessImageName(hProc, 0, Name, &szName);
-		Data.bUsingConsole = !strcmp(Name, "C:\\Windows\\System32\\cmd.exe");
-		CloseHandle(hProc);
-	}
 	
+	// Get args
+	int argc = 0;
+	wchar_t** argv = CommandLineToArgvW(lpCmdLine, &argc);
+	if (argv) {
+		// Look for - commands
+		for (int i = 0; i < argc; i++) {
+			if (!lstrcmpW(argv[i], L"--help")) {
+				Console::SetupConsole();
+				Console::help(L"YAP");
+				return 0;
+			} else if (!lstrcmpW(argv[i], L"--version")) {
+				Console::SetupConsole();
+				Console::buildversion();
+				return 0;
+			}
+		}
+
+		// Search CLI
+		if (argc) {
+			for (int i = 0, n = lstrlenW(argv[0]); i < n; i++) {
+				Data.Project[i] = (char)argv[0][i];
+				Data.Project[i + 1] = 0;
+			}
+			if (argc > 1) {
+				if (!lstrcmpW(argv[1], L"create")) {
+					Console::SetupConsole();
+					SaveProject();
+					return 0;
+				} else if (!lstrcmpW(argv[1], L"version")) {
+					Console::SetupConsole();
+					Console::version();
+					return 0;
+				} else if (!lstrcmpW(argv[1], L"protect")) {
+					if (argc < 3) {
+						LOG(Failed, MODULE_YAP, "Not enough arguments provided\n");
+						return 1;
+					}
+					Console::SetupConsole();
+					Console::protect(argv[2], argc > 3 ? argv[3] : NULL);
+					return 0;
+				}
+			}
+			if (!LoadProject()) LOG(Warning, MODULE_YAP, "Failed to load project\n");
+		}
+
+		LOG(Info, MODULE_YAP, "Launched with %d arguments: \"YAP", argc);
+		for (int i = 0; i < argc; i++) {
+			LOG(Nothing, MODULE_YAP, " %ls", argv[i]);
+		}
+		LOG(Nothing, MODULE_YAP, "\"\n");
+	} else {
+		LOG(Warning, MODULE_YAP, "Failed to get command args (%d)\n", GetLastError());
+	}
+
 	// Setup UI
 	if (!Data.bUsingConsole && argc < 3) {
-		RELEASE_ONLY(FreeConsole());
-		DEBUG_ONLY(Data.bUsingConsole = true); // Makes the console visible in debug builds
-		DEBUG_ONLY(SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING));
-		DEBUG_ONLY(hStdOut = GetStdHandle(STD_OUTPUT_HANDLE));
-
-		// Handle files dropped on top of executable
-		if (argc == 2) {
-			strcpy_s(Data.Project, argv[1]);
-			LoadProject();
-		}
-
+		DEBUG_ONLY(AllocConsole());
+		DEBUG_ONLY(Console::SetupConsole());
 		if (!BeginGUI()) {
 			MessageBox(NULL, "Failed to create GUI!", NULL, MB_ICONERROR | MB_OK);
-			return 1;
-		}
-	}
-
-	// Setup console
-	else {
-		SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
-		hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-
-		// Check number of arguments
-		if (argc < 2) {
-			Console::help(argv[0]);
-			return 1;
-		}
-
-		// --version and --help
-		if (!lstrcmpA(argv[1], "--help") || !lstrcmpA(argv[1], "-h")) {
-			Console::help(argv[0]);
-			return 0;
-		} else if (!lstrcmpA(argv[1], "--version") || !lstrcmpA(argv[1], "-v")) {
-			Console::buildversion();
-			return 0;
-		}
-
-		// Check number of args again
-		if (argc < 3) {
-			Console::help(argv[0]);
-			return 1;
-		}
-		
-		// Dispatch
-		if (!lstrcmpA(argv[2], "create")) {
-			Console::create(argv[1]);
-		} else if (!lstrcmpA(argv[2], "version")) {
-			Console::version(argv[1]);
-		} else if (!lstrcmpA(argv[2], "protect")) {
-			if (argc < 4) {
-				LOG(Failed, MODULE_YAP, "Not enough arguments for command protect\n");
-				return 1;
-			}
-			Console::protect(argv[1], argv[3], argc > 4 ? argv[4] : NULL);
-		} else {
-			LOG(Failed, MODULE_YAP, "Unrecognized command: %s\n", argv[2]);
 			return 1;
 		}
 	}
@@ -320,8 +302,8 @@ th_exit:
 	return 0;
 }
 
-void Console::help(char* name) {
-	LOG(Nothing, MODULE_YAP, "Usage: %s PROJECT COMMAND\n\n", name);
+void Console::help(wchar_t* name) {
+	LOG(Nothing, MODULE_YAP, "Usage: %ls PROJECT COMMAND\n\n", name);
 
 	LOG(Nothing, MODULE_YAP, "COMMANDS\n");
 	LOG(Nothing, MODULE_YAP, "\tcreate\t\t\t\tCreate project\n");
@@ -329,37 +311,36 @@ void Console::help(char* name) {
 	LOG(Nothing, MODULE_YAP, "\tprotect INPUT [OUTPUT]\t\tProtect a file\n\n");
 
 	LOG(Nothing, MODULE_YAP, "ALTERNATIVE COMMANDS\n");
-	LOG(Nothing, MODULE_YAP, "%s --version\tGet build info\n", name);
-	LOG(Nothing, MODULE_YAP, "%s --help\tGet this help menu\n", name);
+	LOG(Nothing, MODULE_YAP, "%ls --version\tGet build info\n", name);
+	LOG(Nothing, MODULE_YAP, "%ls --help\tGet this help menu\n", name);
 }
 
 void Console::buildversion() {
-	LOG(Nothing, MODULE_YAP, "YAP Version: " __YAP_VERSION__ "\n");
+	LOG(Nothing, MODULE_YAP, "YAP: " __YAP_VERSION__ "\n");
+	LOG(Nothing, MODULE_YAP, "ImGui: " IMGUI_VERSION "\n");
+	LOG(Nothing, MODULE_YAP, "Zydis: %d.%d.%d\n", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
+	LOG(Nothing, MODULE_YAP, "AsmJit: %d.%d.%d\n", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
+	LOG(Nothing, MODULE_YAP, "GLFW: %s\n", glfwGetVersionString());
+	LOG(Nothing, MODULE_YAP, "OpenGL: %s\n", glGetString(GL_VERSION));
 	LOG(Nothing, MODULE_YAP, "Build: " __YAP_BUILD__ "\n");
 	LOG(Nothing, MODULE_YAP, "Build Time: " __DATE__ " " __TIME__ "\n");
-	LOG(Nothing, MODULE_YAP, "ImGui Version: " IMGUI_VERSION "\n");
-	LOG(Nothing, MODULE_YAP, "Zydis Version: %d.%d.%d\n", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
-	LOG(Nothing, MODULE_YAP, "AsmJit Version: %d.%d.%d\n", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
 }
 
-void Console::create(char* project) {
-	if (lstrlenA(project) + 1 > MAX_PATH) {
-		LOG(Failed, MODULE_YAP, "Cannot handle project files with names longer than MAX_PATH characters (%d bytes)!\n", MAX_PATH);
-		return;
-	}
-	memcpy(Data.Project, project, lstrlenA(project) + 1);
-	SaveProject();
-}
-
-void Console::version(char* project) {
-	HANDLE hFile = CreateFileA(project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+void Console::version() {
+	HANDLE hFile = CreateFileA(Data.Project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	BYTE Sig[3] = { 0 };
 	DWORD Ver = 0;
+
+	// Check if opened
+	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
+		LOG(Failed, MODULE_YAP, "Could not open file %s (%d)\n", Data.Project, GetLastError());
+		return;
+	}
 
 	// Read signature
 	ReadFile(hFile, Sig, 3, NULL, NULL);
 	if (memcmp(Sig, "YAP", 3)) {
-		LOG(Failed, MODULE_YAP, "%s is not a YAP project\n", project);
+		LOG(Failed, MODULE_YAP, "%s is not a YAP project\n", Data.Project);
 	} else {
 		// Read version
 		ReadFile(hFile, &Ver, sizeof(DWORD), NULL, NULL);
@@ -369,27 +350,22 @@ void Console::version(char* project) {
 	CloseHandle(hFile);
 }
 
-void Console::protect(char* project, char* input, char* output) {
-	if (lstrlenA(project) + 1 > MAX_PATH) {
-		LOG(Failed, MODULE_YAP, "Cannot handle project files with names longer than MAX_PATH characters (%d bytes)!\n", MAX_PATH);
-		return;
-	}
-	if (lstrlenA(input) + 1 > MAX_PATH || (output && lstrlenA(output) + 1 > MAX_PATH)) {
+// Idk improve this maybe
+void Console::protect(wchar_t* input, wchar_t* output) {
+	if (lstrlenW(input) + 1 > MAX_PATH || (output && lstrlenW(output) + 1 > MAX_PATH)) {
 		LOG(Failed, MODULE_YAP, "Cannot handle files with names longer than MAX_PATH characters (%d bytes)!\n", MAX_PATH);
 		return;
 	}
-	memcpy(Data.Project, project, lstrlenA(project) + 1);
-
 	// Load project
 	if (!LoadProject()) return;
 
 	// Output name
-	char TrueOutput[MAX_PATH] = { 0 };
+	wchar_t TrueOutput[MAX_PATH] = { 0 };
 	if (output) {
-		memcpy(TrueOutput, output, lstrlenA(output) + 1);
+		memcpy(TrueOutput, output, lstrlenW(output) * 2 + 2);
 	} else {
-		int InputLen = lstrlenA(input);
-		memcpy(TrueOutput, input, InputLen + 1);
+		int InputLen = lstrlenW(input);
+		memcpy(TrueOutput, input, InputLen * 2 + 2);
 		uint16_t i = InputLen - 1;
 		for (; i > 0; i--) {
 			if (TrueOutput[i] == '.') break;
@@ -398,12 +374,35 @@ void Console::protect(char* project, char* input, char* output) {
 			LOG(Failed, MODULE_YAP, "Failed to set output name!\n");
 			return;
 		}
-		memmove(&TrueOutput[i + 7], &TrueOutput[i], InputLen + 1 - i);
-		memcpy(&TrueOutput[i], "_yapped", 7);
+		memmove(&TrueOutput[i + 7], &TrueOutput[i], InputLen * 2 + 2 - i * 2);
+		memcpy(&TrueOutput[i], L"_yapped", 14);
 	}
 
-	pAssembly = new Asm(input);
-	Begin(TrueOutput);
+	// Run
+	char converted[MAX_PATH] = { 0 };
+	for (int i = 0, n = lstrlenW(input); i < n; i++) {
+		converted[i] = (char)input[i];
+	}
+	pAssembly = new Asm(converted);
+	for (int i = 0, n = lstrlenW(TrueOutput) + 1; i < n; i++) {
+		converted[i] = (char)TrueOutput[i];
+	}
+	LOG(Info, MODULE_YAP, "%ls\n", TrueOutput);
+	LOG(Info, MODULE_YAP, "%s\n", converted);
+	Begin(converted);
+}
+
+void Console::SetupConsole() {
+	if (AttachConsole(ATTACH_PARENT_PROCESS) || GetLastError() == ERROR_ACCESS_DENIED) {
+		hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+		Data.bUsingConsole = true;
+		if (!SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING)) {
+			LOG(Warning, MODULE_YAP, "Colors wont work, terminal output will be ugly af\n");
+		}
+	}
+	else {
+		LOG(Failed, MODULE_YAP, "Failed to attach to console (%d)\n", GetLastError());
+	}
 }
 
 void LOG(LoggingLevel_t level, char* mod, char* str, ...) {
@@ -412,48 +411,51 @@ void LOG(LoggingLevel_t level, char* mod, char* str, ...) {
 	va_start(args, str);
 	vsnprintf(buffer, sizeof(buffer), str, args);
 	va_end(args);
-	if (::Data.bUsingConsole) {
+	if (Data.bUsingConsole) {
 		if (level) {
 			switch (level) {
 			case Failed:
-				printf(LOG_ERROR);
+				WriteConsoleA(hStdOut, LOG_ERROR "[", sizeof(LOG_ERROR), NULL, NULL);
 				break;
 			case Success:
-				printf(LOG_SUCCESS);
+				WriteConsoleA(hStdOut, LOG_SUCCESS "[", sizeof(LOG_SUCCESS), NULL, NULL);
 				break;
 			case Warning:
-				printf(LOG_WARNING);
+				WriteConsoleA(hStdOut, LOG_WARNING "[", sizeof(LOG_WARNING), NULL, NULL);
 				break;
 			case Info:
-				printf(LOG_INFO);
+				WriteConsoleA(hStdOut, LOG_INFO "[", sizeof(LOG_INFO), NULL, NULL);
 				break;
 			case Info_Extended:
-				printf(LOG_INFO_EXTRA);
+				WriteConsoleA(hStdOut, LOG_INFO_EXTRA "[", sizeof(LOG_INFO_EXTRA), NULL, NULL);
 			}
-			printf("[%s]: \t", mod);
+			WriteConsoleA(hStdOut, mod, strlen(mod), NULL, NULL);
+			WriteConsoleA(hStdOut, "]: \t", 4, NULL, NULL);
 		}
-		printf(buffer);
+		WriteConsoleA(hStdOut, buffer, lstrlenA(buffer), NULL, NULL);
 	}
 
-	if (level && hLogFile) {
-		switch (level) {
-		case Failed:
-			WriteFile(hLogFile, "[-] [", 5, NULL, NULL);
-			break;
-		case Success:
-			WriteFile(hLogFile, "[+] [", 5, NULL, NULL);
-			break;
-		case Warning:
-			WriteFile(hLogFile, "[*] [", 5, NULL, NULL);
-			break;
-		case Info:
-			WriteFile(hLogFile, "[?] [", 5, NULL, NULL);
-			break;
-		case Info_Extended:
-			WriteFile(hLogFile, "[>] [", 5, NULL, NULL);
+	if (hLogFile) {
+		if (level) {
+			switch (level) {
+			case Failed:
+				WriteFile(hLogFile, "[-] [", 5, NULL, NULL);
+				break;
+			case Success:
+				WriteFile(hLogFile, "[+] [", 5, NULL, NULL);
+				break;
+			case Warning:
+				WriteFile(hLogFile, "[*] [", 5, NULL, NULL);
+				break;
+			case Info:
+				WriteFile(hLogFile, "[?] [", 5, NULL, NULL);
+				break;
+			case Info_Extended:
+				WriteFile(hLogFile, "[>] [", 5, NULL, NULL);
+			}
+			WriteFile(hLogFile, mod, strlen(mod), NULL, NULL);
+			WriteFile(hLogFile, "]: \t", 4, NULL, NULL);
 		}
-		WriteFile(hLogFile, mod, strlen(mod), NULL, NULL);
-		WriteFile(hLogFile, "]: \t", 4, NULL, NULL);
 		WriteFile(hLogFile, buffer, strlen(buffer), NULL, NULL);
 	}
 }
