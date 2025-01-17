@@ -25,10 +25,14 @@ Section
 	
 	# Other stuff
 	CreateShortCut "$SMPROGRAMS\Yet Another Packer.lnk" "$INSTDIR\YAPClient.exe"
-	WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "DisplayName" "Yet Another Packer ${VERSION}"
+	WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "DisplayName" "Yet Another Packer"
+	WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "DisplayVersion" "${VERSION}"
 	WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
 	WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "NoModify" 1
 	WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "NoRepair" 1
+	!ifdef INSTALLSIZE
+		WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "EstimatedSize" ${INSTALLSIZE}
+	!endif
 	WriteUninstaller $INSTDIR\uninstall.exe
 SectionEnd
 
