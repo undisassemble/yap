@@ -6,7 +6,7 @@ PE::PE(_In_ char* sFileName) {
 	}
 
 	HANDLE hFile = CreateFileA(sFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile == INVALID_HANDLE_VALUE) {
+	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
 		Status = NoFile;
 		return;
 	}

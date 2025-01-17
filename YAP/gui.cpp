@@ -449,7 +449,14 @@ void DrawGUI() {
 				LOG(Failed, MODULE_YAP, "Failed to open file dialogue: %d\n", CommDlgExtendedError());
 			} else {
 				pAssembly = new Asm(file);
-				CreateThread(0, 0, Begin, 0, 0, 0);
+				if (pAssembly->Status) {
+					Modal("Unable to parse binary\n");
+					LOG(Failed, MODULE_YAP, "Failed to parse binary (%d)\n", pAssembly->Status);
+					delete pAssembly;
+					pAssembly = NULL;
+				} else {
+					CreateThread(0, 0, Begin, 0, 0, 0);
+				}
 			}
 		}
 	}

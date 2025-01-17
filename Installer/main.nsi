@@ -24,7 +24,7 @@ Section
 	File yap.h
 	
 	# Other stuff
-	CreateShortCut "$SMPROGRAMS\Yet Another Packer.lnk" "$INSTDIR\YAP.exe"
+	CreateShortCut "$SMPROGRAMS\Yet Another Packer.lnk" "$INSTDIR\YAPClient.exe"
 	WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "DisplayName" "Yet Another Packer ${VERSION}"
 	WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
 	WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "NoModify" 1

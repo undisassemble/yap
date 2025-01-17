@@ -37,6 +37,7 @@ uint64_t rand64() {
 // Main function
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR lpCmdLine, _In_ int nShowCmd) {
 	// General setup
+	
 	srand(time(NULL));
 	hLogFile = CreateFile("yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hLogFile || hLogFile == INVALID_HANDLE_VALUE) {
@@ -47,7 +48,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	// Get args
 	int argc = 0;
 	wchar_t** argv = CommandLineToArgvW(lpCmdLine, &argc);
-	if (argv) {
+	if (lpCmdLine && lpCmdLine[0] && argv) {
 		// Look for - commands
 		for (int i = 0; i < argc; i++) {
 			if (!lstrcmpW(argv[i], L"--help")) {
@@ -62,40 +63,44 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 		}
 
 		// Search CLI
-		if (argc) {
-			for (int i = 0, n = lstrlenW(argv[0]); i < n; i++) {
-				Data.Project[i] = (char)argv[0][i];
-				Data.Project[i + 1] = 0;
-			}
-			if (argc > 1) {
-				if (!lstrcmpW(argv[1], L"create")) {
-					Console::SetupConsole();
-					SaveProject();
-					return 0;
-				} else if (!lstrcmpW(argv[1], L"version")) {
-					Console::SetupConsole();
-					Console::version();
-					return 0;
-				} else if (!lstrcmpW(argv[1], L"protect")) {
-					if (argc < 3) {
-						LOG(Failed, MODULE_YAP, "Not enough arguments provided\n");
-						return 1;
-					}
-					Console::SetupConsole();
-					Console::protect(argv[2], argc > 3 ? argv[3] : NULL);
-					return 0;
-				}
-			}
-			if (!LoadProject()) LOG(Warning, MODULE_YAP, "Failed to load project\n");
+		for (int i = 0, n = lstrlenW(argv[0]); i < n; i++) {
+			Data.Project[i] = (char)argv[0][i];
+			Data.Project[i + 1] = 0;
 		}
-
-		LOG(Info, MODULE_YAP, "Launched with %d arguments: \"YAP", argc);
-		for (int i = 0; i < argc; i++) {
+		if (argc > 1) {
+			if (!lstrcmpW(argv[1], L"create")) {
+				Console::SetupConsole();
+				SaveProject();
+				return 0;
+			} else if (!lstrcmpW(argv[1], L"version")) {
+				Console::SetupConsole();
+				Console::version();
+				return 0;
+			} else if (!lstrcmpW(argv[1], L"protect")) {
+				if (argc < 3) {
+					LOG(Failed, MODULE_YAP, "Not enough arguments provided\n");
+					return 1;
+				}
+				Console::SetupConsole();
+				LOG(Info, MODULE_YAP, "Launched with %d arguments: \"%ls", argc, argv[0]);
+				for (int i = 1; i < argc; i++) {
+					LOG(Nothing, MODULE_YAP, " %ls", argv[i]);
+				}
+				LOG(Nothing, MODULE_YAP, "\"\n");
+				LOG(Info_Extended, MODULE_YAP, "lpCmdLine: %ls\n", lpCmdLine);
+				Console::protect(argv[2], argc > 2 ? argv[3] : NULL);
+				return 0;
+			}
+		}
+		LOG(Info, MODULE_YAP, "Launched with %d arguments: \"%ls", argc, argv[0]);
+		for (int i = 1; i < argc; i++) {
 			LOG(Nothing, MODULE_YAP, " %ls", argv[i]);
 		}
 		LOG(Nothing, MODULE_YAP, "\"\n");
+		LOG(Info_Extended, MODULE_YAP, "lpCmdLine: %ls\n", lpCmdLine);
+		if (!LoadProject()) LOG(Warning, MODULE_YAP, "Failed to load project\n");
 	} else {
-		LOG(Warning, MODULE_YAP, "Failed to get command args (%d)\n", GetLastError());
+		LOG(Warning, MODULE_YAP, "Failed to get command args or none provided (%d)\n", GetLastError());
 	}
 
 	// Setup UI
@@ -384,12 +389,18 @@ void Console::protect(wchar_t* input, wchar_t* output) {
 		converted[i] = (char)input[i];
 	}
 	pAssembly = new Asm(converted);
+	if (pAssembly->Status) {
+		LOG(Failed, MODULE_YAP, "Failed to parse binary (%d)\n", pAssembly->Status);
+		delete pAssembly;
+		pAssembly = NULL;
+		return;
+	}
 	for (int i = 0, n = lstrlenW(TrueOutput) + 1; i < n; i++) {
 		converted[i] = (char)TrueOutput[i];
 	}
-	LOG(Info, MODULE_YAP, "%ls\n", TrueOutput);
-	LOG(Info, MODULE_YAP, "%s\n", converted);
 	Begin(converted);
+	delete pAssembly;
+	pAssembly = NULL;
 }
 
 void Console::SetupConsole() {

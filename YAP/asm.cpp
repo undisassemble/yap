@@ -83,6 +83,7 @@ bool IsInstructionMemory(_In_ ZydisDecodedInstruction* pInstruction, _In_ ZydisD
 Asm::Asm() : PE(false) {}
 
 Asm::Asm(_In_ char* sFileName) : PE(sFileName) {
+	if (Status) return;
 	ZydisDecoderInit(&Decoder, GetMachine(), ZYDIS_STACK_WIDTH_64);
 	Vector<Line> lines;
 	lines.bExponentialGrowth = true;
