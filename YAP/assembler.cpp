@@ -1,5 +1,12 @@
 #include "assembler.hpp"
 
+bool bFailed = false;
+
+void AsmJitErrorHandler::handleError(_In_ Error error, _In_ const char* message, _In_ BaseEmitter* emitter) {
+	LOG(Failed, MODULE_PACKER, "AsmJit error: %s\n", message);
+	bFailed = true;
+}
+
 int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {
 	if (nMin > nMax) return 0;
 	HeldLocks++;
@@ -599,6 +606,7 @@ Error ProtectedAssembler::movzx(Gp o0, Gp o1) {
 Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) {
 	if (!bWaitingOnEmit && !HeldLocks && !bUnprotected) { stub(); bStrict = false; }
 	else { bWaitingOnEmit = false; }
+	this->bFailed = ::bFailed;
 	return Assembler::_emit(instId, o0, o1, o2, opExt);
 }
 

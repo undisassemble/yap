@@ -1,6 +1,6 @@
-# YAP (Yet Another Packer)
+# Yet Another Packer
 
-Protector for 64-bit windows PE's (exe, dll).
+Protector for AMD64 Windows PE's (exe, dll).
 
 
 ## Features

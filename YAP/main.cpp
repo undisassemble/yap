@@ -98,7 +98,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 		}
 		LOG(Nothing, MODULE_YAP, "\"\n");
 		LOG(Info_Extended, MODULE_YAP, "lpCmdLine: %ls\n", lpCmdLine);
-		if (!LoadProject()) LOG(Warning, MODULE_YAP, "Failed to load project\n");
+		if (!LoadProject()) return 1;
 	} else {
 		LOG(Warning, MODULE_YAP, "Failed to get command args or none provided (%d)\n", GetLastError());
 	}

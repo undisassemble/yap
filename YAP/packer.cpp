@@ -29,7 +29,6 @@ struct DecoderInst {
 Vector<DecoderInst> DecoderProc;
 Vector<uint64_t> TLSCallbacks;
 _ShellcodeData ShellcodeData;
-bool bAsmJitFailed = false;
 
 // Commonly seen section names
 char ValidSectionNames[] = 
@@ -45,15 +44,6 @@ char ValidSectionNames[] =
 	".bss\0\0\0\0"
 	".rdata\0\0"
 	".xdata\0";
-
-// Handle AsmJit errors
-class AsmJitErrorHandler : public ErrorHandler {
-public:
-	void handleError(_In_ Error error, _In_ const char* message, _In_ BaseEmitter* emitter) override {
-		LOG(Failed, MODULE_PACKER, "AsmJit error: %s\n", message);
-		bAsmJitFailed = true;
-	}
-};
 
 Sha256Digest Sha256Str(_In_ char* pStr) {
 	CSha256 sha = { 0 };
@@ -603,7 +593,7 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
 	// Return data
 	holder.flatten();
 	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
-	if (bAsmJitFailed) {
+	if (a.bFailed) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate TLS shellcode\n");
 		return buf;
 	}
@@ -1403,7 +1393,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	// Return data
 	holder.flatten();
 	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
-	if (bAsmJitFailed) {
+	if (a.bFailed) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate loader shellcode\n");
 		return buf;
 	}
@@ -3103,7 +3093,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	// Return data
 	holder.flatten();
 	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
-	if (bAsmJitFailed) {
+	if (a.bFailed) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate internal shellcode\n");
 		return buf;
 	}

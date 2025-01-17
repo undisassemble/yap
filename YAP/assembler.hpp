@@ -1,6 +1,11 @@
 #pragma once
 #include "util.hpp"
 
+class AsmJitErrorHandler : public ErrorHandler {
+public:
+	void handleError(_In_ Error error, _In_ const char* message, _In_ BaseEmitter* emitter) override;
+};
+
 class ProtectedAssembler : public Assembler {
 private:
 	bool bWaitingOnEmit = false;
@@ -58,6 +63,7 @@ private:
 public:
 	bool bMutate = true;
 	bool bSubstitute = true;
+	bool bFailed = false;
 	BYTE MutationLevel = 3;
 
 	void stub();
