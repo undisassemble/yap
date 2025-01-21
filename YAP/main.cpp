@@ -180,7 +180,7 @@ DWORD WINAPI Begin(void* args) {
 						break;
 					case Pointer:
 						n = snprintf(buf, 512, "%8.8s:%p\tPtr 0x%p\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->GetBaseAddress() + line.OldRVA, (line.Pointer.IsAbs ? line.Pointer.Abs : pAssembly->GetBaseAddress() + line.Pointer.RVA));
-					case Encoded:
+					default:
 						break;
 					}
 					WriteFile(hDumped, buf, n, NULL, NULL);
@@ -210,11 +210,6 @@ DWORD WINAPI Begin(void* args) {
 			LOG(Failed, MODULE_YAP, "Failed to strip PE\n");
 			goto th_exit;
 		}
-		if (!pAssembly->Mutate()) {
-			Modal("Failed to mutate PE");
-			LOG(Failed, MODULE_YAP, "Failed to mutate PE\n");
-			goto th_exit;
-		}
 
 		// Virtualize
 		if (Options.VM.bEnabled && !Virtualize(pAssembly)) {
@@ -225,13 +220,6 @@ DWORD WINAPI Begin(void* args) {
 
 		// These parts only required if actually assembling
 		if (bNeedsAssembly) {
-			// Fixup
-			if (!pAssembly->FixAddresses()) {
-				Modal("Address fixer failed");
-				LOG(Failed, MODULE_YAP, "Address fixer failed\n");
-				goto th_exit;
-			}
-
 			// Assemble
 			if (!pAssembly->Assemble()) {
 				Modal("Assembly failed");
@@ -242,7 +230,7 @@ DWORD WINAPI Begin(void* args) {
 			LOG(Info, MODULE_YAP, "Skipping assembly step as assembly is not modified.\n");
 		}
 
-		// Modify (after assembled)
+		// Modify again
 		if (Options.Reassembly.bStripDOSStub) {
 			pAssembly->StripDosStub();
 			pAssembly->FixHeaders();

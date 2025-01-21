@@ -1,5 +1,5 @@
 #include "asm.hpp"
-#include "zyasm.hpp"
+#include "assembler.hpp"
 
 typedef struct {
 	BYTE Version_Flag;
@@ -112,7 +112,7 @@ Asm::Asm(_In_ HANDLE hFile) : PE(hFile) {
 }
 
 Asm::~Asm() {
-	for (int i = 0; i < Sections.Size(); i++) {
+	for (int i = 0; i < Sections.Size(); i++) if (Sections[i].Lines) {
 		Sections[i].Lines->Release();
 		free(Sections[i].Lines);
 	}
@@ -988,7 +988,7 @@ bool Asm::Analyze() {
 	return true;
 }
 
-bool Asm::FixAddresses() {
+/*bool Asm::FixAddresses() {
 	LOG(Info, MODULE_REASSEMBLER, "Patching instructions\n");
 	Vector<Line>* Lines;
 	
@@ -1234,231 +1234,178 @@ bool Asm::FixAddresses() {
 
 	LOG(Success, MODULE_REASSEMBLER, "Patched instructions\n");
 	return true;
-}
-
-bool Asm::Mutate() {
-	return true;
-	LOG(Info, MODULE_REASSEMBLER, "Beginning mutation\n");
-
-	// Vars
-	BYTE encoded[ZYDIS_MAX_INSTRUCTION_LENGTH];
-	ZyanUSize szEncoded = ZYDIS_MAX_INSTRUCTION_LENGTH;
-	ZydisEncoderRequest request;
-	Line replacement;
-	replacement.Type = Decoded;
-
-	for (WORD wSecIndex = 0; wSecIndex < Sections.Size(); wSecIndex++) {
-		Vector<Line> Overwrite;
-		Overwrite.bExponentialGrowth = true;
-		Vector<Line>* Lines = Sections[wSecIndex].Lines;
-		Vector<Line> replacement;
-		for (DWORD i = 0; i < Lines->Size(); i++) {
-			if (Lines->At(i).Type != Decoded) continue;
-
-			bool bAppend = true;
-
-			if (Options.Reassembly.bSubstitution) {
-				// Substitute instruction
-				switch (Lines->At(i).Decoded.Instruction.mnemonic) {
-				case ZYDIS_MNEMONIC_MOV:
-					replacement = zyasm::mov(zyasm::Op(Lines->At(i).Decoded.Operands[0]), zyasm::Op(Lines->At(i).Decoded.Operands[1]));
-					break;
-				}
-				
-				// Replace instruction
-				if (replacement.Size()) {
-					Line first = replacement[0];
-					first.OldRVA = Lines->At(i).OldRVA;
-					replacement.Replace(0, first);
-					Overwrite.Merge(replacement);
-					bAppend = false;
-				}
-				replacement.Release();
-			}
-
-			if (bAppend) {
-				Overwrite.Push(Lines->At(i));
-			}
-		}
-
-		Lines->Release();
-		Lines->nItems = Overwrite.nItems;
-		Lines->raw = Overwrite.raw;
-	}
-
-	LOG(Success, MODULE_REASSEMBLER, "Finished mutation\n");
-	return true;
-}
+}*/
 
 bool Asm::Assemble() {
 	// Setup
 	LOG(Info, MODULE_REASSEMBLER, "Beginning assembly\n");
 	if (!Sections.Size()) return false;
-	ZydisEncoderRequest Request;
-	ZyanStatus Status;
-	Vector<Line>* Lines;
+	Vector<Line>* pLines;
 	Line line;
-	ZyanUSize Size;
-	BYTE Raw[ZYDIS_MAX_INSTRUCTION_LENGTH];
+	Environment environment;
+	environment.setArch(Arch::kX64);
+	CodeHolder holder;
+	holder.init(environment);
+	AsmJitErrorHandler ErrorHandler;
+	holder.setErrorHandler(&ErrorHandler);
+	ProtectedAssembler a(&holder);
+	a.bMutate = a.bSubstitute = false;
+	a.MutationLevel = Options.Packing.MutationLevel;
 
+	// Linker data
+	Vector<DWORD> XREFs;
+	Vector<Label> XREFLabels;
+	Vector<Line> LinkLater;
+	Vector<QWORD> LinkLaterOffsets;
+
+	// Assemble sections
 	for (DWORD SecIndex = 0; SecIndex < Sections.Size(); SecIndex++) {
-		Lines = Sections[SecIndex].Lines;
+		// Prepare next section
+		AsmSection section = Sections[SecIndex];
+		pLines = section.Lines;
+		section.NewRVA = SecIndex ? Sections[SecIndex - 1].NewRVA + a.offset() : SectionHeaders[0].VirtualAddress;
+		DWORD rva = section.NewRVA;
+		section.NewRawSize = 0;
 
-		for (size_t i = 0; i < Lines->Size(); i++) {
-			line = Lines->At(i);
-			
-			if (line.Type == LineType::Request) {
-				Size = ZYDIS_MAX_INSTRUCTION_LENGTH;
-				ZyanStatus status = ZydisEncoderEncodeInstructionAbsolute(&line.Request, Raw, &Size, line.NewRVA);
-				if (ZYAN_FAILED(status)) {
-					LOG(Failed, MODULE_REASSEMBLER, "Failed to assemble inserted instruction (%s)\n", ZydisErrorToString(status));
-					return false;
-				}
-				line.Type = Encoded;
-				line.Encoded.Size = Size;
-				memcpy(line.Encoded.Raw, Raw, Size);
-				Lines->Replace(i, line);
-				continue;
-			} if (line.Type != Decoded) {
-				continue;
-			}
+		// Assemble lines
+		for (int i = 0; i < pLines->Size(); i++) {
+			line = pLines->At(i);
+			line.NewRVA = rva;
+			pLines->Replace(i, line);
+			size_t off = a.offset();
 
-			// Translate to encoder request
-			if (ZYAN_FAILED(Status = ZydisEncoderDecodedInstructionToEncoderRequest(&line.Decoded.Instruction, line.Decoded.Operands, line.Decoded.Instruction.operand_count_visible, &Request))) {
-				LOG(Failed, MODULE_REASSEMBLER, "Assembler failed at translation (%s)\n", ZydisErrorToString(Status));
-				return false;
-			}
-			
-			// Encode the actual instruction
-			Size = ZYDIS_MAX_INSTRUCTION_LENGTH;
-			if (ZYAN_FAILED(Status = ZydisEncoderEncodeInstruction(&Request, Raw, &Size))) {
-				LOG(Failed, MODULE_REASSEMBLER, "Assembler failed to encode instruction at %p (%s)\n", GetBaseAddress() + line.OldRVA, ZydisErrorToString(Status));
-				return false;
-			}
-
-			// Encoded instruction was larger than the original instruction, this may get fixed later
-			if (line.Decoded.Instruction.length < Size) {
-				LOG(Failed, MODULE_REASSEMBLER, "Assembler output was too large\n");
-				return false;
-			}
-
-			// If the assembled size is less than the original, some modifications need to be made
-			if (Size < line.Decoded.Instruction.length) {
-				// Change immediate values if the instruction changes control flow
-				bool bCheckImm = IsInstructionCF(line.Decoded.Instruction.mnemonic);
-
-				// If there are any memory operations, change the relative offset
-				bool bReencode = false;
-				for (int j = 0; j < line.Decoded.Instruction.operand_count_visible; j++) {
-					if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Decoded.Operands[j].mem.disp.value && (line.Decoded.Operands[j].mem.base == ZYDIS_REGISTER_RIP || line.Decoded.Operands[j].mem.base == ZYDIS_REGISTER_EIP)) {
-						line.Decoded.Operands[j].mem.disp.value += line.Decoded.Instruction.length - Size;
-						bReencode = true;
-					}
-
-					else if (bCheckImm && line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
-						line.Decoded.Operands[j].imm.value.s += line.Decoded.Instruction.length - Size;
-						bReencode = true;
-					}
-				}
-
-				// Translate
-				if (bReencode) {
-					if (ZYAN_FAILED(Status = ZydisEncoderDecodedInstructionToEncoderRequest(&line.Decoded.Instruction, line.Decoded.Operands, line.Decoded.Instruction.operand_count_visible, &Request))) {
-						LOG(Failed, MODULE_REASSEMBLER, "Assembler failed at translation (%s)\n", ZydisErrorToString(Status));
-						LOG(Info_Extended, MODULE_REASSEMBLER, "At line %zu\n", i + 1);
-						LOG(Info_Extended, MODULE_REASSEMBLER, "Due to resized instruction\n");
-						return false;
-					}
-
-					// Re-encode
-					Size = ZYDIS_MAX_INSTRUCTION_LENGTH;
-					if (ZYAN_FAILED(Status = ZydisEncoderEncodeInstruction(&Request, Raw, &Size))) {
-						LOG(Failed, MODULE_REASSEMBLER, "Assembler failed at encoding (%s)\n", ZydisErrorToString(Status));
-						LOG(Info_Extended, MODULE_REASSEMBLER, "At line %zu\n", i + 1);
-						return false;
-					}
-				}
-
-				// Add NOPs
-				ZydisEncoderNopFill(&Raw[Size], line.Decoded.Instruction.length - Size);
-				Size = line.Decoded.Instruction.length;
-			}
-
-			// Replace
-			line.Type = Encoded;
-			line.Encoded.Size = Size;
-			memcpy(line.Encoded.Raw, Raw, Size);
-			Lines->Replace(i, line);
-		}
-
-		// Finally, construct the output buffer
-		Buffer Buf = { 0 };
-		IMAGE_SECTION_HEADER* pCurrentSection = NULL;
-		for (size_t i = 0, n = Lines->Size(); i < n; i++) {
-			line = Lines->At(i);
-			if (line.Type == Padding) {
-				if (i < n - 1) {
-					LOG(Failed, MODULE_REASSEMBLER, "Encountered code beyond the end of the section.\n");
-					LOG(Info_Extended, MODULE_REASSEMBLER, "In section %.8s\n", SectionHeaders[i].Name);
-					return false;
-				}
-				continue;
-			}
-
-			// Insert data
-			if (line.Type != RawInsert) {
-				Buf.u64Size += GetLineSize(line);
-				Buf.pBytes = reinterpret_cast<BYTE*>(realloc(Buf.pBytes, Buf.u64Size));
-			}
 			switch (line.Type) {
-			case Encoded:
-				memcpy(Buf.pBytes + Buf.u64Size - line.Encoded.Size, line.Encoded.Raw, line.Encoded.Size);
+			case Decoded: {
+				// Calculate referenced address
+				int rel = -1;
+				uint64_t refs = 0;
+				Label ah;
+				if (IsInstructionCF(line.Decoded.Instruction.mnemonic) && line.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
+					rel = 0;
+				} else {
+					for (int i = 0; i < line.Decoded.Instruction.operand_count_visible; i++) {
+						if (line.Decoded.Operands[i].type == ZYDIS_OPERAND_TYPE_MEMORY && (line.Decoded.Operands[i].mem.base == ZYDIS_REGISTER_RIP || line.Decoded.Operands[i].mem.index == ZYDIS_REGISTER_RIP)) {
+							rel = i;
+							break;
+						}
+					}
+				}
+				if (rel >= 0) {
+					if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&line.Decoded.Instruction, &line.Decoded.Operands[rel], line.OldRVA, &refs))) {
+						LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate reference address of instruction at %p\n", GetBaseAddress() + line.OldRVA);
+						return false;
+					}
+					int loc = XREFs.Find(refs);
+					if (loc < 0) {
+						XREFs.Push(refs);
+						ah = a.newLabel();
+						XREFLabels.Push(ah);
+					} else {
+						ah = XREFLabels[loc];
+					}
+				}
+
+				// Encode
+				a.FromDis(&line, rel >= 0 ? &ah : NULL);
 				break;
-			case Embed:
-				ReadRVA(line.OldRVA, Buf.pBytes + Buf.u64Size - line.Embed.Size, line.Embed.Size);
+			}
+			case Embed: {
+				Buffer buf = { 0 };
+				buf.u64Size = line.Embed.Size;
+				buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+				ReadRVA(line.OldRVA, buf.pBytes, line.Embed.Size);
+				a.embed(buf.pBytes, buf.u64Size);
+				buf.Release();
+				break;
+			}
+			case RawInsert:
+				a.embed(line.RawInsert.pBytes, line.RawInsert.u64Size);
+				break;
+			case Padding:
+				section.NewRawSize += line.Padding.Size;
+				if (i < pLines->Size() - 1) {
+					LOG(Failed, MODULE_REASSEMBLER, "Ran into padding in the middle of a section\n");
+					return false;
+				}
 				break;
 			case JumpTable:
-				*reinterpret_cast<DWORD*>(Buf.pBytes + Buf.u64Size - sizeof(DWORD)) = line.JumpTable.Value;
-				break;
-			case RawInsert:
-				Buf.Merge(line.RawInsert);
+				LinkLaterOffsets.Push(a.offset());
+				a.dd(0);
+				LinkLater.Push(line);
 				break;
 			case Pointer:
-				if (line.Pointer.IsAbs) {
-					*reinterpret_cast<QWORD*>(Buf.pBytes + Buf.u64Size - sizeof(QWORD)) = line.Pointer.Abs;
-				} else {
-					*reinterpret_cast<DWORD*>(Buf.pBytes + Buf.u64Size - sizeof(DWORD)) = line.Pointer.RVA;
-				}
-				break;
-			default:
-				LOG(Warning, MODULE_REASSEMBLER, "No data inserted at %#x!\n", line.NewRVA);
+				LinkLaterOffsets.Push(a.offset());
+				if (line.Pointer.IsAbs) a.dq(0);
+				else a.dd(0);
+				LinkLater.Push(line);
 			}
+
+			rva += a.offset() - off;
 		}
 
-		// Dump section data
-#ifdef _DEBUG
-		if (Options.Debug.bDumpSections) {
-			char sname[12] = { 0 };
-			snprintf(sname, 12, "%.8s.bin", SectionHeaders[SecIndex].Name);
-			HANDLE hFile = CreateFile(sname, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-			WriteFile(hFile, Buf.pBytes, Buf.u64Size, NULL, NULL);
-			CloseHandle(hFile);
+		// Finalize section
+		a.align(AlignMode::kZero, NTHeaders.x64.OptionalHeader.SectionAlignment);
+		section.NewRawSize += a.offset() - section.NewRVA;
+		Sections.Replace(SecIndex, section);
+	}
+
+	// Link
+	if (XREFs.Size() != XREFLabels.Size()) {
+		LOG(Failed, MODULE_REASSEMBLER, "This should never happen (XREFs.Size() != XREFLabels.Size())\n");
+		return false;
+	}
+	if (LinkLater.Size() != LinkLaterOffsets.Size()) {
+		LOG(Failed, MODULE_REASSEMBLER, "This should never happen part 2 (LinkLater.Size() != LinkLaterOffsets.Size())\n");
+		return false;
+	}
+	for (int i = 0; i < LinkLater.Size(); i++) {
+		break; // Argh
+		line = LinkLater[i];
+		//a.setOffset(LinkLaterOffsets[i]);
+		if (line.Type == JumpTable) {
+			// TODO
+		} else if (line.Type == Pointer) {
+			if (line.Pointer.IsAbs) {
+				
+			} else {
+
+			}
+		} else {
+			LOG(Failed, MODULE_REASSEMBLER, "This also should never happen (LinkLater[i].Type != JumpTable && LinkLater[i].Type != Pointer)\n");
+			return false;
 		}
-#endif
-
-		AsmSection sec = Sections[SecIndex];
-		sec.Assembled = Buf;
-		Sections.Replace(SecIndex, sec);
+	}
+	for (int i = 0; i < XREFs.Size(); i++) {
+		holder.bindLabel(XREFLabels[i], holder.textSection()->id(), TranslateOldAddress(XREFs[i]) - SectionHeaders[0].VirtualAddress);
+	}
+	LinkLater.Release();
+	LinkLaterOffsets.Release();
+	XREFs.Release();
+	XREFLabels.Release();
+	if (a.bFailed) {
+		LOG(Failed, MODULE_REASSEMBLER, "Detected assembly errors\n");
+		return false;
 	}
 
-	for (int i = 0; i < Sections.Size(); i++) {
-		OverwriteSection(i, Sections[i].Assembled.pBytes, Sections[i].Assembled.u64Size);
-		IMAGE_SECTION_HEADER Header = SectionHeaders[i];
-		Header.VirtualAddress = Sections[i].NewRVA;
-		Header.Misc.VirtualSize = Sections[i].NewSize;
-		SectionHeaders.Replace(i, Header);
+	// Copy data
+	holder.flatten();
+	holder.relocateToBase(GetBaseAddress() + SectionHeaders[0].VirtualAddress);
+	if (a.bFailed) {
+		LOG(Failed, MODULE_PACKER, "Failed to generate TLS shellcode\n");
+		return false;
 	}
-
+	for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+		SectionData[i].Release();
+		Buffer buf = { 0 };
+		buf.u64Size = Sections[i].NewRawSize;
+		buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+		memcpy(buf.pBytes, holder.textSection()->buffer().data() + Sections[i].NewRVA - SectionHeaders[0].VirtualAddress, buf.u64Size);
+		SectionData.Replace(i, buf);
+		IMAGE_SECTION_HEADER header = SectionHeaders[i];
+		header.VirtualAddress = Sections[i].NewRVA;
+		header.SizeOfRawData = Sections[i].NewRawSize;
+		header.Misc.VirtualSize = Sections[i].NewVirtualSize;
+	}
 	FixHeaders();
 	LOG(Success, MODULE_REASSEMBLER, "Finished assembly\n");
 	return true;
@@ -1602,23 +1549,6 @@ DWORD Asm::TranslateOldAddress(_In_ DWORD dwRVA) {
 	return dwRVA + Sections[SecIndex].NewRVA - Sections[SecIndex].OldRVA;
 }
 
-bool Asm::InsertNewLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ ZydisEncoderRequest* pRequest) {
-	if (!pRequest || SectionIndex >= Sections.Size() || LineIndex > Sections[SectionIndex].Lines->Size()) return false;
-	pRequest->machine_mode = ZYDIS_MACHINE_MODE_LONG_64;
-	Line line = { 0 };
-	line.Type = Encoded;
-	ZyanUSize sz = ZYDIS_MAX_INSTRUCTION_LENGTH;
-	ZyanStatus status = ZydisEncoderEncodeInstruction(pRequest, line.Encoded.Raw, &sz);
-	if (ZYAN_SUCCESS(status)) {
-		line.Encoded.Size = sz;
-		Sections[SectionIndex].Lines->Insert(LineIndex, line);
-		return true;
-	} else {
-		LOG(Failed, MODULE_REASSEMBLER, "Failed to assemble line: %s\n", ZydisErrorToString(status));
-		return false;
-	}
-}
-
 void Asm::DeleteLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex) {
 	Sections[SectionIndex].Lines->Remove(LineIndex);
 }
@@ -1660,12 +1590,10 @@ Vector<FunctionRange> Asm::GetDisassembledFunctionRanges() {
 	return clone;
 }
 
-DWORD GetLineSize(_In_ Line line) {
+DWORD GetLineSize(_In_ Line& line) {
 	switch (line.Type) {
 	case Decoded:
 		return line.Decoded.Instruction.length;
-	case Encoded:
-		return line.Encoded.Size;
 	case Embed:
 		return line.Embed.Size;
 	case Padding:
@@ -1676,28 +1604,7 @@ DWORD GetLineSize(_In_ Line line) {
 		return line.RawInsert.u64Size;
 	case Pointer:
 		return (line.Pointer.IsAbs ? sizeof(uint64_t) : sizeof(DWORD));
-	case Request: {
-		BYTE Raw[ZYDIS_MAX_INSTRUCTION_LENGTH];
-		ZyanUSize Size = ZYDIS_MAX_INSTRUCTION_LENGTH;
-		ZyanStatus status;
-		if (line.bRelative) {
-			if (IsInstructionCF(line.Request.mnemonic) && line.Request.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
-				line.Request.operands[0].imm.s = 0x100;
-			} else {
-				for (int j = 0; j < line.Request.operand_count; j++) {
-					if (line.Request.operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Request.operands[j].mem.base == ZYDIS_REGISTER_RIP) {
-						line.Request.operands[j].mem.base = ZYDIS_REGISTER_NONE;
-						line.Request.operands[0].mem.displacement = 0x100;
-					}
-				}
-			}
-		}
-		if (ZYAN_FAILED(status = ZydisEncoderEncodeInstructionAbsolute(&line.Request, Raw, &Size, line.NewRVA))) {
-			LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate length of instruction (request) (%s)\n", ZydisErrorToString(status));
-			return 0;
-		}
-		return Size;
-	}}
+	}
 	LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate length of instruction (unknown mnemonic)\n");
 	return 0;
 }

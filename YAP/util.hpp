@@ -277,11 +277,20 @@ struct Vector {
 		nItems--;
 	}
 
-	bool Includes(_In_ T Item) {
+	/// <summary>
+	/// Finds item in array
+	/// </summary>
+	/// <param name="Item">Item to find</param>
+	/// <returns>Index of item, or -1 if not found</returns>
+	int Find(_In_ T Item) {
 		for (int i = 0, n = Size(); i < n; i++) {
-			if (!memcmp(&Item, &((T*)raw.pBytes)[i], sizeof(T))) return true;
+			if (!memcmp(&Item, &((T*)raw.pBytes)[i], sizeof(T))) return i;
 		}
-		return false;
+		return -1;
+	}
+
+	bool Includes(_In_ T Item) {
+		return Find(Item) >= 0;
 	}
 
 	//~Vector() {

@@ -6,8 +6,6 @@
 /// All functions are provided if they were imported, regardless of configuration options when packing.
 /// You also cannot use GetProcAddress to get access to these functions.
 /// 
-/// Define YAP_EDR to import YAP-based WINAPI functions
-/// 
 /// Have a good day :)
 
 #pragma once
@@ -31,6 +29,7 @@ extern "C" {
 /// <summary>
 /// Manually check for attached debuggers.
 /// It is highly recommended that you use this in your main thread, as no protective threads are spawned by the packer.
+/// Only the main thread of the application can check for hardware breakpoints.
 /// </summary>
 /// <returns>true if debugger is found, false otherwise</returns>
 YAP_IMPORT(bool) CheckForDebuggers();

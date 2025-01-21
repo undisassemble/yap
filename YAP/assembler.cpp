@@ -30,9 +30,13 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 		
 		switch (pLine->Decoded.Operands[i].type) {
 		case ZYDIS_OPERAND_TYPE_IMMEDIATE:
-			immop = Imm();
-			immop._setValueInternal(pLine->Decoded.Operands[i].imm.value.s, ImmType::kInt);
-			ops[i] = immop;
+			if (pLabel && pLine->Decoded.Instruction.operand_count_visible == 1) { // Probably jmp or smthn
+				ops[0] = *pLabel;
+			} else {
+				immop = Imm();
+				immop._setValueInternal(pLine->Decoded.Operands[i].imm.value.s, ImmType::kInt);
+				ops[i] = immop;
+			}
 			break;
 		case ZYDIS_OPERAND_TYPE_REGISTER:
 			ops[i] = ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].reg.value];
@@ -40,6 +44,7 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 		case ZYDIS_OPERAND_TYPE_POINTER:
 			memop = Mem(pLine->Decoded.Operands[i].ptr.offset);
 			memop.setSegment(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].ptr.segment]._baseId); // might need to be changed, relies on segment being a zydis encoded register
+			memop.setSize(pLine->Decoded.Operands[i].size / 8);
 			ops[i] = memop;
 			break;
 		case ZYDIS_OPERAND_TYPE_MEMORY: // Also might need to be changed, dunno if scale is 2^scale or not
@@ -49,6 +54,7 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 				memop = Mem(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.base], ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], pLine->Decoded.Operands[i].mem.scale, pLine->Decoded.Operands[i].mem.disp.has_displacement ? pLine->Decoded.Operands[i].mem.disp.value : 0);
 			}
 			memop.setSegment(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].ptr.segment]._baseId);
+			memop.setSize(pLine->Decoded.Operands[i].size / 8);
 			ops[i] = memop;
 		}
 	}
@@ -60,7 +66,7 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 		LOG(Warning, MODULE_REASSEMBLER, "Unable to process all operands: %s\n", formatted);
 	}
 
-	return !_emit(mnem, ops[0], ops[1], ops[2], pLine->Decoded.Instruction.operand_count_visible < 4 ? NULL : &ops[3]);
+	return !_emit(mnem, ops[0], ops[1], ops[2], &ops[3]);
 }
 
 int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {

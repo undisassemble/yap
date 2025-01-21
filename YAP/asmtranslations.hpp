@@ -473,7 +473,7 @@ InstId Mnemonics[ZYDIS_MNEMONIC_MAX_VALUE + 1] = {
     Inst::kIdMovq,
     Inst::kIdMovq2dq,
     Inst::kIdNone,
-    Inst::kIdMovsd,
+    Inst::kIdNone, //Inst::kIdMovsd,
     Inst::kIdMovshdup,
     Inst::kIdMovsldup,
     Inst::kIdNone,

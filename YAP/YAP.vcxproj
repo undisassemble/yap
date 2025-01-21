@@ -199,7 +199,6 @@
     <ClCompile Include="packer.cpp" />
     <ClCompile Include="pe.cpp" />
     <ClCompile Include="vm.cpp" />
-    <ClCompile Include="zyasm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="asm.hpp" />
@@ -232,7 +231,6 @@
     <ClInclude Include="util.hpp" />
     <ClInclude Include="vm.hpp" />
     <ClInclude Include="vm_types.hpp" />
-    <ClInclude Include="zyasm.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="LzmaDecode.raw" />

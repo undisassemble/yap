@@ -2,16 +2,15 @@
 
 #include "util.hpp"
 #include "pe.hpp"
+#include <asmjit/asmjit.h>
 
 enum LineType : BYTE {
 	Decoded,
-	Encoded,
 	Embed,
 	RawInsert,
 	Padding,
 	JumpTable,
 	Pointer,
-	Request
 };
 
 struct Line {
@@ -25,10 +24,6 @@ struct Line {
 			ZydisDecodedInstruction Instruction;
 			ZydisDecodedOperand Operands[ZYDIS_MAX_OPERAND_COUNT_VISIBLE];
 		} Decoded;
-		struct {
-			BYTE Raw[ZYDIS_MAX_INSTRUCTION_LENGTH];
-			BYTE Size;
-		} Encoded;
 		struct {
 			DWORD Size;
 		} Embed;
@@ -47,7 +42,6 @@ struct Line {
 			};
 			bool IsAbs;
 		} Pointer;
-		ZydisEncoderRequest Request;
 	};
 };
 
@@ -55,8 +49,8 @@ struct AsmSection {
 	DWORD OldRVA = 0;
 	DWORD NewRVA = 0;
 	DWORD OldSize = 0;
-	DWORD NewSize = 0;
-	Buffer Assembled;
+	DWORD NewRawSize = 0;
+	DWORD NewVirtualSize = 0;
 	Vector<Line>* Lines;
 };
 
@@ -66,7 +60,7 @@ struct FunctionRange {
 	DWORD dwSize = 0;
 };
 
-DWORD GetLineSize(_In_ Line line);
+DWORD GetLineSize(_In_ Line& line);
 
 /// <summary>
 /// Encodes an array of relocation RVAs into the relocation directory.
@@ -108,8 +102,6 @@ public:
 	/// <returns>Success/failure</returns>
 	bool Strip();
 
-	bool Mutate();
-
 	DWORD TranslateOldAddress(_In_ DWORD dwRVA);
 
 	/// <summary>
@@ -146,7 +138,6 @@ public:
 	/// <returns>Success/failure</returns>
 	void InsertLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ Line Line);
 
-	bool InsertNewLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ ZydisEncoderRequest* pRequest);
 	void DeleteLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex);
 	void RemoveData(_In_ DWORD dwRVA, _In_ DWORD dwSize);
 
@@ -156,9 +147,4 @@ public:
 	Vector<AsmSection> GetSections();
 
 	void DeleteSection(_In_ WORD wIndex) override;
-
-	/// <summary>
-	/// Fixes addresses in existing asm code
-	/// </summary>
-	bool FixAddresses();
 };
