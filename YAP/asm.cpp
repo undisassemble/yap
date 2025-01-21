@@ -1263,9 +1263,10 @@ bool Asm::Assemble() {
 		// Prepare next section
 		AsmSection section = Sections[SecIndex];
 		pLines = section.Lines;
-		section.NewRVA = SecIndex ? Sections[SecIndex - 1].NewRVA + a.offset() : SectionHeaders[0].VirtualAddress;
+		section.NewRVA = a.offset() + SectionHeaders[0].VirtualAddress;
 		DWORD rva = section.NewRVA;
 		section.NewRawSize = 0;
+		section.NewVirtualSize = 0;
 
 		// Assemble lines
 		for (int i = 0; i < pLines->Size(); i++) {
@@ -1322,7 +1323,8 @@ bool Asm::Assemble() {
 				a.embed(line.RawInsert.pBytes, line.RawInsert.u64Size);
 				break;
 			case Padding:
-				section.NewRawSize += line.Padding.Size;
+				section.NewVirtualSize += line.Padding.Size;
+				a.db(0, line.Padding.Size);
 				if (i < pLines->Size() - 1) {
 					LOG(Failed, MODULE_REASSEMBLER, "Ran into padding in the middle of a section\n");
 					return false;
@@ -1344,8 +1346,12 @@ bool Asm::Assemble() {
 		}
 
 		// Finalize section
-		a.align(AlignMode::kZero, NTHeaders.x64.OptionalHeader.SectionAlignment);
-		section.NewRawSize += a.offset() - section.NewRVA;
+		section.NewRawSize = a.offset() - (section.NewRVA - SectionHeaders[0].VirtualAddress);
+		section.NewRawSize -= section.NewVirtualSize;
+		section.NewVirtualSize += section.NewRawSize;
+		if (a.offset() % NTHeaders.x64.OptionalHeader.SectionAlignment) {
+			a.db(0, NTHeaders.x64.OptionalHeader.SectionAlignment - a.offset() % NTHeaders.x64.OptionalHeader.SectionAlignment);
+		}
 		Sections.Replace(SecIndex, section);
 	}
 
@@ -1361,7 +1367,6 @@ bool Asm::Assemble() {
 	for (int i = 0; i < LinkLater.Size(); i++) {
 		break; // Argh
 		line = LinkLater[i];
-		//a.setOffset(LinkLaterOffsets[i]);
 		if (line.Type == JumpTable) {
 			// TODO
 		} else if (line.Type == Pointer) {
@@ -1391,14 +1396,19 @@ bool Asm::Assemble() {
 	holder.flatten();
 	holder.relocateToBase(GetBaseAddress() + SectionHeaders[0].VirtualAddress);
 	if (a.bFailed) {
-		LOG(Failed, MODULE_PACKER, "Failed to generate TLS shellcode\n");
+		LOG(Failed, MODULE_PACKER, "Failed to assemble\n");
 		return false;
 	}
 	for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
 		SectionData[i].Release();
 		Buffer buf = { 0 };
+		SectionData.Replace(i, buf);
 		buf.u64Size = Sections[i].NewRawSize;
 		buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+		if (holder.textSection()->buffer().size() < Sections[i].NewRVA - SectionHeaders[0].VirtualAddress + buf.u64Size) {
+			LOG(Failed, MODULE_REASSEMBLER, "Failed to read assembled code (size: %p, expected: %p)\n", holder.textSection()->buffer().size(), Sections[i].NewRVA - SectionHeaders[0].VirtualAddress + buf.u64Size);
+			return false;
+		}
 		memcpy(buf.pBytes, holder.textSection()->buffer().data() + Sections[i].NewRVA - SectionHeaders[0].VirtualAddress, buf.u64Size);
 		SectionData.Replace(i, buf);
 		IMAGE_SECTION_HEADER header = SectionHeaders[i];

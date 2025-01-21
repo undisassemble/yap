@@ -22,6 +22,11 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 		return false;
 	}
 
+	// movsd
+	if (mnem == Inst::kIdMovsd && !pLine->Decoded.Instruction.operand_count_visible) {
+		return !movsd();
+	}
+
 	// Convert operands
 	Operand_ ops[4] = { 0 };
 	for (int i = 0; i < pLine->Decoded.Instruction.operand_count_visible && i < 4; i++) {
