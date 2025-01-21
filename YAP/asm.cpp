@@ -1238,7 +1238,7 @@ bool Asm::Analyze() {
 
 bool Asm::Assemble() {
 	// Setup
-	LOG(Info, MODULE_REASSEMBLER, "Beginning assembly\n");
+	LOG(Info, MODULE_REASSEMBLER, "Assembling\n");
 	if (!Sections.Size()) return false;
 	Vector<Line>* pLines;
 	Line line;
@@ -1356,6 +1356,7 @@ bool Asm::Assemble() {
 	}
 
 	// Link
+	LOG(Info, MODULE_REASSEMBLER, "Linking\n");
 	if (XREFs.Size() != XREFLabels.Size()) {
 		LOG(Failed, MODULE_REASSEMBLER, "This should never happen (XREFs.Size() != XREFLabels.Size())\n");
 		return false;
@@ -1365,15 +1366,16 @@ bool Asm::Assemble() {
 		return false;
 	}
 	for (int i = 0; i < LinkLater.Size(); i++) {
-		break; // Argh
 		line = LinkLater[i];
 		if (line.Type == JumpTable) {
-			// TODO
+			if (line.bRelative) line.JumpTable.Base = TranslateOldAddress(line.JumpTable.Base);
+			line.JumpTable.Value = TranslateOldAddress((line.bRelative ? line.JumpTable.Base : 0) + line.JumpTable.Value) - (line.bRelative ? line.JumpTable.Base : 0);
+			*reinterpret_cast<DWORD*>(holder.textSection()->buffer().data() + LinkLaterOffsets[i]) = line.JumpTable.Value;
 		} else if (line.Type == Pointer) {
 			if (line.Pointer.IsAbs) {
-				
+				*reinterpret_cast<QWORD*>(holder.textSection()->buffer().data() + LinkLaterOffsets[i]) = GetBaseAddress() + TranslateOldAddress(line.Pointer.Abs - GetBaseAddress());
 			} else {
-
+				*reinterpret_cast<DWORD*>(holder.textSection()->buffer().data() + LinkLaterOffsets[i]) = TranslateOldAddress(line.Pointer.RVA);
 			}
 		} else {
 			LOG(Failed, MODULE_REASSEMBLER, "This also should never happen (LinkLater[i].Type != JumpTable && LinkLater[i].Type != Pointer)\n");
@@ -1392,9 +1394,24 @@ bool Asm::Assemble() {
 		return false;
 	}
 
+	// Translate known addresses
+	for (int i = 0; i < 16; i++) {
+		if (i == 5) continue;
+		NTHeaders.x64.OptionalHeader.DataDirectory[i].VirtualAddress = TranslateOldAddress(NTHeaders.x64.OptionalHeader.DataDirectory[i].VirtualAddress);
+		if (NTHeaders.x64.OptionalHeader.DataDirectory[i].VirtualAddress == _UI32_MAX) {
+			LOG(Warning, MODULE_REASSEMBLER, "Failed to translate data directory %d\n", i);
+			NTHeaders.x64.OptionalHeader.DataDirectory[i].VirtualAddress = NTHeaders.x64.OptionalHeader.DataDirectory[i].Size = 0;
+		}
+	}
+	NTHeaders.x64.OptionalHeader.AddressOfEntryPoint = TranslateOldAddress(NTHeaders.x64.OptionalHeader.AddressOfEntryPoint);
+
 	// Copy data
+	LOG(Info, MODULE_REASSEMBLER, "Finalizing\n");
 	holder.flatten();
 	holder.relocateToBase(GetBaseAddress() + SectionHeaders[0].VirtualAddress);
+	LOG(Info_Extended, MODULE_REASSEMBLER, "Assembled code has %d sections, and %s have relocations\n", holder.sectionCount(), holder.hasRelocEntries() ? "does" : "does not");
+	if (holder.hasUnresolvedLinks()) holder.resolveUnresolvedLinks();
+	if (holder.hasUnresolvedLinks()) LOG(Warning, MODULE_REASSEMBLER, "Assembled code has %d unsolved links\n", holder.unresolvedLinkCount());
 	if (a.bFailed) {
 		LOG(Failed, MODULE_PACKER, "Failed to assemble\n");
 		return false;
@@ -1415,6 +1432,7 @@ bool Asm::Assemble() {
 		header.VirtualAddress = Sections[i].NewRVA;
 		header.SizeOfRawData = Sections[i].NewRawSize;
 		header.Misc.VirtualSize = Sections[i].NewVirtualSize;
+		SectionHeaders.Replace(i, header);
 	}
 	FixHeaders();
 	LOG(Success, MODULE_REASSEMBLER, "Finished assembly\n");

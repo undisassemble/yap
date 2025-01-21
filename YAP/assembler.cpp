@@ -32,6 +32,7 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 	for (int i = 0; i < pLine->Decoded.Instruction.operand_count_visible && i < 4; i++) {
 		Mem memop;
 		Imm immop;
+		int scale = 0;
 		
 		switch (pLine->Decoded.Operands[i].type) {
 		case ZYDIS_OPERAND_TYPE_IMMEDIATE:
@@ -52,13 +53,17 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 			memop.setSize(pLine->Decoded.Operands[i].size / 8);
 			ops[i] = memop;
 			break;
-		case ZYDIS_OPERAND_TYPE_MEMORY: // Also might need to be changed, dunno if scale is 2^scale or not
+		case ZYDIS_OPERAND_TYPE_MEMORY:
+			if (pLine->Decoded.Operands[i].mem.scale == 2) scale = 1;
+			else if (pLine->Decoded.Operands[i].mem.scale == 4) scale = 2;
+			else if (pLine->Decoded.Operands[i].mem.scale == 8) scale = 3;
 			if (pLabel) {
-				memop = Mem(*pLabel, ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], pLine->Decoded.Operands[i].mem.scale, pLine->Decoded.Operands[i].mem.disp.has_displacement ? pLine->Decoded.Operands[i].mem.disp.value : 0);
+				memop = Mem(*pLabel, ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], scale, 0);
 			} else {
-				memop = Mem(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.base], ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], pLine->Decoded.Operands[i].mem.scale, pLine->Decoded.Operands[i].mem.disp.has_displacement ? pLine->Decoded.Operands[i].mem.disp.value : 0);
+				memop = Mem(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.base], ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], scale, pLine->Decoded.Operands[i].mem.disp.has_displacement ? pLine->Decoded.Operands[i].mem.disp.value : 0);
 			}
-			memop.setSegment(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].ptr.segment]._baseId);
+			if (pLine->Decoded.Operands[i].mem.segment == ZYDIS_REGISTER_GS) memop.setSegment(gs);
+			else if (pLine->Decoded.Operands[i].mem.segment == ZYDIS_REGISTER_FS) memop.setSegment(fs);
 			memop.setSize(pLine->Decoded.Operands[i].size / 8);
 			ops[i] = memop;
 		}
