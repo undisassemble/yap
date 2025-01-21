@@ -1,5 +1,6 @@
 #pragma once
 #include "util.hpp"
+#include "asm.hpp"
 
 class AsmJitErrorHandler : public ErrorHandler {
 public:
@@ -65,6 +66,14 @@ public:
 	bool bSubstitute = true;
 	bool bFailed = false;
 	BYTE MutationLevel = 3;
+
+	/// <summary>
+	/// Converts and assembles a decoded instruction.
+	/// </summary>
+	/// <param name="pLine">Pointer to decoded line</param>
+	/// <param name="pLabel">Pointer to label referenced, if used</param>
+	/// <returns>Success/failure</returns>
+	bool FromDis(_In_ Line* pLine, _In_ Label* pLabel = NULL);
 
 	void stub();
 	size_t garbage();

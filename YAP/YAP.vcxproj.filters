@@ -179,6 +179,9 @@
     <ClInclude Include="imgui_impl_opengl3.h">
       <Filter>Header Files\Vendor</Filter>
     </ClInclude>
+    <ClInclude Include="asmtranslations.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="LzmaDecode.raw">

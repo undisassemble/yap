@@ -1,10 +1,66 @@
 #include "assembler.hpp"
+#include "asmtranslations.hpp"
 
 bool bFailed = false;
 
 void AsmJitErrorHandler::handleError(_In_ Error error, _In_ const char* message, _In_ BaseEmitter* emitter) {
-	LOG(Failed, MODULE_PACKER, "AsmJit error: %s\n", message);
+	LOG(Failed, MODULE_YAP, "AsmJit error: %s\n", message);
 	bFailed = true;
+}
+
+bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
+	if (!pLine || pLine->Type != Decoded) return false;
+
+	// Convert mnemonic
+	InstId mnem = ZydisToAsmJit::Mnemonics[pLine->Decoded.Instruction.mnemonic];
+	if (!mnem) {
+		char formatted[MAX_PATH];
+		ZydisFormatter fmt;
+		ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
+		ZydisFormatterFormatInstruction(&fmt, &pLine->Decoded.Instruction, pLine->Decoded.Operands, pLine->Decoded.Instruction.operand_count_visible, formatted, sizeof(formatted), pLine->OldRVA, NULL);
+		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate mnemonic: %s\n", formatted);
+		return false;
+	}
+
+	// Convert operands
+	Operand_ ops[4] = { 0 };
+	for (int i = 0; i < pLine->Decoded.Instruction.operand_count_visible && i < 4; i++) {
+		Mem memop;
+		Imm immop;
+		
+		switch (pLine->Decoded.Operands[i].type) {
+		case ZYDIS_OPERAND_TYPE_IMMEDIATE:
+			immop = Imm();
+			immop._setValueInternal(pLine->Decoded.Operands[i].imm.value.s, ImmType::kInt);
+			ops[i] = immop;
+			break;
+		case ZYDIS_OPERAND_TYPE_REGISTER:
+			ops[i] = ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].reg.value];
+			break;
+		case ZYDIS_OPERAND_TYPE_POINTER:
+			memop = Mem(pLine->Decoded.Operands[i].ptr.offset);
+			memop.setSegment(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].ptr.segment]._baseId); // might need to be changed, relies on segment being a zydis encoded register
+			ops[i] = memop;
+			break;
+		case ZYDIS_OPERAND_TYPE_MEMORY: // Also might need to be changed, dunno if scale is 2^scale or not
+			if (pLabel) {
+				memop = Mem(*pLabel, ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], pLine->Decoded.Operands[i].mem.scale, pLine->Decoded.Operands[i].mem.disp.has_displacement ? pLine->Decoded.Operands[i].mem.disp.value : 0);
+			} else {
+				memop = Mem(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.base], ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], pLine->Decoded.Operands[i].mem.scale, pLine->Decoded.Operands[i].mem.disp.has_displacement ? pLine->Decoded.Operands[i].mem.disp.value : 0);
+			}
+			memop.setSegment(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].ptr.segment]._baseId);
+			ops[i] = memop;
+		}
+	}
+	if (pLine->Decoded.Instruction.operand_count_visible > 4) {
+		char formatted[MAX_PATH];
+		ZydisFormatter fmt;
+		ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
+		ZydisFormatterFormatInstruction(&fmt, &pLine->Decoded.Instruction, pLine->Decoded.Operands, pLine->Decoded.Instruction.operand_count_visible, formatted, sizeof(formatted), pLine->OldRVA, NULL);
+		LOG(Warning, MODULE_REASSEMBLER, "Unable to process all operands: %s\n", formatted);
+	}
+
+	return !_emit(mnem, ops[0], ops[1], ops[2], pLine->Decoded.Instruction.operand_count_visible < 4 ? NULL : &ops[3]);
 }
 
 int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {
@@ -603,13 +659,6 @@ Error ProtectedAssembler::movzx(Gp o0, Gp o1) {
 	return Assembler::movzx(o0, o1);
 }
 
-Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) {
-	if (!bWaitingOnEmit && !HeldLocks && !bUnprotected) { stub(); bStrict = false; }
-	else { bWaitingOnEmit = false; }
-	this->bFailed = ::bFailed;
-	return Assembler::_emit(instId, o0, o1, o2, opExt);
-}
-
 uint64_t ProtectedAssembler::GetStackSize() {
 	uint64_t ret = 0;
 	for (int i = 0, n = stack.Size(); i < n; i++) {
@@ -637,4 +686,12 @@ Error ProtectedAssembler::ret() {
 Error ProtectedAssembler::ret(Imm o0) {
 	if (stack.Size()) restorestack();
 	return Assembler::ret(o0);
+}
+
+// Emitter hook
+Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) {
+	if (!bWaitingOnEmit && !HeldLocks && !bUnprotected) { stub(); bStrict = false; }
+	else { bWaitingOnEmit = false; }
+	this->bFailed = ::bFailed;
+	return Assembler::_emit(instId, o0, o1, o2, opExt);
 }

@@ -203,6 +203,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="asm.hpp" />
+    <ClInclude Include="asmtranslations.hpp" />
     <ClInclude Include="assembler.hpp" />
     <ClInclude Include="font.hpp" />
     <ClInclude Include="gui.hpp" />
