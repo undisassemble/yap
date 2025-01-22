@@ -1253,6 +1253,9 @@ bool Asm::Assemble() {
 	a.MutationLevel = Options.Packing.MutationLevel;
 
 	// Linker data
+	RemoveData(NTHeaders.x64.OptionalHeader.DataDirectory[3].VirtualAddress, NTHeaders.x64.OptionalHeader.DataDirectory[3].Size);
+	NTHeaders.x64.OptionalHeader.DataDirectory[3].VirtualAddress = NTHeaders.x64.OptionalHeader.DataDirectory[3].Size = 0;
+	RemoveData(NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress, NTHeaders.x64.OptionalHeader.DataDirectory[5].Size);
 	Vector<DWORD> XREFs;
 	Vector<Label> XREFLabels;
 	Vector<Line> LinkLater;
@@ -1404,12 +1407,25 @@ bool Asm::Assemble() {
 		}
 	}
 	NTHeaders.x64.OptionalHeader.AddressOfEntryPoint = TranslateOldAddress(NTHeaders.x64.OptionalHeader.AddressOfEntryPoint);
+	Vector<DWORD> Relocations = GetRelocations();
+	for (int i = 0; i < Relocations.Size(); i++) {
+		Relocations.Replace(i, TranslateOldAddress(Relocations[i]));
+		/*for (int j = 0; j < holder.relocEntries().size(); j++) {
+			if (holder.relocEntries().at(j)->relocType() == RelocType::kAbsToAbs) {
+				
+			} else if (holder.relocEntries().at(j)->relocType() != RelocType::kNone) {
+				LOG(Warning, MODULE_REASSEMBLER, "Relocation not handled\n");
+			}
+		}*/
+	}
+	Buffer relocs = GenerateRelocSection(Relocations);
+	NTHeaders.x64.OptionalHeader.DataDirectory[5].Size = relocs.u64Size;
 
 	// Copy data
 	LOG(Info, MODULE_REASSEMBLER, "Finalizing\n");
 	holder.flatten();
 	holder.relocateToBase(GetBaseAddress() + SectionHeaders[0].VirtualAddress);
-	LOG(Info_Extended, MODULE_REASSEMBLER, "Assembled code has %d sections, and %s have relocations\n", holder.sectionCount(), holder.hasRelocEntries() ? "does" : "does not");
+	LOG(Info_Extended, MODULE_REASSEMBLER, "Assembled code has %d sections, and has %d relocations\n", holder.sectionCount(), holder.hasRelocEntries() ? holder.relocEntries().size() : 0);
 	if (holder.hasUnresolvedLinks()) holder.resolveUnresolvedLinks();
 	if (holder.hasUnresolvedLinks()) LOG(Warning, MODULE_REASSEMBLER, "Assembled code has %d unsolved links\n", holder.unresolvedLinkCount());
 	if (a.bFailed) {
@@ -1420,6 +1436,10 @@ bool Asm::Assemble() {
 		SectionData[i].Release();
 		Buffer buf = { 0 };
 		SectionData.Replace(i, buf);
+		if (!Sections[i].NewVirtualSize && !Sections[i].NewRawSize) {
+			DeleteSection(i);
+			i--;
+		}
 		buf.u64Size = Sections[i].NewRawSize;
 		buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
 		if (holder.textSection()->buffer().size() < Sections[i].NewRVA - SectionHeaders[0].VirtualAddress + buf.u64Size) {
@@ -1434,6 +1454,16 @@ bool Asm::Assemble() {
 		header.Misc.VirtualSize = Sections[i].NewVirtualSize;
 		SectionHeaders.Replace(i, header);
 	}
+	IMAGE_SECTION_HEADER RelocHeader = { 0 };
+	RelocHeader.Misc.VirtualSize = RelocHeader.SizeOfRawData = relocs.u64Size;
+	RelocHeader.VirtualAddress = SectionHeaders[SectionHeaders.Size() - 1].VirtualAddress + SectionHeaders[SectionHeaders.Size() - 1].Misc.VirtualSize;
+	RelocHeader.VirtualAddress += (RelocHeader.VirtualAddress % NTHeaders.x64.OptionalHeader.SectionAlignment) ? NTHeaders.x64.OptionalHeader.SectionAlignment - (RelocHeader.VirtualAddress % NTHeaders.x64.OptionalHeader.SectionAlignment) : 0;
+	NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress = RelocHeader.VirtualAddress;
+	RelocHeader.Characteristics = IMAGE_SCN_MEM_READ;
+	memcpy(RelocHeader.Name, ".reloc\0", 8);
+	SectionHeaders.Push(RelocHeader);
+	SectionData.Push(relocs);
+	NTHeaders.x64.FileHeader.NumberOfSections++;
 	FixHeaders();
 	LOG(Success, MODULE_REASSEMBLER, "Finished assembly\n");
 	return true;

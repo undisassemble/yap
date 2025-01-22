@@ -60,11 +60,12 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 			if (pLabel) {
 				memop = Mem(*pLabel, ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], scale, 0);
 			} else {
-				memop = Mem(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.base], ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], scale, pLine->Decoded.Operands[i].mem.disp.has_displacement ? pLine->Decoded.Operands[i].mem.disp.value : 0);
+				memop = Mem(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.base], ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], scale, pLine->Decoded.Operands[i].mem.disp.has_displacement ? (pLine->Decoded.Operands[i].mem.disp.value & 0xFFFFFFFF) : 0);
 			}
 			if (pLine->Decoded.Operands[i].mem.segment == ZYDIS_REGISTER_GS) memop.setSegment(gs);
 			else if (pLine->Decoded.Operands[i].mem.segment == ZYDIS_REGISTER_FS) memop.setSegment(fs);
 			memop.setSize(pLine->Decoded.Operands[i].size / 8);
+			if (!pLabel && pLine->Decoded.Operands[i].mem.disp.has_displacement) memop.setBaseId(pLine->Decoded.Operands[i].mem.disp.value & 0xFFFFFFFF00000000); // I dont know why this is how this works but ig i dont care
 			ops[i] = memop;
 		}
 	}
@@ -75,6 +76,16 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 		ZydisFormatterFormatInstruction(&fmt, &pLine->Decoded.Instruction, pLine->Decoded.Operands, pLine->Decoded.Instruction.operand_count_visible, formatted, sizeof(formatted), pLine->OldRVA, NULL);
 		LOG(Warning, MODULE_REASSEMBLER, "Unable to process all operands: %s\n", formatted);
 	}
+
+	// Prefixes
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_LOCK) lock();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REP) rep();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPE) repe();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPNE) repne();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPZ) repz();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPNZ) repnz();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XRELEASE) xrelease();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XACQUIRE) xacquire();
 
 	return !_emit(mnem, ops[0], ops[1], ops[2], &ops[3]);
 }
