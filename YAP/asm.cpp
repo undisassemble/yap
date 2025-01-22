@@ -2,12 +2,26 @@
 #include "assembler.hpp"
 
 typedef struct {
-	BYTE Version_Flag;
-	BYTE PrologSize;
-	BYTE CntUnwindCodes;
-	BYTE FrReg : 4;
-	BYTE FrRegOff : 4;
-} UNWIND_INFO_HDR;
+	BYTE Version : 3;
+	BYTE Flags : 5;
+	BYTE SizeProlog;
+	BYTE NumUnwindCodes;
+	BYTE FrameReg : 4;
+	BYTE FrameRegOff : 4;
+} UNWIND_INFO;
+
+typedef struct {
+	BYTE Offset;
+	BYTE OpCode : 4;
+	BYTE OpInfo : 4;
+} UNWIND_CODE;
+
+typedef struct {
+	DWORD BeginAddress;
+	DWORD EndAddress;
+	DWORD HandlerAddress;
+	DWORD JumpTarget;
+} C_SCOPE_TABLE;
 
 char* ZydisErrorToString(ZyanStatus Status) {
 	switch (Status) {
@@ -527,6 +541,7 @@ bool Asm::CheckRuntimeFunction(_In_ RUNTIME_FUNCTION* pFunc, _In_ bool bFixAddr)
 	if (bFixAddr) {
 		pFunc->BeginAddress = TranslateOldAddress(pFunc->BeginAddress);
 		pFunc->EndAddress = TranslateOldAddress(pFunc->EndAddress);
+		pFunc->UnwindData = TranslateOldAddress(pFunc->UnwindData);
 	} else {
 		// Disassemble
 		if (pFunc->BeginAddress && !DisasmRecursive(pFunc->BeginAddress))
@@ -534,19 +549,46 @@ bool Asm::CheckRuntimeFunction(_In_ RUNTIME_FUNCTION* pFunc, _In_ bool bFixAddr)
 	}
 
 	// Check unwind info for function
-	UNWIND_INFO_HDR UnwindInfo = ReadRVA<UNWIND_INFO_HDR>(pFunc->UnwindData);
+	UNWIND_INFO UnwindInfo = ReadRVA<UNWIND_INFO>(pFunc->UnwindData);
+	if (UnwindInfo.NumUnwindCodes & 1) UnwindInfo.NumUnwindCodes++;
 
-	// EHANDLER flag being set means that at the end is a RUNTIME_FUNCTION struct
-	if (UnwindInfo.Version_Flag == 0x21) {
-		RUNTIME_FUNCTION F2 = ReadRVA<RUNTIME_FUNCTION>(pFunc->UnwindData + sizeof(UNWIND_INFO_HDR) + UnwindInfo.CntUnwindCodes * 2);
-		// Unwind info addr + sizeof(UNWIND_INFO_HDR) + Num UNWIND_CODE * sizeof(UNWIND_CODE) = address of RUNTIME_FUNCTION
-		if (!CheckRuntimeFunction(&F2, bFixAddr))
-			return false;
-		if (bFixAddr) {
-			DWORD oOff = pFunc->UnwindData;
-			pFunc->UnwindData = TranslateOldAddress(pFunc->UnwindData);
-			WriteRVA<RUNTIME_FUNCTION>(oOff + sizeof(UNWIND_INFO_HDR) + UnwindInfo.CntUnwindCodes * 2, F2);
+	// Check for handler
+	if (UnwindInfo.Flags & UNW_FLAG_EHANDLER || UnwindInfo.Flags & UNW_FLAG_UHANDLER) {
+		
+		// Handler RVA
+		DWORD RVA = ReadRVA<DWORD>(pFunc->UnwindData + sizeof(UNWIND_INFO) + UnwindInfo.NumUnwindCodes * sizeof(UNWIND_CODE));
+		
+		// Scope table
+		Vector<C_SCOPE_TABLE> Tables;
+		for (int i = 0, n = ReadRVA<DWORD>(pFunc->UnwindData + sizeof(UNWIND_INFO) + UnwindInfo.NumUnwindCodes * sizeof(UNWIND_CODE) + sizeof(DWORD)); i < n; i++) {
+			C_SCOPE_TABLE temp = ReadRVA<C_SCOPE_TABLE>(pFunc->UnwindData + sizeof(UNWIND_INFO) + UnwindInfo.NumUnwindCodes * sizeof(UNWIND_CODE) + sizeof(DWORD) * 2 + sizeof(C_SCOPE_TABLE) * i);
+			Tables.Push(temp);
 		}
+
+		if (bFixAddr) {
+			WriteRVA<DWORD>(pFunc->UnwindData + sizeof(UNWIND_INFO) + UnwindInfo.NumUnwindCodes * sizeof(UNWIND_CODE), TranslateOldAddress(RVA));
+			
+			// Scope table
+			for (int i = 0; i < Tables.Size(); i++) {
+				C_SCOPE_TABLE t = Tables[i];
+				t.BeginAddress = TranslateOldAddress(Tables[i].BeginAddress);
+				t.EndAddress = TranslateOldAddress(Tables[i].EndAddress);
+				t.HandlerAddress = TranslateOldAddress(Tables[i].HandlerAddress);
+				t.JumpTarget = TranslateOldAddress(Tables[i].JumpTarget);
+				WriteRVA<C_SCOPE_TABLE>(pFunc->UnwindData + sizeof(UNWIND_INFO) + UnwindInfo.NumUnwindCodes * sizeof(UNWIND_CODE) + sizeof(DWORD) * 2 + sizeof(C_SCOPE_TABLE) * i, t);
+			}
+		} else {
+			if (RVA && !DisasmRecursive(RVA)) return false;
+			
+			// Scope table
+			for (int i = 0; i < Tables.Size(); i++) {
+				if (Tables[i].BeginAddress && !DisasmRecursive(Tables[i].BeginAddress)) return false;
+				if (Tables[i].EndAddress && !DisasmRecursive(Tables[i].EndAddress)) return false;
+				if (Tables[i].HandlerAddress && !DisasmRecursive(Tables[i].HandlerAddress)) return false;
+				if (Tables[i].JumpTarget && !DisasmRecursive(Tables[i].JumpTarget)) return false;
+			}
+		}
+		Tables.Release();
 	}
 	return true;
 }
@@ -1253,8 +1295,6 @@ bool Asm::Assemble() {
 	a.MutationLevel = Options.Packing.MutationLevel;
 
 	// Linker data
-	RemoveData(NTHeaders.x64.OptionalHeader.DataDirectory[3].VirtualAddress, NTHeaders.x64.OptionalHeader.DataDirectory[3].Size);
-	NTHeaders.x64.OptionalHeader.DataDirectory[3].VirtualAddress = NTHeaders.x64.OptionalHeader.DataDirectory[3].Size = 0;
 	RemoveData(NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress, NTHeaders.x64.OptionalHeader.DataDirectory[5].Size);
 	Vector<DWORD> XREFs;
 	Vector<Label> XREFLabels;
@@ -1454,6 +1494,8 @@ bool Asm::Assemble() {
 		header.Misc.VirtualSize = Sections[i].NewVirtualSize;
 		SectionHeaders.Replace(i, header);
 	}
+	
+	// Insert relocation data
 	IMAGE_SECTION_HEADER RelocHeader = { 0 };
 	RelocHeader.Misc.VirtualSize = RelocHeader.SizeOfRawData = relocs.u64Size;
 	RelocHeader.VirtualAddress = SectionHeaders[SectionHeaders.Size() - 1].VirtualAddress + SectionHeaders[SectionHeaders.Size() - 1].Misc.VirtualSize;
@@ -1464,6 +1506,20 @@ bool Asm::Assemble() {
 	SectionHeaders.Push(RelocHeader);
 	SectionData.Push(relocs);
 	NTHeaders.x64.FileHeader.NumberOfSections++;
+
+	// Fix exception data
+	IMAGE_DATA_DIRECTORY ExcDataDir = NTHeaders.x64.OptionalHeader.DataDirectory[3];
+	if (ExcDataDir.VirtualAddress) {
+		Buffer ExcData = SectionData[FindSectionByRVA(ExcDataDir.VirtualAddress)];
+		IMAGE_SECTION_HEADER ExcSecHeader = SectionHeaders[FindSectionByRVA(ExcDataDir.VirtualAddress)];
+		if (ExcData.pBytes && ExcSecHeader.VirtualAddress) {
+			RUNTIME_FUNCTION* pArray = reinterpret_cast<RUNTIME_FUNCTION*>(ExcData.pBytes + ExcDataDir.VirtualAddress - ExcSecHeader.VirtualAddress);
+			for (DWORD i = 0, n = ExcDataDir.Size / sizeof(RUNTIME_FUNCTION); i < n; i++) {
+				CheckRuntimeFunction(&pArray[i], true);
+			}
+		}
+	}
+
 	FixHeaders();
 	LOG(Success, MODULE_REASSEMBLER, "Finished assembly\n");
 	return true;

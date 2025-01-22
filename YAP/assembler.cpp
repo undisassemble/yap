@@ -706,7 +706,7 @@ Error ProtectedAssembler::ret() {
 	xchg(qword_ptr(rsp), reg);
 	bStrict = j;
 	pop(qword_ptr(rip));
-	dq(rand64());
+	return dq(rand64());
 }
 
 // I doubt I will ever use this one
