@@ -636,7 +636,8 @@ bool Asm::Disassemble() {
 				return false;
 			}
 			do {
-				ReadRVA(insert.OldRVA, &entry, sizeof(IAT_ENTRY));
+				entry = ReadRVA<IAT_ENTRY>(insert.OldRVA);
+				if (!entry.LookupRVA || !entry.NameRVA) break;
 				insert.Pointer.RVA = entry.LookupRVA;
 				Sections[wSecIndex].Lines->Insert(wIndex, insert);
 				wIndex++;
@@ -669,6 +670,7 @@ bool Asm::Disassemble() {
 				// Do
 				do {
 					insert.Pointer.RVA = ReadRVA<DWORD>(insert.OldRVA);
+					if (!insert.Pointer.RVA) break;
 					Sections[wSecIndex].Lines->Insert(wIndex, insert);
 					wIndex++;
 					insert.OldRVA += sizeof(uint64_t);
@@ -1030,254 +1032,6 @@ bool Asm::Analyze() {
 	return true;
 }
 
-/*bool Asm::FixAddresses() {
-	LOG(Info, MODULE_REASSEMBLER, "Patching instructions\n");
-	Vector<Line>* Lines;
-	
-	// Fix sections
-	AsmSection sec;
-	sec = Sections[0];
-	sec.NewRVA = sec.OldRVA;
-	sec.NewSize = GetAssembledSize(0);
-	Sections.Replace(0, sec);
-	if (sec.NewRVA != sec.OldRVA || sec.NewSize != sec.OldSize) LOG(Info_Extended, MODULE_REASSEMBLER, "%.8s changed memory range: (%08x - %08x) -> (%08x - %08x)\n", SectionHeaders[0].Name, sec.OldRVA, sec.OldRVA + sec.OldSize, sec.NewRVA, sec.NewRVA + sec.NewSize);
-	for (WORD SecIndex = 1; SecIndex < Sections.Size(); SecIndex++) {
-		sec = Sections[SecIndex];
-		sec.NewRVA = Sections[SecIndex - 1].NewRVA + Sections[SecIndex - 1].NewSize;
-		sec.NewRVA += (sec.NewRVA % NTHeaders.x64.OptionalHeader.SectionAlignment) ? NTHeaders.x64.OptionalHeader.SectionAlignment - (sec.NewRVA % NTHeaders.x64.OptionalHeader.SectionAlignment) : 0;
-		sec.NewSize = GetAssembledSize(SecIndex);
-		Sections.Replace(SecIndex, sec);
-		if (sec.NewRVA != sec.OldRVA || sec.NewSize != sec.OldSize) LOG(Info_Extended, MODULE_REASSEMBLER, "%.8s changed memory range: (%08x - %08x) -> (%08x - %08x)\n", SectionHeaders[SecIndex].Name, sec.OldRVA, sec.OldRVA + sec.OldSize, sec.NewRVA, sec.NewRVA + sec.NewSize);
-	}
-	
-	// Set new RVAs
-	for (DWORD SecIndex = 0; SecIndex < Sections.Size(); SecIndex++) {
-		// Apply new addresses
-		Lines = Sections[SecIndex].Lines;
-		DWORD dwCurrentAddress = Sections[SecIndex].NewRVA;
-		Line line = { 0 };
-		for (size_t i = 0; i < Lines->Size(); i++) {
-			line = Lines->At(i);
-			line.NewRVA = dwCurrentAddress;
-			if (line.OldRVA == NTHeaders.x64.OptionalHeader.AddressOfEntryPoint) {
-				NTHeaders.x64.OptionalHeader.AddressOfEntryPoint = line.NewRVA;
-			}
-
-			// Change short jmps into long jmps
-			if (line.Type == Decoded && IsInstructionCF(line.Decoded.Instruction.mnemonic) && line.Decoded.Instruction.mnemonic != ZYDIS_MNEMONIC_CALL && line.Decoded.Instruction.length == 2 && line.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
-				line.Type = Request;
-				line.Request.mnemonic = Lines->At(i).Decoded.Instruction.mnemonic;
-				line.Request.operand_count = 1;
-				line.Request.machine_mode = ZYDIS_MACHINE_MODE_LONG_64;
-				line.Request.address_size_hint = ZYDIS_ADDRESS_SIZE_HINT_NONE;
-				line.Request.allowed_encodings = ZYDIS_ENCODABLE_ENCODING_DEFAULT;
-				line.Request.branch_type = ZYDIS_BRANCH_TYPE_NONE;
-				line.Request.branch_width = ZYDIS_BRANCH_WIDTH_NONE;
-				line.Request.prefixes = 0;
-				line.Request.operand_size_hint = ZYDIS_OPERAND_SIZE_HINT_NONE;
-				line.Request.operands[0] = zyasm::Op(Lines->At(i).Decoded.Operands[0]);
-				line.bRelative = false;
-				line.bRelocate = true;
-				ZeroMemory(&line.Request.evex, sizeof(line.Request.evex));
-				ZeroMemory(&line.Request.mvex, sizeof(line.Request.mvex));
-				ZydisCalcAbsoluteAddress(&Lines->At(i).Decoded.Instruction, &Lines->At(i).Decoded.Operands[0], line.NewRVA, &line.Request.operands[0].imm.u);
-			}
-			Lines->Replace(i, line);
-
-			// Update address
-			DWORD dwChange = GetLineSize(line);
-			if (!dwChange) return false;
-			dwCurrentAddress += dwChange;
-		}
-	}
-
-	for (DWORD SecIndex = 0; SecIndex < Sections.Size(); SecIndex++) {
-		// Fix relative addresses in asm
-		Lines = Sections[SecIndex].Lines;
-		Line line;
-		uint64_t u64Referencing = 0;
-		int64_t i64Off = 0;
-		size_t szIndex = 0;
-		DWORD _SecIndex, _LineIndex;
-		for (size_t k, j, i = 0; i < Lines->Size(); i++) {
-			line = Lines->At(i);
-			if (line.Type == Decoded) {
-				for (j = 0; j < line.Decoded.Instruction.operand_count_visible; j++) {
-					if (IsInstructionMemory(&line.Decoded.Instruction, &line.Decoded.Operands[j])) {
-						if (IsInstructionCF(line.Decoded.Instruction.mnemonic) && line.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER)
-							continue;
-						if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && ((line.Decoded.Operands[j].mem.base != ZYDIS_REGISTER_RIP && line.Decoded.Operands[j].mem.base != ZYDIS_REGISTER_NONE) || line.Decoded.Operands[j].mem.index != ZYDIS_REGISTER_NONE))
-							continue;
-
-						// Find target
-						ZyanStatus status = ZydisCalcAbsoluteAddress(&line.Decoded.Instruction, &line.Decoded.Operands[j], line.OldRVA, &u64Referencing);
-						if (ZYAN_FAILED(status)) {
-							ZydisFormatter fmt;
-							ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
-							char op[128];
-							ZydisFormatterFormatInstruction(&fmt, &line.Decoded.Instruction, line.Decoded.Operands, line.Decoded.Instruction.operand_count_visible, op, 128, GetBaseAddress() + line.OldRVA, NULL);
-							LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate absolute address of memory: %s (%s)\n", ZydisErrorToString(status), op);
-							return false;
-						}
-
-						if (u64Referencing < Sections[0].OldRVA) {
-							ZydisFormatter fmt;
-							ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
-							char op[128];
-							ZydisFormatterFormatOperand(&fmt, &line.Decoded.Instruction, &line.Decoded.Operands[j], op, 128, GetBaseAddress() + line.OldRVA, NULL);
-							LOG(Warning, MODULE_REASSEMBLER, "Failed to translate address at %p (%s)\n", GetBaseAddress() + line.OldRVA, op);
-							continue;
-						}
-						
-						// Calc offset
-						i64Off = (int64_t)TranslateOldAddress(u64Referencing) - (line.NewRVA + GetLineSize(line));
-						
-						// Apply offset
-						if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
-							line.Decoded.Operands[j].imm.value.s = i64Off;
-						} else if (line.Decoded.Operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY) {
-							line.Decoded.Operands[j].mem.disp.value = i64Off;
-						}
-					}
-				}
-			}
-			
-			// Fix jump tables
-			else if (line.Type == JumpTable) {
-				// Find target
-				u64Referencing = (line.bRelative ? line.JumpTable.Base : 0) + line.JumpTable.Value;
-
-				// Calc offset
-				if (line.bRelative) line.JumpTable.Base = TranslateOldAddress(line.JumpTable.Base);
-				DWORD NewValue = TranslateOldAddress(u64Referencing);
-				if (NewValue == _UI32_MAX) {
-					LOG(Failed, MODULE_REASSEMBLER, "Failed to translate switch case targetting %#x\n", u64Referencing);
-					return false;
-				}
-				line.JumpTable.Value = NewValue - (line.bRelative ? line.JumpTable.Base : 0);
-			}
-
-			// Absolutes
-			else if (line.Type == Pointer) {
-				u64Referencing = (line.Pointer.IsAbs ? line.Pointer.Abs - GetBaseAddress() : line.Pointer.RVA);
-
-				// Do the thing
-				DWORD NewValue = TranslateOldAddress(u64Referencing);
-				if (NewValue == _UI32_MAX) {
-					LOG(Failed, MODULE_REASSEMBLER, "Failed to translate pointer pointing at 0x%p\n", GetBaseAddress() + u64Referencing);
-					return false;
-				}
-
-				// Apply
-				if (line.Pointer.IsAbs) {
-					line.Pointer.Abs = GetBaseAddress() + NewValue;
-				} else {
-					line.Pointer.RVA = NewValue;
-				}
-			}
-
-			// Requests
-			else if (line.Type == Request) {
-				if (line.bRelative) {
-					if (IsInstructionCF(line.Request.mnemonic) && line.Request.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
-						DWORD index = line.Request.operands[0].imm.u;
-						if (index >= Lines->Size()) {
-							LOG(Failed, MODULE_REASSEMBLER, "Failed to translate relative insertion\n");
-							return false;
-						}
-						line.Request.operands[0].imm.u = Lines->At(index).NewRVA;
-					} else {
-						for (int j = 0; j < line.Request.operand_count; j++) {
-							if (line.Request.operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Request.operands[j].mem.base == ZYDIS_REGISTER_RIP) {
-								line.Request.operands[j].mem.base = ZYDIS_REGISTER_NONE;
-								DWORD index = line.Request.operands[j].mem.displacement;
-								if (index >= Lines->Size()) {
-									LOG(Failed, MODULE_REASSEMBLER, "Failed to translate relative insertion\n");
-									return false;
-								}
-								line.Request.operands[j].mem.displacement = Lines->At(index).NewRVA;
-							}
-						}
-					}
-				} else if (line.bRelocate) {
-					if (IsInstructionCF(line.Request.mnemonic) && line.Request.operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
-						line.Request.operands[0].imm.u = TranslateOldAddress(line.Request.operands[0].imm.u);
-					} else {
-						for (int j = 0; j < line.Request.operand_count; j++) {
-							if (line.Request.operands[j].type == ZYDIS_OPERAND_TYPE_MEMORY && line.Request.operands[j].mem.base == ZYDIS_REGISTER_RIP) {
-								line.Request.operands[j].mem.base = ZYDIS_REGISTER_NONE;
-								line.Request.operands[j].mem.displacement = TranslateOldAddress(line.Request.operands[j].mem.displacement);
-							}
-						}
-					}
-				}
-			}
-
-			Lines->Replace(i, line);
-		}
-	}
-
-	// Fix TLS callbacks
-	uint64_t* pCallbacks = GetTLSCallbacks();
-	if (pCallbacks) {
-		for (WORD i = 0; pCallbacks[i] != 0; i++) {
-			pCallbacks[i] = GetBaseAddress() + TranslateOldAddress(pCallbacks[i] - GetBaseAddress());
-		}
-	}
-	
-	// Fix exception dir
-	IMAGE_DATA_DIRECTORY ExcDataDir = NTHeaders.x64.OptionalHeader.DataDirectory[3];
-	if (ExcDataDir.VirtualAddress) {
-		Buffer ExcData = SectionData[FindSectionByRVA(ExcDataDir.VirtualAddress)];
-		IMAGE_SECTION_HEADER ExcSecHeader = SectionHeaders[FindSectionByRVA(ExcDataDir.VirtualAddress)];
-		if (ExcData.pBytes && ExcSecHeader.VirtualAddress) {
-			RUNTIME_FUNCTION* pArray = reinterpret_cast<RUNTIME_FUNCTION*>(ExcData.pBytes + ExcDataDir.VirtualAddress - ExcSecHeader.VirtualAddress);
-			for (DWORD i = 0, n = ExcDataDir.Size / sizeof(RUNTIME_FUNCTION); i < n; i++) {
-				CheckRuntimeFunction(&pArray[i], true);
-			}
-		}
-	}
-
-	// Fix relocations
-	Vector<DWORD> Relocations = GetRelocations();
-	for (int i = 0; i < Relocations.Size(); i++) {
-		Relocations.Replace(i, TranslateOldAddress(Relocations[i]));
-	}
-	Buffer relocs = GenerateRelocSection(Relocations);
-	RemoveData(NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress, NTHeaders.x64.OptionalHeader.DataDirectory[5].Size);
-	DWORD SecIndex = FindSectionIndex(NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress);
-	Line insert = { 0 };
-	insert.Type = RawInsert;
-	insert.RawInsert = relocs;
-	InsertLine(SecIndex, FindPosition(SecIndex, NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress), insert);
-	NTHeaders.x64.OptionalHeader.DataDirectory[5].Size = relocs.u64Size;
-
-	// Fix data dirs
-	for (int i = 0; i < 16; i++) {
-		if (i == 5) continue;
-		NTHeaders.x64.OptionalHeader.DataDirectory[i].VirtualAddress = TranslateOldAddress(NTHeaders.x64.OptionalHeader.DataDirectory[i].VirtualAddress);
-		if (NTHeaders.x64.OptionalHeader.DataDirectory[i].VirtualAddress == _UI32_MAX) {
-			LOG(Warning, MODULE_REASSEMBLER, "Failed to translate data directory %d\n", i);
-			NTHeaders.x64.OptionalHeader.DataDirectory[i].VirtualAddress = NTHeaders.x64.OptionalHeader.DataDirectory[i].Size = 0;
-		}
-	}
-
-	// Fix function ranges
-	for (int i = 0; i < FunctionRanges.Size(); i++) {
-		FunctionRange range = FunctionRanges[i];
-		DWORD end = TranslateOldAddress(range.dwStart + range.dwSize);
-		range.dwStart = TranslateOldAddress(range.dwStart);
-		range.dwSize = end - range.dwStart;
-		for (int j = 0; j < range.Entries.Size(); j++) {
-			range.Entries.Replace(j, TranslateOldAddress(range.Entries[j]));
-		}
-		FunctionRanges.Replace(i, range);
-	}
-
-	LOG(Success, MODULE_REASSEMBLER, "Patched instructions\n");
-	return true;
-}*/
-
 bool Asm::Assemble() {
 	// Setup
 	LOG(Info, MODULE_REASSEMBLER, "Assembling\n");
@@ -1518,6 +1272,47 @@ bool Asm::Assemble() {
 				CheckRuntimeFunction(&pArray[i], true);
 			}
 		}
+	}
+
+	// Fix function ranges
+	for (int i = 0; i < FunctionRanges.Size(); i++) {
+		FunctionRange range = FunctionRanges[i];
+		DWORD end = TranslateOldAddress(range.dwStart + range.dwSize);
+		range.dwStart = TranslateOldAddress(range.dwStart);
+		range.dwSize = end - range.dwStart;
+		for (int j = 0; j < range.Entries.Size(); j++) {
+			range.Entries.Replace(j, TranslateOldAddress(range.Entries[j]));
+		}
+		FunctionRanges.Replace(i, range);
+	}
+
+	// Fix resources (dont work)
+	if (NTHeaders.x64.OptionalHeader.DataDirectory[2].Size && NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress) {
+		Vector<DWORD> Offsets;
+		Offsets.Push(0);
+		Vector<DWORD> Done;
+		Done.Push(0);
+		IMAGE_RESOURCE_DIRECTORY Dir;
+		IMAGE_RESOURCE_DIRECTORY_ENTRY Entry;
+		DWORD dwOff = 0;
+		do {
+			Dir = ReadRVA<IMAGE_RESOURCE_DIRECTORY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + Offsets.Pop());
+			// LATER: Clear meta Dir.TimeDateStamp = 0;
+			for (int i = 0; i < Dir.NumberOfNamedEntries + Dir.NumberOfIdEntries; i++) {
+				Entry = ReadRVA<IMAGE_RESOURCE_DIRECTORY_ENTRY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + sizeof(IMAGE_RESOURCE_DIRECTORY) + sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY) * i);
+				if (Entry.DataIsDirectory) {
+					if (!Done.Includes(Entry.OffsetToDirectory)) {
+						Offsets.Push(Entry.OffsetToDirectory);
+						Done.Push(Entry.OffsetToDirectory);
+					}
+				} else {
+					IMAGE_RESOURCE_DATA_ENTRY Resource = ReadRVA<IMAGE_RESOURCE_DATA_ENTRY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + Entry.OffsetToData);
+					Resource.OffsetToData = TranslateOldAddress(Resource.OffsetToData);
+					WriteRVA<IMAGE_RESOURCE_DATA_ENTRY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + Entry.OffsetToData, Resource);
+				}
+			}
+		} while (Offsets.Size());
+		Done.Release();
 	}
 
 	FixHeaders();

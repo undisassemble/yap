@@ -315,9 +315,6 @@ void PE::FixHeaders() {
 	DosHeader.e_magic = IMAGE_DOS_SIGNATURE;
 	DosHeader.e_lfanew = sizeof(IMAGE_DOS_HEADER) + DosStub.u64Size;
 
-	// File header
-
-
 	// Set stuff
 	uint64_t Raw = DosHeader.e_lfanew + (x86 ? sizeof(IMAGE_NT_HEADERS32) : sizeof(IMAGE_NT_HEADERS64)) + sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections;
 	uint64_t RVA = Raw;
@@ -332,6 +329,16 @@ void PE::FixHeaders() {
 		RVA += Header.Misc.VirtualSize;
 		Raw += Header.SizeOfRawData;
 	}
+
+	// File header
+	NTHeaders.x64.OptionalHeader.Magic = 0x20B;
+	NTHeaders.x64.Signature = IMAGE_NT_SIGNATURE;
+	NTHeaders.x64.FileHeader.Machine = IMAGE_FILE_MACHINE_AMD64;
+	NTHeaders.x64.OptionalHeader.CheckSum = 0;
+	NTHeaders.x64.OptionalHeader.SizeOfImage = RVA;
+	NTHeaders.x64.OptionalHeader.SizeOfHeaders = DosHeader.e_lfanew + sizeof(IMAGE_NT_HEADERS64) + sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections;
+	NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes = 0x10;
+	NTHeaders.x64.FileHeader.SizeOfOptionalHeader = sizeof(IMAGE_OPTIONAL_HEADER64);
 }
 
 bool PE::ProduceBinary(_In_ HANDLE hFile) {
