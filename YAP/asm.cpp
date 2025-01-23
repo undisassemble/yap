@@ -1045,8 +1045,9 @@ bool Asm::Assemble() {
 	AsmJitErrorHandler ErrorHandler;
 	holder.setErrorHandler(&ErrorHandler);
 	ProtectedAssembler a(&holder);
-	a.bMutate = a.bSubstitute = false;
-	a.MutationLevel = Options.Packing.MutationLevel;
+	a.bMutate = Options.Reassembly.MutationLevel;
+	a.MutationLevel = Options.Reassembly.MutationLevel + 1;
+	a.bSubstitute = Options.Reassembly.bSubstitution;
 
 	// Linker data
 	RemoveData(NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress, NTHeaders.x64.OptionalHeader.DataDirectory[5].Size);
@@ -1292,12 +1293,13 @@ bool Asm::Assemble() {
 		Offsets.Push(0);
 		Vector<DWORD> Done;
 		Done.Push(0);
+		Vector<DWORD> Done2;
 		IMAGE_RESOURCE_DIRECTORY Dir;
 		IMAGE_RESOURCE_DIRECTORY_ENTRY Entry;
 		DWORD dwOff = 0;
 		do {
 			Dir = ReadRVA<IMAGE_RESOURCE_DIRECTORY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + Offsets.Pop());
-			// LATER: Clear meta Dir.TimeDateStamp = 0;
+			if (Options.Reassembly.bRemoveData) Dir.TimeDateStamp = 0;
 			for (int i = 0; i < Dir.NumberOfNamedEntries + Dir.NumberOfIdEntries; i++) {
 				Entry = ReadRVA<IMAGE_RESOURCE_DIRECTORY_ENTRY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + sizeof(IMAGE_RESOURCE_DIRECTORY) + sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY) * i);
 				if (Entry.DataIsDirectory) {
@@ -1305,7 +1307,8 @@ bool Asm::Assemble() {
 						Offsets.Push(Entry.OffsetToDirectory);
 						Done.Push(Entry.OffsetToDirectory);
 					}
-				} else {
+				} else if (!Done2.Includes(Entry.OffsetToData)) {
+					Done2.Push(Entry.OffsetToData);
 					IMAGE_RESOURCE_DATA_ENTRY Resource = ReadRVA<IMAGE_RESOURCE_DATA_ENTRY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + Entry.OffsetToData);
 					Resource.OffsetToData = TranslateOldAddress(Resource.OffsetToData);
 					WriteRVA<IMAGE_RESOURCE_DATA_ENTRY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + Entry.OffsetToData, Resource);
@@ -1313,11 +1316,27 @@ bool Asm::Assemble() {
 			}
 		} while (Offsets.Size());
 		Done.Release();
+		Done2.Release();
 	}
 
 	FixHeaders();
 	LOG(Success, MODULE_REASSEMBLER, "Finished assembly\n");
 	return true;
+}
+
+void Asm::CleanHeaders() {
+	ZeroMemory(&DosHeader, sizeof(DosHeader));
+	NTHeaders.x64.FileHeader.TimeDateStamp = 0;
+	NTHeaders.x64.OptionalHeader.SizeOfCode = 0;
+	NTHeaders.x64.OptionalHeader.SizeOfInitializedData = 0;
+	NTHeaders.x64.OptionalHeader.SizeOfUninitializedData = 0;
+	NTHeaders.x64.OptionalHeader.BaseOfCode = 0;
+	NTHeaders.x64.OptionalHeader.MajorImageVersion = 0;
+	NTHeaders.x64.OptionalHeader.MinorImageVersion = 0;
+	NTHeaders.x64.OptionalHeader.Win32VersionValue = 0;
+	NTHeaders.x64.OptionalHeader.CheckSum = 0;
+	NTHeaders.x64.OptionalHeader.DataDirectory[12].VirtualAddress = 0;
+	NTHeaders.x64.OptionalHeader.DataDirectory[12].Size = 0;
 }
 
 bool Asm::Strip() {

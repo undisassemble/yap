@@ -76,7 +76,13 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 		LOG(Warning, MODULE_REASSEMBLER, "Unable to process all operands: %s\n", formatted);
 	}
 
-	// Prefixes
+	// Mutate
+	strict();
+	if (!bWaitingOnEmit && !HeldLocks && !bUnprotected) { stub(); bStrict = false; }
+	else { bWaitingOnEmit = false; }
+	this->bFailed = ::bFailed;
+
+	// Emit
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_LOCK) lock();
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REP) rep();
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPE) repe();
@@ -85,8 +91,7 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPNZ) repnz();
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XRELEASE) xrelease();
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XACQUIRE) xacquire();
-
-	return !_emit(mnem, ops[0], ops[1], ops[2], &ops[3]);
+	return !Assembler::_emit(mnem, ops[0], ops[1], ops[2], &ops[3]);
 }
 
 int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {

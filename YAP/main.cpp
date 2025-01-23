@@ -204,11 +204,14 @@ DWORD WINAPI Begin(void* args) {
 #endif
 
 		// Modify
-		bool bNeedsAssembly = Options.Reassembly.bSubstitution || (Options.Reassembly.bStrip && pAssembly->NTHeaders.x64.OptionalHeader.DataDirectory[6].Size && pAssembly->NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress);
+		bool bNeedsAssembly = Options.Reassembly.MutationLevel || Options.Reassembly.bSubstitution || (Options.Reassembly.bStrip && pAssembly->NTHeaders.x64.OptionalHeader.DataDirectory[6].Size && pAssembly->NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress);
 		if (Options.Reassembly.bStrip && !pAssembly->Strip()) {
 			Modal("Failed to strip PE");
 			LOG(Failed, MODULE_YAP, "Failed to strip PE\n");
 			goto th_exit;
+		}
+		if (Options.Reassembly.bRemoveData) {
+			pAssembly->CleanHeaders();
 		}
 
 		// Virtualize

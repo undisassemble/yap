@@ -365,9 +365,11 @@ struct Options_t {
 
 	struct {
 		bool bEnabled : 1 = false;
+		bool bRemoveData : 1 = false;
 		bool bStrip : 1 = false;
 		bool bStripDOSStub : 1 = false;
 		bool bSubstitution : 1 = false;
+		int MutationLevel = 1;
 		uint64_t Rebase = 0;
 	} Reassembly;
 

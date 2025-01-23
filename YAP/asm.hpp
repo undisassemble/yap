@@ -101,6 +101,7 @@ public:
 	/// </summary>
 	/// <returns>Success/failure</returns>
 	bool Strip();
+	void CleanHeaders();
 
 	DWORD TranslateOldAddress(_In_ DWORD dwRVA);
 

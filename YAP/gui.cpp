@@ -298,13 +298,17 @@ void DrawGUI() {
 		if (ImGui::BeginTabItem(ICON_CODE " Reassembler")) {
 			ImGui::Text("The reassembler is currently expiremental, the only tested/supported compilers are MSVC and GCC/G++.");
 			IMGUI_TOGGLE("Enabled", Options.Reassembly.bEnabled);
-			ImGui::SetItemTooltip("Disassembles your application, modifies the assembly a ton, and then assembles the modified assembly.");
+			ImGui::SetItemTooltip("Disassembles your application, and assembles a new modified version.");
+			ImGui::SliderInt("Mutation Level", &Options.Reassembly.MutationLevel, 0, 4);
+			ImGui::SetItemTooltip("How much garbage code should be inserted between real code (more -> slower).");
+			IMGUI_TOGGLE("Remove Useless Data", Options.Reassembly.bRemoveData);
+			ImGui::SetItemTooltip("Removes some data from the PE headers.");
 			IMGUI_TOGGLE("Strip Debug Symbols", Options.Reassembly.bStrip);
 			ImGui::SetItemTooltip("Remove debugging information from the PE.");
 			IMGUI_TOGGLE("Strip DOS Stub", Options.Reassembly.bStripDOSStub);
 			ImGui::SetItemTooltip("Remove DOS stub from the PE.");
 			IMGUI_TOGGLE("Instruction Substitution", Options.Reassembly.bSubstitution);
-			ImGui::SetItemTooltip("Replaces some existing instructions with other, more complicated alternatives.\n");
+			ImGui::SetItemTooltip("Replaces some existing instructions with other, more complicated alternatives.");
 			ImGui::InputScalar("Rebase Image", ImGuiDataType_U64, &Options.Reassembly.Rebase, NULL, NULL, "%p", ImGuiInputTextFlags_CharsHexadecimal);
 			ImGui::SetItemTooltip("Changes images prefered base address. (0 to disable)");
 			ImGui::EndTabItem();
