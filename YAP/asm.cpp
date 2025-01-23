@@ -1045,7 +1045,7 @@ bool Asm::Assemble() {
 	AsmJitErrorHandler ErrorHandler;
 	holder.setErrorHandler(&ErrorHandler);
 	ProtectedAssembler a(&holder);
-	a.bMutate = Options.Reassembly.MutationLevel;
+	a.bMutate = true;
 	a.MutationLevel = Options.Reassembly.MutationLevel + 1;
 	a.bSubstitute = Options.Reassembly.bSubstitution;
 
@@ -1247,6 +1247,7 @@ bool Asm::Assemble() {
 		header.VirtualAddress = Sections[i].NewRVA;
 		header.SizeOfRawData = Sections[i].NewRawSize;
 		header.Misc.VirtualSize = Sections[i].NewVirtualSize;
+		header.Characteristics |= IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE;
 		SectionHeaders.Replace(i, header);
 	}
 	
@@ -1337,6 +1338,12 @@ void Asm::CleanHeaders() {
 	NTHeaders.x64.OptionalHeader.CheckSum = 0;
 	NTHeaders.x64.OptionalHeader.DataDirectory[12].VirtualAddress = 0;
 	NTHeaders.x64.OptionalHeader.DataDirectory[12].Size = 0;
+	IMAGE_SECTION_HEADER sec = { 0 };
+	for (int i = 0; i < SectionHeaders.Size(); i++) {
+		sec = SectionHeaders[i];
+		sec.Characteristics &= ~(IMAGE_SCN_CNT_CODE | IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_CNT_INITIALIZED_DATA);
+		SectionHeaders.Replace(i, sec);
+	}
 }
 
 bool Asm::Strip() {

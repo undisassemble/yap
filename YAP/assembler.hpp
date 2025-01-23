@@ -12,7 +12,6 @@ private:
 	bool bWaitingOnEmit = false;
 	BYTE HeldLocks = 0;
 	bool bStrict = false;
-	bool bUnprotected = false;
 	Gp regs[15] = { rax, rbx, rcx, rdx, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15 };
 	Vector<Gp> Blacklist;
 	Gp truerandreg() { return regs[rand() % countof(regs)]; }
@@ -83,8 +82,6 @@ public:
 	void desync_mov(Gpq o0);
 	void block() { bWaitingOnEmit = true; } // Prevents garbage stub from being generated
 	void strict() { bStrict = true; } // Tells the garbage stub to leave EFLAGS untouched
-	void unprotected() { bUnprotected = true; }
-	void protect() { bUnprotected = false; }
 	Error call(Gp o0);
 	Error call(Imm o0);
 	Error call(Label o0);

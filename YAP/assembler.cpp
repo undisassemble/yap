@@ -78,11 +78,11 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 
 	// Mutate
 	strict();
-	if (!bWaitingOnEmit && !HeldLocks && !bUnprotected) { stub(); bStrict = false; }
+	if (!bWaitingOnEmit && !HeldLocks) { stub(); bStrict = false; }
 	else { bWaitingOnEmit = false; }
 	this->bFailed = ::bFailed;
 
-	// Emit
+	// Prefixes
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_LOCK) lock();
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REP) rep();
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPE) repe();
@@ -91,6 +91,49 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPNZ) repnz();
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XRELEASE) xrelease();
 	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XACQUIRE) xacquire();
+	
+	// Substitution
+	if (bSubstitute) {
+		switch (mnem) {
+		case Inst::kIdRet:
+			if (!pLine->Decoded.Instruction.operand_count_visible) return ret();
+			break;
+		case Inst::kIdMov:
+			if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) {
+				Gp o0;
+				memcpy(&o0, &ops[0], sizeof(Gp));
+				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) {
+					Gp o1;
+					memcpy(&o1, &ops[1], sizeof(Gp));
+					return mov(o0, o1);
+				} else if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
+					Imm o1;
+					memcpy(&o1, &ops[1], sizeof(Imm));
+					return mov(o0, o1);
+				} else {
+					Mem o1;
+					memcpy(&o1, &ops[1], sizeof(Mem));
+					return mov(o0, o1);
+				}
+			} else {
+				Mem o0;
+				memcpy(&o0, &ops[0], sizeof(Mem));
+				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) {
+					Gp o1;
+					memcpy(&o1, &ops[1], sizeof(Gp));
+					return mov(o0, o1);
+				} else {
+					Imm o1;
+					memcpy(&o1, &ops[1], sizeof(Imm));
+					return mov(o0, o1);
+				}
+			}
+			break;
+		case Inst::kIdCall:
+			if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && pLabel) return call(*pLabel);
+			break;
+		}
+	}
 	return !Assembler::_emit(mnem, ops[0], ops[1], ops[2], &ops[3]);
 }
 
@@ -721,7 +764,7 @@ Error ProtectedAssembler::ret(Imm o0) {
 
 // Emitter hook
 Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) {
-	if (!bWaitingOnEmit && !HeldLocks && !bUnprotected) { stub(); bStrict = false; }
+	if (!bWaitingOnEmit && !HeldLocks) { stub(); bStrict = false; }
 	else { bWaitingOnEmit = false; }
 	this->bFailed = ::bFailed;
 	return Assembler::_emit(instId, o0, o1, o2, opExt);
