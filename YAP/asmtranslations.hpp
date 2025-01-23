@@ -1803,7 +1803,7 @@ InstId Mnemonics[ZYDIS_MNEMONIC_MAX_VALUE + 1] = {
 };
 
 Reg Registers[ZYDIS_REGISTER_MAX_VALUE + 1] = {
-    Reg(),
+    no_seg,
     al,
     cl,
     dl,

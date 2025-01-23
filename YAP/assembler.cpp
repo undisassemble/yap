@@ -65,7 +65,6 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 			if (pLine->Decoded.Operands[i].mem.segment == ZYDIS_REGISTER_GS) memop.setSegment(gs);
 			else if (pLine->Decoded.Operands[i].mem.segment == ZYDIS_REGISTER_FS) memop.setSegment(fs);
 			memop.setSize(pLine->Decoded.Operands[i].size / 8);
-			if (!pLabel && pLine->Decoded.Operands[i].mem.disp.has_displacement) memop.setBaseId(pLine->Decoded.Operands[i].mem.disp.value & 0xFFFFFFFF00000000); // I dont know why this is how this works but ig i dont care
 			ops[i] = memop;
 		}
 	}
