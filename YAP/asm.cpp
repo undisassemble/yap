@@ -1288,7 +1288,7 @@ bool Asm::Assemble() {
 		FunctionRanges.Replace(i, range);
 	}
 
-	// Fix resources (dont work)
+	// Fix resources
 	if (NTHeaders.x64.OptionalHeader.DataDirectory[2].Size && NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress) {
 		Vector<DWORD> Offsets;
 		Offsets.Push(0);
@@ -1299,10 +1299,11 @@ bool Asm::Assemble() {
 		IMAGE_RESOURCE_DIRECTORY_ENTRY Entry;
 		DWORD dwOff = 0;
 		do {
-			Dir = ReadRVA<IMAGE_RESOURCE_DIRECTORY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + Offsets.Pop());
+			dwOff = Offsets.Pop();
+			Dir = ReadRVA<IMAGE_RESOURCE_DIRECTORY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + dwOff);
 			if (Options.Reassembly.bRemoveData) Dir.TimeDateStamp = 0;
 			for (int i = 0; i < Dir.NumberOfNamedEntries + Dir.NumberOfIdEntries; i++) {
-				Entry = ReadRVA<IMAGE_RESOURCE_DIRECTORY_ENTRY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + sizeof(IMAGE_RESOURCE_DIRECTORY) + sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY) * i);
+				Entry = ReadRVA<IMAGE_RESOURCE_DIRECTORY_ENTRY>(NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress + dwOff + sizeof(IMAGE_RESOURCE_DIRECTORY) + sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY) * i);
 				if (Entry.DataIsDirectory) {
 					if (!Done.Includes(Entry.OffsetToDirectory)) {
 						Offsets.Push(Entry.OffsetToDirectory);
