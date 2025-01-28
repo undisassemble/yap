@@ -78,7 +78,7 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 
 	// Mutate
 	strict();
-	if (!bWaitingOnEmit && !HeldLocks) { stub(); bStrict = false; }
+	if (!bWaitingOnEmit && !HeldLocks) { stub(); }
 	else { bWaitingOnEmit = false; }
 	this->bFailed = ::bFailed;
 
@@ -134,6 +134,7 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 			break;
 		}
 	}
+	bStrict = false;
 	return !Assembler::_emit(mnem, ops[0], ops[1], ops[2], &ops[3]);
 }
 
@@ -594,8 +595,9 @@ void ProtectedAssembler::desync_mov(Gpq o0) {
 }
 
 Error ProtectedAssembler::call(Gp o0) {
-	if (bWaitingOnEmit || !bMutate || bStrict) return Assembler::call(o0);
+	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
 	BYTE dist = 64 + (rand() % 192);
+	if (bStrict) dist = 0;
 	push(o0);
 	push(o0);
 	push(o0);
@@ -621,9 +623,10 @@ Error ProtectedAssembler::call(Imm o0) {
 }
 
 Error ProtectedAssembler::call(Label o0) {
-	if (bWaitingOnEmit || !bMutate || bStrict) return Assembler::call(o0);
+	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
 	Gp reg = truerandreg();
 	BYTE dist = 64 + (rand() % 192);
+	if (bStrict) dist = 0;
 	push(reg);
 	push(reg);
 	push(reg);
@@ -647,10 +650,11 @@ Error ProtectedAssembler::call(Label o0) {
 }
 
 Error ProtectedAssembler::call(Mem o0) {
-	if (bWaitingOnEmit || !bMutate || bStrict || o0.baseReg() == rsp) return Assembler::call(o0);
+	if (bWaitingOnEmit || !bMutate || o0.baseReg() == rsp) return Assembler::call(o0);
 	Gp reg = truerandreg();
 	o0.setSize(8);
 	BYTE dist = 64 + (rand() % 192);
+	if (bStrict) dist = 0;
 	push(o0);
 	push(o0);
 	push(reg);
