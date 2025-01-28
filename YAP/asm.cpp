@@ -1218,6 +1218,14 @@ bool Asm::Assemble() {
 	}
 	Buffer relocs = GenerateRelocSection(Relocations);
 	NTHeaders.x64.OptionalHeader.DataDirectory[5].Size = relocs.u64Size;
+	for (int i = 0; i < FunctionRanges.Size(); i++) {
+		FunctionRange range = FunctionRanges[i];
+		for (int j = 0; j < range.Entries.Size(); j++) range.Entries.Replace(j, TranslateOldAddress(range.Entries[j]));
+		DWORD dwOldStart = range.dwStart;
+		range.dwStart = TranslateOldAddress(dwOldStart);
+		range.dwSize = TranslateOldAddress(dwOldStart + range.dwSize) - range.dwStart;
+		FunctionRanges.Replace(i, range);
+	}
 
 	// Copy data
 	LOG(Info, MODULE_REASSEMBLER, "Finalizing\n");

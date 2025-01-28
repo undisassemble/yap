@@ -5,7 +5,7 @@
 using namespace asmjit;
 using namespace asmjit::_abi_1_13::x86;
 namespace ZydisToAsmJit {
-
+    
 InstId Mnemonics[ZYDIS_MNEMONIC_MAX_VALUE + 1] = {
     Inst::kIdNone,
     Inst::kIdAaa,
@@ -472,7 +472,7 @@ InstId Mnemonics[ZYDIS_MNEMONIC_MAX_VALUE + 1] = {
     Inst::kIdMovntss,
     Inst::kIdMovq,
     Inst::kIdMovq2dq,
-    Inst::kIdNone,
+    Inst::kIdMovs,
     Inst::kIdMovsd,
     Inst::kIdMovshdup,
     Inst::kIdMovsldup,
@@ -777,10 +777,10 @@ InstId Mnemonics[ZYDIS_MNEMONIC_MAX_VALUE + 1] = {
     Inst::kIdStgi,
     Inst::kIdSti,
     Inst::kIdStmxcsr,
-    Inst::kIdNone,
-    Inst::kIdNone,
-    Inst::kIdNone,
-    Inst::kIdNone,
+    Inst::kIdStos,
+    Inst::kIdStos,
+    Inst::kIdStos,
+    Inst::kIdStos,
     Inst::kIdStr,
     Inst::kIdSttilecfg,
     Inst::kIdStui,

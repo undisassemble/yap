@@ -6,6 +6,8 @@
 /// All functions are provided if they were imported, regardless of configuration options when packing.
 /// You also cannot use GetProcAddress to get access to these functions.
 /// 
+/// You don't have to link with yap.dll if you only use reasm macros.
+/// 
 /// Have a good day :)
 
 #pragma once
@@ -44,3 +46,19 @@ YAP_IMPORT(HMODULE) GetSelf();
 }
 #endif
 #undef YAP_IMPORT
+
+
+// Asm macros
+#define YAP_OP_REASM_MUTATION 0b10000000
+#define YAP_OP_REASM_SUB      0b00000010
+#ifdef __MINGW64__
+#define YAP_OP(x) __asm__ volatile (".byte 0x67, 0x48, 0x0F, 0x1F, 0x04, 0x25, %c0, 0x80, 0x65, 0x89" : : "i" (x & 0xFF))
+#else
+#define YAP_OP(x) __asm nop qword [0x89658000 | (x)]
+#endif
+
+// Set mutation level (0 = disabled)
+#define YAP_MUTATIONLEVEL(level) YAP_OP(YAP_OP_REASM_MUTATION | (level & 0b1111111))
+
+// Enable/disable substitution (1/0 or true/false, only checks lower bit)
+#define YAP_SUBSTITUTION(enabled) YAP_OP(YAP_OP_REASM_SUB | (enabled & 1))

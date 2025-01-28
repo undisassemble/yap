@@ -1,6 +1,10 @@
 #include "assembler.hpp"
 #include "asmtranslations.hpp"
 
+// SDK defs
+#define YAP_OP_REASM_MUTATION 0b10000000
+#define YAP_OP_REASM_SUB      0b00000010
+
 bool bFailed = false;
 
 void AsmJitErrorHandler::handleError(_In_ Error error, _In_ const char* message, _In_ BaseEmitter* emitter) {
@@ -11,6 +15,51 @@ void AsmJitErrorHandler::handleError(_In_ Error error, _In_ const char* message,
 bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 	if (!pLine || pLine->Type != Decoded) return false;
 
+	// Special ops
+	if (pLine->Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_NOP && pLine->Decoded.Instruction.operand_count_visible > 0 && pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && (pLine->Decoded.Operands[0].mem.disp.value & 0xFFFFFF00) == 0x89658000) {
+		BYTE op = pLine->Decoded.Operands[0].mem.disp.value & 0xFF;
+		if (op & YAP_OP_REASM_MUTATION) {
+			bMutate = MutationLevel = op & 0b01111111;
+			LOG(Info, MODULE_REASSEMBLER, "Set mutation level to %d (at RVA %#010x)\n", MutationLevel, pLine->OldRVA);
+		} else if (op & YAP_OP_REASM_SUB) {
+			bSubstitute = op & 1;
+			LOG(Info, MODULE_REASSEMBLER, "%s substitution (at RVA %#010x)\n", bSubstitute ? "Enabled" : "Disabled", pLine->OldRVA);
+		} else {
+			LOG(Warning, MODULE_REASSEMBLER, "Reasm macro noticed, but unable to interpret instruction.\n");
+		}
+		return true;
+	}
+
+	// Mutate
+	strict();
+	if (!bWaitingOnEmit && !HeldLocks) { stub(); }
+	else { bWaitingOnEmit = false; }
+	this->bFailed = ::bFailed;
+
+	// Prefixes
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_LOCK) lock();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REP) rep();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPE) repe();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPNE) repne();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPZ) repz();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPNZ) repnz();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XRELEASE) xrelease();
+	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XACQUIRE) xacquire();
+	
+	// Special instructions
+	if (!pLine->Decoded.Instruction.operand_count_visible) {
+		switch (pLine->Decoded.Instruction.mnemonic) {
+		case ZYDIS_MNEMONIC_MOVSB: return movsb();
+		case ZYDIS_MNEMONIC_MOVSW: return movsw();
+		case ZYDIS_MNEMONIC_MOVSD: return movsd();
+		case ZYDIS_MNEMONIC_MOVSQ: return movsq();
+		case ZYDIS_MNEMONIC_STOSB: return stosb();
+		case ZYDIS_MNEMONIC_STOSW: return stosw();
+		case ZYDIS_MNEMONIC_STOSD: return stosd();
+		case ZYDIS_MNEMONIC_STOSQ: return stosq();
+		}
+	}
+
 	// Convert mnemonic
 	InstId mnem = ZydisToAsmJit::Mnemonics[pLine->Decoded.Instruction.mnemonic];
 	if (!mnem) {
@@ -19,12 +68,8 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 		ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
 		ZydisFormatterFormatInstruction(&fmt, &pLine->Decoded.Instruction, pLine->Decoded.Operands, pLine->Decoded.Instruction.operand_count_visible, formatted, sizeof(formatted), pLine->OldRVA, NULL);
 		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate mnemonic: %s\n", formatted);
+		this->bFailed = true;
 		return false;
-	}
-
-	// movsd
-	if (mnem == Inst::kIdMovsd && !pLine->Decoded.Instruction.operand_count_visible) {
-		return !movsd();
 	}
 
 	// Convert operands
@@ -75,22 +120,6 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 		ZydisFormatterFormatInstruction(&fmt, &pLine->Decoded.Instruction, pLine->Decoded.Operands, pLine->Decoded.Instruction.operand_count_visible, formatted, sizeof(formatted), pLine->OldRVA, NULL);
 		LOG(Warning, MODULE_REASSEMBLER, "Unable to process all operands: %s\n", formatted);
 	}
-
-	// Mutate
-	strict();
-	if (!bWaitingOnEmit && !HeldLocks) { stub(); }
-	else { bWaitingOnEmit = false; }
-	this->bFailed = ::bFailed;
-
-	// Prefixes
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_LOCK) lock();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REP) rep();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPE) repe();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPNE) repne();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPZ) repz();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPNZ) repnz();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XRELEASE) xrelease();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XACQUIRE) xacquire();
 	
 	// Substitution
 	if (bSubstitute) {

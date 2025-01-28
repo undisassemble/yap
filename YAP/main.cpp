@@ -204,7 +204,6 @@ DWORD WINAPI Begin(void* args) {
 #endif
 
 		// Modify
-		bool bNeedsAssembly = Options.Reassembly.MutationLevel || Options.Reassembly.bSubstitution || (Options.Reassembly.bStrip && pAssembly->NTHeaders.x64.OptionalHeader.DataDirectory[6].Size && pAssembly->NTHeaders.x64.OptionalHeader.DataDirectory[6].VirtualAddress);
 		if (Options.Reassembly.bStrip && !pAssembly->Strip()) {
 			Modal("Failed to strip PE");
 			LOG(Failed, MODULE_YAP, "Failed to strip PE\n");
@@ -221,16 +220,11 @@ DWORD WINAPI Begin(void* args) {
 			goto th_exit;
 		}
 
-		// These parts only required if actually assembling
-		if (bNeedsAssembly) {
-			// Assemble
-			if (!pAssembly->Assemble()) {
-				Modal("Assembly failed");
-				LOG(Failed, MODULE_YAP, "Assembly failed\n");
-				goto th_exit;
-			}
-		} else {
-			LOG(Info, MODULE_YAP, "Skipping assembly step as assembly is not modified.\n");
+		// Assemble
+		if (!pAssembly->Assemble()) {
+			Modal("Assembly failed");
+			LOG(Failed, MODULE_YAP, "Assembly failed\n");
+			goto th_exit;
 		}
 
 		// Modify again
