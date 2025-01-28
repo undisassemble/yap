@@ -1166,8 +1166,11 @@ bool Asm::Assemble() {
 	for (int i = 0; i < LinkLater.Size(); i++) {
 		line = LinkLater[i];
 		if (line.Type == JumpTable) {
-			if (line.bRelative) line.JumpTable.Base = TranslateOldAddress(line.JumpTable.Base);
-			line.JumpTable.Value = TranslateOldAddress((line.bRelative ? line.JumpTable.Base : 0) + line.JumpTable.Value) - (line.bRelative ? line.JumpTable.Base : 0);
+			line.JumpTable.Value = TranslateOldAddress((line.bRelative ? line.JumpTable.Base : 0) + line.JumpTable.Value);
+			if (line.bRelative) {
+				line.JumpTable.Base = TranslateOldAddress(line.JumpTable.Base);
+				line.JumpTable.Value -= line.JumpTable.Base;
+			}
 			*reinterpret_cast<DWORD*>(holder.textSection()->buffer().data() + LinkLaterOffsets[i]) = line.JumpTable.Value;
 		} else if (line.Type == Pointer) {
 			if (line.Pointer.IsAbs) {

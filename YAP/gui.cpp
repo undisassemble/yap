@@ -253,7 +253,7 @@ void DrawGUI() {
 			IMGUI_TOGGLE("API Emulation", Options.Packing.bAPIEmulation);
 			ImGui::SetItemTooltip("Emulate some simple WINAPI functions.\n");
 			IMGUI_TOGGLE("Delayed Entry Point", Options.Packing.bDelayedEntry);
-			ImGui::SetItemTooltip("Changes the entry point of the application during runtime.");
+			ImGui::SetItemTooltip("Changes the behavior of the entry point before it is run.");
 			IMGUI_TOGGLE("DLL Sideloading Mitigations", Options.Packing.bMitigateSideloading);
 			ImGui::SetItemTooltip("Prioritizes DLLs in Windows directories, loading those first instead of DLLs placed in the local directory.");
 			ImGui::SameLine();
