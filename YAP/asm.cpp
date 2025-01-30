@@ -289,16 +289,6 @@ DWORD Asm::FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 	Vector<DWORD> ToDisasm; // To prevent stack overflows on big programs, this function is a lie and is not actually recursive, sue me
 	ToDisasm.Push(dwRVA);
-	//Vector<DWORD> Funcs; // Vector of indexes
-	//Funcs.Push(0);
-	//Vector<FunctionRange> ranges;
-	//Vector<bool> verified;
-	//FunctionRange range;
-	//range.dwStart = dwRVA;
-	//range.dwSize = 0;
-	//ranges.Push(range);
-	//verified.Push(false);
-	//DWORD CurrentFunc = 0;
 	ZydisDecodedOperand Operands[ZYDIS_MAX_OPERAND_COUNT];
 	Vector<Line>* Lines;
 	Vector<Line> TempLines;
@@ -308,12 +298,8 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 	ZydisFormatterInit(&Formatter, ZYDIS_FORMATTER_STYLE_INTEL);
 
 	do {
-		//ranges.Replace(CurrentFunc, range);
-
 		// Setup
 		dwRVA = ToDisasm.Pop();
-		//CurrentFunc = Funcs.Pop();
-		//range = ranges[CurrentFunc];
 		TempLines.Release();
 		if (!dwRVA) {
 			LOG(Warning, MODULE_REASSEMBLER, "Skipping NULL RVA\n");
@@ -354,13 +340,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 			CraftedLine.OldRVA = dwRVA;
 			TempLines.Push(CraftedLine);
 
-			if (CraftedLine.Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_RET) {
-				//verified.Replace(CurrentFunc, true); // verify if function returns
-				//if (dwRVA + CraftedLine.Decoded.Instruction.length > range.dwSize + range.dwStart) {
-					//range.dwSize = dwRVA - range.dwStart + CraftedLine.Decoded.Instruction.length;
-				//}
-				break;
-			}
+			if (CraftedLine.Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_RET) break;
 
 			// Check if is jump table
 			if (CraftedLine.Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_LEA && CraftedLine.Decoded.Operands[1].mem.base == ZYDIS_REGISTER_RIP) {
@@ -459,8 +439,6 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 							insert.Type = Pointer;
 							insert.Pointer.IsAbs = true;
 							insert.Pointer.Abs = u64Referencing;
-							// At this point I got contacted by a discord scammer and decided to bait them instead of coding, continue here please!
-							// Im back :)
 							{
 								WORD wInsertAt = FindPosition(wContainingIndex, insert.OldRVA);
 								if (wInsertAt == _UI16_MAX) {
@@ -482,14 +460,6 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 								ToDisasm.Push(u64Referencing);
 								if (CraftedLine.Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_CALL && !Functions.Includes(u64Referencing)) {
 									Functions.Push(u64Referencing);
-									//Funcs.Push(verified.Size());
-									//verified.Push(false);
-									//FunctionRange temp;
-									//temp.dwStart = u64Referencing;
-									//temp.dwSize = 0;
-									//ranges.Push(temp);
-								} else {
-									//Funcs.Push(CurrentFunc);
 								}
 							}
 						}
@@ -503,15 +473,9 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 			}
 
 			// Adjust vars
-			//if (dwRVA < range.dwStart) {
-				//range.dwStart = dwRVA;
-			//}
 			dwRVA += CraftedLine.Decoded.Instruction.length;
 			RawBytes.u64Size -= CraftedLine.Decoded.Instruction.length;
 			RawBytes.pBytes += CraftedLine.Decoded.Instruction.length;
-			//if (dwRVA > range.dwSize + range.dwStart) {
-				//range.dwSize = dwRVA - range.dwStart;
-			//}
 
 			// Stop disassembly if the next instruction has already been disassembled
 			if (i < Lines->Size() && Lines->At(i).OldRVA == dwRVA) {
@@ -522,17 +486,8 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 		// Insert lines
 		Lines->Insert(i, TempLines);
 	} while (ToDisasm.Size());
-	//ranges.Replace(CurrentFunc, range);
-
-	// Store verified functions
-	//for (int i = 0; i < verified.Size(); i++) if (verified[i]) {
-		//FunctionRanges.Push(ranges[i]);
-	//}
 
 	ToDisasm.Release();
-	//Funcs.Release();
-	//verified.Release();
-	//ranges.Release();
 	return true;
 }
 
@@ -543,6 +498,7 @@ bool Asm::CheckRuntimeFunction(_In_ RUNTIME_FUNCTION* pFunc, _In_ bool bFixAddr)
 		pFunc->EndAddress = TranslateOldAddress(pFunc->EndAddress);
 		pFunc->UnwindData = TranslateOldAddress(pFunc->UnwindData);
 	} else {
+		if (!Functions.Includes(pFunc->BeginAddress)) Functions.Push(pFunc->BeginAddress);
 		// Disassemble
 		if (pFunc->BeginAddress && !DisasmRecursive(pFunc->BeginAddress))
 			return false;
@@ -806,7 +762,6 @@ bool Asm::Disassemble() {
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent searching: %llu\n", Data.TimeSpentSearching));
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent inserting: %llu\n", Data.TimeSpentInserting));
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Number of instructions: %llu\n", GetNumLines()));
-	//LOG(Info, MODULE_REASSEMBLER, "Discovered %d functions\n", FunctionRanges.Size());
 	LOG(Success, MODULE_REASSEMBLER, "Finished disassembly\n");
 
 	// Insert missing data + padding
@@ -931,12 +886,7 @@ bool Asm::Analyze() {
 				while (1) {
 					bool bExit = false;
 					// Find end cases
-					if (Done.Includes(pLines->At(index).OldRVA) || (!range.Entries.Includes(pLines->At(index).OldRVA) && Functions.Includes(pLines->At(index).OldRVA))) {
-						if (dwRVA != pLines->At(index).OldRVA && pLines->At(index).OldRVA + GetLineSize(pLines->At(index)) > range.dwStart + range.dwSize) {
-							range.dwSize = (pLines->At(index).OldRVA + GetLineSize(pLines->At(index))) - range.dwStart;
-						}
-						break;
-					}
+					if (Done.Includes(pLines->At(index).OldRVA) || (!range.Entries.Includes(pLines->At(index).OldRVA) && Functions.Includes(pLines->At(index).OldRVA))) break;
 
 					// CF stuff
 					if (pLines->At(index).Type == Decoded && IsInstructionCF(pLines->At(index).Decoded.Instruction.mnemonic) && pLines->At(index).Decoded.Instruction.mnemonic != ZYDIS_MNEMONIC_CALL) {
@@ -976,15 +926,15 @@ bool Asm::Analyze() {
 		ToDo.Release();
 		Functions.Release();
 
-		// Check for invalid functions
+		// Check for overlapping functions
 		int removed = 0;
 		for (int i = 0; i < FunctionRanges.Size(); i++) {
 			range = FunctionRanges[i];
-			
+
 			// Combined functions (improve this)
 			for (int j = 0; j < FunctionRanges.Size(); j++) if (j != i) {
 				FunctionRange range2 = FunctionRanges[j];
-				
+
 				// Overlapping
 				if (range.dwStart <= range2.dwStart && range.dwStart + range.dwSize >= range2.dwStart) {
 					FunctionRanges.Remove(i);
@@ -996,9 +946,9 @@ bool Asm::Analyze() {
 		}
 
 		// Remove invalid data
-		for (int i = 0; i < FunctionRanges.Size(); i++) { 
+		for (int i = 0; i < FunctionRanges.Size(); i++) {
 			FunctionRange range = FunctionRanges[i];
-			
+
 			// Functions that are too small
 			if (range.dwSize < 17) {
 				range.Entries.Release();
@@ -1008,15 +958,18 @@ bool Asm::Analyze() {
 				continue;
 			}
 
-			// Out-of-bounds entry points
 			for (int j = 0; j < range.Entries.Size(); j++) {
+				// Out-of-bounds entry points
 				if (range.Entries[j] < range.dwStart || range.Entries[j] >= range.dwStart + range.dwSize) {
-					removed++;
 					if (range.Entries.Size() == 1) {
+						removed++;
 						range.Entries.Release();
 						FunctionRanges.Remove(i);
 						i--;
 						break;
+					} else {
+						range.Entries.Remove(j);
+						j--;
 					}
 				}
 			}
@@ -1218,14 +1171,6 @@ bool Asm::Assemble() {
 	}
 	Buffer relocs = GenerateRelocSection(Relocations);
 	NTHeaders.x64.OptionalHeader.DataDirectory[5].Size = relocs.u64Size;
-	for (int i = 0; i < FunctionRanges.Size(); i++) {
-		FunctionRange range = FunctionRanges[i];
-		for (int j = 0; j < range.Entries.Size(); j++) range.Entries.Replace(j, TranslateOldAddress(range.Entries[j]));
-		DWORD dwOldStart = range.dwStart;
-		range.dwStart = TranslateOldAddress(dwOldStart);
-		range.dwSize = TranslateOldAddress(dwOldStart + range.dwSize) - range.dwStart;
-		FunctionRanges.Replace(i, range);
-	}
 
 	// Copy data
 	LOG(Info, MODULE_REASSEMBLER, "Finalizing\n");
@@ -1290,12 +1235,17 @@ bool Asm::Assemble() {
 	// Fix function ranges
 	for (int i = 0; i < FunctionRanges.Size(); i++) {
 		FunctionRange range = FunctionRanges[i];
-		DWORD end = TranslateOldAddress(range.dwStart + range.dwSize);
-		range.dwStart = TranslateOldAddress(range.dwStart);
-		range.dwSize = end - range.dwStart;
-		for (int j = 0; j < range.Entries.Size(); j++) {
-			range.Entries.Replace(j, TranslateOldAddress(range.Entries[j]));
-		}
+		for (int j = 0; j < range.Entries.Size(); j++) range.Entries.Replace(j, TranslateOldAddress(range.Entries[j]));
+		
+		// Bandaid fix
+		DWORD offset = 0;
+		DWORD sec = FindSectionIndex(range.dwStart + range.dwSize);
+		DWORD j = FindIndex(sec, range.dwStart + range.dwSize);
+		offset = GetLineSize(Sections[sec].Lines->At(j));
+
+		DWORD dwOldStart = range.dwStart;
+		range.dwStart = TranslateOldAddress(dwOldStart);
+		range.dwSize = TranslateOldAddress(dwOldStart + range.dwSize) - range.dwStart - offset;
 		FunctionRanges.Replace(i, range);
 	}
 

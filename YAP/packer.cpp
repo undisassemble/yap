@@ -3021,6 +3021,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 				}
 			}
 
+			Label finnish = a.newLabel();
 			a.bind(UnloadSegment);
 			a.push(rax);
 			a.push(rcx);
@@ -3028,6 +3029,9 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			a.push(r8);
 			a.push(r9);
 			a.mov(eax, ptr(CurrentlyLoadedSegment));
+			a.cmp(eax, count);
+			a.strict();
+			a.jge(finnish);
 			a.lea(rcx, ptr(PointerArray));
 			a.mov(rcx, ptr(rcx, rax, 3));
 			a.add(rcx, ptr(InternalRelOff));
@@ -3035,7 +3039,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			a.mov(edx, ptr(rdx, rax, 2));
 			a.push(rax);
 			Label loop = a.newLabel();
-			a.mov(al, 0xCC);
+			a.mov(al, 0x90);
 			a.bind(loop);
 			a.mov(byte_ptr(rcx), al);
 			a.inc(rcx);
@@ -3071,6 +3075,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			a.cmp(rdx, ptr(rcx, r9, 3));
 			a.strict();
 			a.jz(setentryloop);
+			a.bind(finnish);
 			a.mov(dword_ptr(CurrentlyLoadedSegment), _I32_MAX);
 			a.pop(r9);
 			a.pop(r8);

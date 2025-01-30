@@ -189,8 +189,9 @@ DWORD WINAPI Begin(void* args) {
 			CloseHandle(hDumped);
 		}
 
+		HANDLE hDumped = NULL;
 		if (Options.Debug.bDumpFunctions) {
-			HANDLE hDumped = CreateFile("YAP.functions.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			hDumped = CreateFile("YAP.functions.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];
 			for (int i = 0; i < pAssembly->GetDisassembledFunctionRanges().Size(); i++) {
 				WriteFile(hDumped, "------------\n", 13, NULL, NULL);
@@ -199,7 +200,6 @@ DWORD WINAPI Begin(void* args) {
 					WriteFile(hDumped, buf, n, NULL, NULL);
 				}
 			}
-			CloseHandle(hDumped);
 		}
 #endif
 
@@ -226,6 +226,21 @@ DWORD WINAPI Begin(void* args) {
 			LOG(Failed, MODULE_YAP, "Assembly failed\n");
 			goto th_exit;
 		}
+
+#ifdef _DEBUG
+		if (Options.Debug.bDumpFunctions) {
+			WriteFile(hDumped, "\n\n\n", 3, NULL, NULL);
+			char buf[512];
+			for (int i = 0; i < pAssembly->GetDisassembledFunctionRanges().Size(); i++) {
+				WriteFile(hDumped, "------------\n", 13, NULL, NULL);
+				for (int j = 0; j < pAssembly->GetDisassembledFunctionRanges()[i].Entries.Size(); j++) {
+					int n = snprintf(buf, 512, "%08x: %08x -> %08x\n", pAssembly->GetDisassembledFunctionRanges()[i].Entries[j], pAssembly->GetDisassembledFunctionRanges()[i].dwStart, pAssembly->GetDisassembledFunctionRanges()[i].dwStart + pAssembly->GetDisassembledFunctionRanges()[i].dwSize);
+					WriteFile(hDumped, buf, n, NULL, NULL);
+				}
+			}
+			CloseHandle(hDumped);
+		}
+#endif
 
 		// Modify again
 		if (Options.Reassembly.bStripDOSStub) {
