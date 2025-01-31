@@ -1599,7 +1599,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 		a.jmp(not_found);
 
 		a.bind(new_buf);
-		a.embed(Options.Packing.Masquerade, lstrlenA(Options.Packing.Masquerade) + 1);
+		for (int i = 0; i < strlen(Options.Packing.Masquerade); i++) a.db(Options.Packing.Masquerade[i] ^ XORKey);
+		a.db(0);
 
 		a.bind(not_found);
 	}

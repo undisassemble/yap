@@ -274,20 +274,30 @@ void DrawGUI() {
 			DEBUG_ONLY(ImGui::SetItemTooltip("Still run if the detected VM is only MS Hyper-V."));
 			DEBUG_ONLY(IMGUI_TOGGLE("Anti-Sandbox", Options.Packing.bAntiSandbox));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a sandboxed environment."));
-			if (Options.Packing.bDelayedEntry && Options.Packing.Immitate == ExeStealth) Options.Packing.Immitate = YAP;
-			if (!Options.Reassembly.bEnabled) ImGui::BeginDisabled();
-			IMGUI_TOGGLE("Partial Unpacking", Options.Packing.bPartialUnpacking);
-			ImGui::SetItemTooltip(Options.Reassembly.bEnabled ? "Only allows one function to be loaded at a time, preventing the whole program from being dumped at once." : "Requires reassembler to be enabled");
-			ImGui::SameLine();
-			ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
-			ImGui::SetItemTooltip("This feature is not threadsafe, and only works on single threaded apps.");
-			if (!Options.Reassembly.bEnabled) ImGui::EndDisabled();
+			DEBUG_ONLY(if (Options.Packing.bDelayedEntry && Options.Packing.Immitate == ExeStealth) Options.Packing.Immitate = YAP);
+			DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::BeginDisabled());
+			DEBUG_ONLY(IMGUI_TOGGLE("Partial Unpacking", Options.Packing.bPartialUnpacking));
+			DEBUG_ONLY(ImGui::SetItemTooltip(Options.Reassembly.bEnabled ? "Only allows one function to be loaded at a time, preventing the whole program from being dumped at once." : "Requires reassembler to be enabled"));
+			DEBUG_ONLY(ImGui::SameLine());
+			DEBUG_ONLY(ImGui::Text(ICON_TRIANGLE_EXCLAMATION));
+			DEBUG_ONLY(ImGui::SetItemTooltip("This feature is not threadsafe, and only works on single threaded apps."));
+			DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::EndDisabled());
 			ImGui::Combo("Immitate Packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
 			ImGui::SetItemTooltip("Changes some details about the packed binary to make it look like another packer.");
 			IMGUI_TOGGLE("Enable Process Masquerading", Options.Packing.bEnableMasquerade);
 			ImGui::SetItemTooltip("Makes the packed executable appear as a different process (NOT process hollowing).\nPlease note that the smaller the path the easier it is to use.");
 			ImGui::SameLine();
+			ImGui::SetNextItemWidth(width / 2);
 			ImGui::InputText(" ", Options.Packing.Masquerade, MAX_PATH);
+			ImGui::SameLine();
+			if (ImGui::Button("Scramble")) {
+				ZeroMemory(Options.Packing.Masquerade, sizeof(Options.Packing.Masquerade));
+				for (int i = 0, n = rand() % 32; i < n; i++) {
+					Options.Packing.Masquerade[i] = rand() & 0xFF;
+					if (!Options.Packing.Masquerade[i]) break;
+				}
+			}
+			ImGui::SetItemTooltip("Set to randomized string.");
 			IMGUI_TOGGLE("Mark Critical (Requires Admin)", Options.Packing.bMarkCritical);
 			ImGui::SetItemTooltip("Marks the process as critical, causing the system to bluescreen when the process exits or is killed.\nRequires the packed process to be run with administrator privileges.");
 			ImGui::InputText("Leave a Message", Options.Packing.Message, 64);
