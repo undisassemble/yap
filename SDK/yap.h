@@ -17,7 +17,7 @@
 #endif
 
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include <windows.h>
 
 #define __YAP_VERSION__ "0.0.0"
 #define YAP_IMPORT(type) __declspec(dllimport) type __stdcall

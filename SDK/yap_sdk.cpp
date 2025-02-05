@@ -1,5 +1,9 @@
+#ifndef _WIN64
+#error YAP can only be used on 64-bit Windows binaries!
+#endif
+
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include <windows.h>
 #define STATUS_NOT_IMPLEMENTED 0xC0000002
 
 BOOL WINAPI DllMain(_In_ HINSTANCE hInstDll, _In_ DWORD dwReason, _In_ LPVOID pReserved) {

@@ -1,7 +1,7 @@
 #pragma once
 
 // Headers
-#include <Windows.h>
+#include <windows.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
