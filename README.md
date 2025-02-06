@@ -12,16 +12,15 @@ A full list of features can be seen [here](Features.md).
 
 ### Dependencies
 
-Windows (requires [vcpkg](https://learn.microsoft.com/en-us/vcpkg/get_started/get-started-msbuild?pivots=shell-cmd#1---set-up-vcpkg)): `vcpkg install`
+Get submodules: `git submodule update --init --recursive`
 
-Debian: `sudo apt install libasmjit-dev libzydis-dev libglfw3-dev`
+Extra dependencies if using linux: `sudo apt install `
 
 ### CMake
 
 ```
 cmake . -DCMAKE_BUILD_TYPE=Release -Bbuild
-cd build
-make
+cmake --build build
 ```
 
 ### Visual Studio, only builds Windows binaries

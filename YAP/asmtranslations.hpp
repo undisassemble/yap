@@ -1,11 +1,12 @@
 #pragma once
 #include <asmjit/asmjit.h>
 #include <Zydis/Zydis.h>
+#include <asmjit/x86/x86globals.h>
 
 using namespace asmjit;
-using namespace asmjit::_abi_1_13::x86;
+using namespace asmjit::x86;
 namespace ZydisToAsmJit {
-    
+
 InstId Mnemonics[ZYDIS_MNEMONIC_MAX_VALUE + 1] = {
     Inst::kIdNone,
     Inst::kIdAaa,

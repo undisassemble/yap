@@ -1487,7 +1487,7 @@ Vector<FunctionRange> Asm::GetDisassembledFunctionRanges() {
 	return clone;
 }
 
-DWORD GetLineSize(_In_ Line& line) {
+DWORD GetLineSize(_In_ const Line& line) {
 	switch (line.Type) {
 	case Decoded:
 		return line.Decoded.Instruction.length;

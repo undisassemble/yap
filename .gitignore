@@ -10,6 +10,7 @@ Makefile
 *.cmake
 
 # Other stuff
+build
 out.exe
 tester.exe
 yap.log.txt

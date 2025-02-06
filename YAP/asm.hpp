@@ -60,7 +60,7 @@ struct FunctionRange {
 	DWORD dwSize = 0;
 };
 
-DWORD GetLineSize(_In_ Line& line);
+DWORD GetLineSize(_In_ const Line& line);
 
 /// <summary>
 /// Encodes an array of relocation RVAs into the relocation directory.

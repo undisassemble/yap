@@ -1,0 +1,12 @@
+[submodule "YAP/imgui"]
+	path = YAP/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "YAP/asmjit"]
+	path = YAP/asmjit
+	url = https://github.com/asmjit/asmjit.git
+[submodule "YAP/zydis"]
+	path = YAP/zydis
+	url = https://github.com/zyantific/zydis.git
+[submodule "YAP/glfw"]
+	path = YAP/glfw
+	url = https://github.com/glfw/glfw.git

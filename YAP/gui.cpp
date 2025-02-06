@@ -6,9 +6,9 @@
 #include <GLFW/glfw3native.h>
 #include <stdlib.h>
 #include <ctime>
-#include <Psapi.h>
-#include <Shlwapi.h>
-#include <imgui_internal.h>
+#include <psapi.h>
+#include <shlwapi.h>
+#include "imgui_internal.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "util.hpp"
@@ -447,7 +447,7 @@ void DrawGUI() {
 			ImGui::Text("Zydis: %d.%d.%d", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
 			ImGui::Text("AsmJit: %d.%d.%d", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
 			ImGui::Text("GLFW: %s", glfwGetVersionString());
-			ImGui::Text("OpenGL: %s", glGetString(GL_VERSION));
+			// ImGui::Text("OpenGL: %s", glGetString(GL_VERSION));
 			ImGui::SeparatorText("Build information");
 			ImGui::Text("Build: " __YAP_BUILD__);
 			ImGui::Text("Time: " __DATE__ " @ " __TIME__);
