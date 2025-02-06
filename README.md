@@ -14,16 +14,9 @@ A full list of features can be seen [here](Features.md).
 
 Get submodules: `git submodule update --init --recursive`
 
-Extra dependencies if using linux: `sudo apt install `
-
 ### CMake
 
 ```
 cmake . -DCMAKE_BUILD_TYPE=Release -Bbuild
 cmake --build build
 ```
-
-### Visual Studio, only builds Windows binaries
-
-1. Set config to `Release x64`
-2. Build solution
