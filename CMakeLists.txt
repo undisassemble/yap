@@ -8,7 +8,7 @@ elseif (NOT (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "Rel
 endif()
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
-configure_file("YAP/version.hpp.in" "YAP/version.hpp")
+configure_file("YAP/include/version.hpp.in" "YAP/include/version.hpp")
 
 # Cross-compilation stuff
 set(CMAKE_SYSTEM_NAME Windows)
@@ -60,22 +60,23 @@ add_compile_definitions(_GLFW_WIN32)
 
 ##### DEPENDENCIES #####
 include_directories(
-	"YAP"
-	"YAP/lzma"
-	"YAP/imgui"
-	"YAP/imgui/backends"
-	"YAP/asmjit/src"
-	"YAP/zydis/include"
-	"YAP/zydis/src"
-	"YAP/zydis/dependencies/zycore/include"
-	"YAP/zydis/dependencies/zycore/src"
-	"YAP/glfw/include"
+	"YAP/include"
+	"YAP/dependencies"
+	"YAP/dependencies/lzma"
+	"YAP/dependencies/imgui"
+	"YAP/dependencies/imgui/backends"
+	"YAP/dependencies/asmjit/src"
+	"YAP/dependencies/zydis/include"
+	"YAP/dependencies/zydis/src"
+	"YAP/dependencies/zydis/dependencies/zycore/include"
+	"YAP/dependencies/zydis/dependencies/zycore/src"
+	"YAP/dependencies/glfw/include"
 )
 
 # glfw
 file(GLOB SOURCES_GLFW
-	"YAP/glfw/src/*.c"
-	"YAP/glfw/deps/*.c"
+	"YAP/dependencies/glfw/src/*.c"
+	"YAP/dependencies/glfw/deps/*.c"
 )
 add_library(glfw3 SHARED ${SOURCES_GLFW})
 set_target_properties(glfw3 PROPERTIES PREFIX "")
@@ -86,9 +87,9 @@ endif()
 
 # imgui
 file(GLOB SOURCES_IMGUI
-	"YAP/imgui/*.cpp"
-	"YAP/imgui/backends/imgui_impl_opengl3.cpp"
-	"YAP/imgui/backends/imgui_impl_glfw.cpp"
+	"YAP/dependencies/imgui/*.cpp"
+	"YAP/dependencies/imgui/backends/imgui_impl_opengl3.cpp"
+	"YAP/dependencies/imgui/backends/imgui_impl_glfw.cpp"
 )
 add_library(imgui SHARED ${SOURCES_IMGUI})
 target_link_libraries(imgui glfw3)
@@ -100,8 +101,8 @@ endif()
 
 # asmjit
 file(GLOB SOURCES_ASMJIT
-	"YAP/asmjit/src/asmjit/core/*.cpp"
-	"YAP/asmjit/src/asmjit/x86/*.cpp"
+	"YAP/dependencies/asmjit/src/asmjit/core/*.cpp"
+	"YAP/dependencies/asmjit/src/asmjit/x86/*.cpp"
 )
 add_library(asmjit SHARED ${SOURCES_ASMJIT})
 set_target_properties(asmjit PROPERTIES PREFIX "")
@@ -112,10 +113,10 @@ endif()
 
 # zydis
 file(GLOB SOURCES_ZYDIS
-	"YAP/zydis/src/*.c"
-	"YAP/zydis/src/Generated/*.inc"
-	"YAP/zydis/dependencies/src/*.c"
-	"YAP/zydis/dependencies/src/API/*.c"
+	"YAP/dependencies/zydis/src/*.c"
+	"YAP/dependencies/zydis/src/Generated/*.inc"
+	"YAP/dependencies/zydis/dependencies/src/*.c"
+	"YAP/dependencies/zydis/dependencies/src/API/*.c"
 )
 add_library(zydis SHARED ${SOURCES_ZYDIS})
 set_target_properties(zydis PROPERTIES PREFIX "")
@@ -139,8 +140,8 @@ endif()
 
 # YAP.exe
 file(GLOB SOURCES
-	"YAP/*.cpp"
-	"YAP/lzma/*.c"
+	"YAP/src/*.cpp"
+	"YAP/dependencies/lzma/*.c"
 )
 add_executable(exe WIN32 ${SOURCES})
 target_link_options(exe PRIVATE -municode)
@@ -168,16 +169,18 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64\\\\${CMAKE_PROJECT_NAME}")
 	# set(CPACK_NSIS_MUI_ICON "INSTALLER ICON")
 	# set(CPACK_NSIS_MUI_UNIICON "UNINSTALLER ICON")
+	# set(CPACK_NSIS_MUI_HEADERIMAGE "HEADER IMAGE")
 	set(CPACK_NSIS_COMPRESSOR "lzma")
 	set(CPACK_NSIS_MODIFY_PATH ON)
 	set(CPACK_NSIS_DISPLAY_NAME "${CMAKE_PROJECT_NAME}")
 	set(CPACK_NSIS_PACKAGE_NAME "${CMAKE_PROJECT_NAME}")
 	set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/undisassemble/yap")
-	set(CPACK_NSIS_CREATE_ICONS ON)
+	# set(CPACK_NSIS_CREATE_ICONS "ON")
 	set(CPACK_NSIS_MUI_WELCOMEPAGE_TITLE "Welcome")
 	set(CPACK_NSIS_MUI_LICENSEPAGE_TEXT "License Agreement")
 	set(CPACK_NSIS_MUI_FINISHPAGE_TITLE "Finished")
 	set(CPACK_NSIS_MUI_FINISHPAGE_TEXT "Thank you for installing ${CMAKE_PROJECT_NAME}.")
+	set(CPACK_PACKAGE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE}")
 
 	include(CPack)
 endif()

@@ -3,8 +3,6 @@
 #include "pe.hpp"
 #include "packer.hpp"
 #include "gui.hpp"
-#include <imgui/imgui.h>
-#include <imgui/imgui_internal.h>
 #include <time.h>
 #include <stdarg.h>
 #include <GLFW/glfw3.h>

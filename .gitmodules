@@ -1,12 +1,12 @@
 [submodule "YAP/imgui"]
-	path = YAP/imgui
+	path = YAP/dependencies/imgui
 	url = https://github.com/ocornut/imgui.git
 [submodule "YAP/asmjit"]
-	path = YAP/asmjit
+	path = YAP/dependencies/asmjit
 	url = https://github.com/asmjit/asmjit.git
 [submodule "YAP/zydis"]
-	path = YAP/zydis
+	path = YAP/dependencies/zydis
 	url = https://github.com/zyantific/zydis.git
 [submodule "YAP/glfw"]
-	path = YAP/glfw
+	path = YAP/dependencies/glfw
 	url = https://github.com/glfw/glfw.git
