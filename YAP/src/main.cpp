@@ -10,10 +10,10 @@
 // Forward declares
 DWORD WINAPI Begin(void* args);
 namespace Console {
-	void help(wchar_t* name);
+	void help(char* name);
 	void buildversion();
 	void version();
-	void protect(wchar_t* input, wchar_t* output = NULL);
+	void protect(char* input, char* output = NULL);
 	void SetupConsole();
 }
 
@@ -33,7 +33,7 @@ uint64_t rand64() {
 }
 
 // Main function
-int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR lpCmdLine, _In_ int nShowCmd) {
+int main(int argc, char** argv) {
 	// General setup
 	
 	srand(time(NULL));
@@ -43,66 +43,44 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	}
 	LoadSettings();
 	
-	// Get args
-	int argc = 0;
-	wchar_t** argv = CommandLineToArgvW(lpCmdLine, &argc);
-	if (lpCmdLine && lpCmdLine[0] && argv) {
-		// Look for - commands
-		for (int i = 0; i < argc; i++) {
-			if (!lstrcmpW(argv[i], L"--help")) {
-				Console::SetupConsole();
-				Console::help(L"YAP");
-				return 0;
-			} else if (!lstrcmpW(argv[i], L"--version")) {
-				Console::SetupConsole();
-				Console::buildversion();
-				return 0;
-			}
+	// Look for - commands
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "--help")) {
+			Console::SetupConsole();
+			Console::help("YAP");
+			return 0;
+		} else if (!strcmp(argv[i], "--version")) {
+			Console::SetupConsole();
+			Console::buildversion();
+			return 0;
 		}
-
-		// Search CLI
-		for (int i = 0, n = lstrlenW(argv[0]); i < n; i++) {
-			Data.Project[i] = (char)argv[0][i];
-			Data.Project[i + 1] = 0;
-		}
-		if (argc > 1) {
-			if (!lstrcmpW(argv[1], L"create")) {
-				Console::SetupConsole();
-				SaveProject();
-				return 0;
-			} else if (!lstrcmpW(argv[1], L"version")) {
-				Console::SetupConsole();
-				Console::version();
-				return 0;
-			} else if (!lstrcmpW(argv[1], L"protect")) {
-				if (argc < 3) {
-					LOG(Failed, MODULE_YAP, "Not enough arguments provided\n");
-					return 1;
-				}
-				Console::SetupConsole();
-				LOG(Info, MODULE_YAP, "Launched with %d arguments: \"%ls", argc, argv[0]);
-				for (int i = 1; i < argc; i++) {
-					LOG(Nothing, MODULE_YAP, " %ls", argv[i]);
-				}
-				LOG(Nothing, MODULE_YAP, "\"\n");
-				LOG(Info_Extended, MODULE_YAP, "lpCmdLine: %ls\n", lpCmdLine);
-				Console::protect(argv[2], argc > 2 ? argv[3] : NULL);
-				return 0;
-			}
-		}
-		LOG(Info, MODULE_YAP, "Launched with %d arguments: \"%ls", argc, argv[0]);
-		for (int i = 1; i < argc; i++) {
-			LOG(Nothing, MODULE_YAP, " %ls", argv[i]);
-		}
-		LOG(Nothing, MODULE_YAP, "\"\n");
-		LOG(Info_Extended, MODULE_YAP, "lpCmdLine: %ls\n", lpCmdLine);
-		if (!LoadProject()) return 1;
-	} else {
-		LOG(Warning, MODULE_YAP, "Failed to get command args or none provided (%d)\n", GetLastError());
 	}
 
+	// Search CLI
+	strcpy_s(Data.Project, argv[1]);
+	if (argc > 2) {
+		if (!strcmp(argv[2], "create")) {
+			Console::SetupConsole();
+			SaveProject();
+			return 0;
+		} else if (!strcmp(argv[2], "version")) {
+			Console::SetupConsole();
+			Console::version();
+			return 0;
+		} else if (!strcmp(argv[2], "protect")) {
+			if (argc < 4) {
+				LOG(Failed, MODULE_YAP, "Not enough arguments provided\n");
+				return 1;
+			}
+			Console::SetupConsole();
+			Console::protect(argv[3], argc > 3 ? argv[4] : NULL);
+			return 0;
+		}
+	}
+	if (Data.Project[0] && !LoadProject()) return 1;
+
 	// Setup UI
-	if (!Data.bUsingConsole && argc < 3) {
+	if (!Data.bUsingConsole && argc < 4) {
 		DEBUG_ONLY(AllocConsole());
 		DEBUG_ONLY(Console::SetupConsole());
 		if (!BeginGUI()) {
@@ -305,8 +283,8 @@ th_exit:
 	return 0;
 }
 
-void Console::help(wchar_t* name) {
-	LOG(Nothing, MODULE_YAP, "Usage: %ls PROJECT COMMAND\n\n", name);
+void Console::help(char* name) {
+	LOG(Nothing, MODULE_YAP, "Usage: %s PROJECT COMMAND\n\n", name);
 
 	LOG(Nothing, MODULE_YAP, "COMMANDS\n");
 	LOG(Nothing, MODULE_YAP, "\tcreate\t\t\t\tCreate project\n");
@@ -314,8 +292,8 @@ void Console::help(wchar_t* name) {
 	LOG(Nothing, MODULE_YAP, "\tprotect INPUT [OUTPUT]\t\tProtect a file\n\n");
 
 	LOG(Nothing, MODULE_YAP, "ALTERNATIVE COMMANDS\n");
-	LOG(Nothing, MODULE_YAP, "%ls --version\tGet build info\n", name);
-	LOG(Nothing, MODULE_YAP, "%ls --help\tGet this help menu\n", name);
+	LOG(Nothing, MODULE_YAP, "%s --version\tGet build info\n", name);
+	LOG(Nothing, MODULE_YAP, "%s --help\tGet this help menu\n", name);
 }
 
 void Console::buildversion() {
@@ -354,8 +332,8 @@ void Console::version() {
 }
 
 // Idk improve this maybe
-void Console::protect(wchar_t* input, wchar_t* output) {
-	if (lstrlenW(input) + 1 > MAX_PATH || (output && lstrlenW(output) + 1 > MAX_PATH)) {
+void Console::protect(char* input, char* output) {
+	if (strlen(input) + 1 > MAX_PATH || (output && strlen(output) + 1 > MAX_PATH)) {
 		LOG(Failed, MODULE_YAP, "Cannot handle files with names longer than MAX_PATH characters (%d bytes)!\n", MAX_PATH);
 		return;
 	}
@@ -363,12 +341,12 @@ void Console::protect(wchar_t* input, wchar_t* output) {
 	if (!LoadProject()) return;
 
 	// Output name
-	wchar_t TrueOutput[MAX_PATH] = { 0 };
+	char TrueOutput[MAX_PATH] = { 0 };
 	if (output) {
-		memcpy(TrueOutput, output, lstrlenW(output) * 2 + 2);
+		strcpy_s(TrueOutput, output);
 	} else {
-		int InputLen = lstrlenW(input);
-		memcpy(TrueOutput, input, InputLen * 2 + 2);
+		int InputLen = strlen(input);
+		strcpy_s(TrueOutput, input);
 		uint16_t i = InputLen - 1;
 		for (; i > 0; i--) {
 			if (TrueOutput[i] == '.') break;
@@ -377,26 +355,19 @@ void Console::protect(wchar_t* input, wchar_t* output) {
 			LOG(Failed, MODULE_YAP, "Failed to set output name!\n");
 			return;
 		}
-		memmove(&TrueOutput[i + 7], &TrueOutput[i], InputLen * 2 + 2 - i * 2);
-		memcpy(&TrueOutput[i], L"_yapped", 14);
+		memmove(&TrueOutput[i + 7], &TrueOutput[i], InputLen + 1 - i);
+		memcpy(&TrueOutput[i], "_yapped", 7);
 	}
 
 	// Run
-	char converted[MAX_PATH] = { 0 };
-	for (int i = 0, n = lstrlenW(input); i < n; i++) {
-		converted[i] = (char)input[i];
-	}
-	pAssembly = new Asm(converted);
+	pAssembly = new Asm(input);
 	if (pAssembly->Status) {
 		LOG(Failed, MODULE_YAP, "Failed to parse binary (%d)\n", pAssembly->Status);
 		delete pAssembly;
 		pAssembly = NULL;
 		return;
 	}
-	for (int i = 0, n = lstrlenW(TrueOutput) + 1; i < n; i++) {
-		converted[i] = (char)TrueOutput[i];
-	}
-	Begin(converted);
+	Begin(TrueOutput);
 	delete pAssembly;
 	pAssembly = NULL;
 }
