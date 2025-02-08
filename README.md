@@ -17,6 +17,6 @@ Get submodules: `git submodule update --init --recursive`
 ### CMake
 
 ```
-cmake . -DCMAKE_BUILD_TYPE=Release -Bbuild
-cmake --build build
+cmake . -DCMAKE_BUILD_TYPE=Release
+make
 ```

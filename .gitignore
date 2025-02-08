@@ -4,6 +4,8 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 # CMake files
+version.hpp
+compile_commands.json
 CMakeCache.txt
 CMakeFiles
 Makefile

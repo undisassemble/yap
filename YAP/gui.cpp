@@ -4,14 +4,10 @@
 #include "icons.hpp"
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
-#include <stdlib.h>
 #include <ctime>
-#include <psapi.h>
-#include <shlwapi.h>
 #include "imgui_internal.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include "util.hpp"
 #include "asm.hpp"
 
 // Globals

@@ -1,12 +1,9 @@
 #pragma once
 
 // Headers
-#include <windows.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
+#include "platform.hpp"
+#include "version.hpp"
 #include <limits.h>
-#include <winternl.h>
 typedef uint64_t QWORD;
 #ifndef UTIL_STRUCT_ONLY
 #include <asmjit/asmjit.h>
@@ -40,24 +37,6 @@ void LOG(LoggingLevel_t level, char* mod, char* str, ...);
 #define ASMJIT_LIBRARY_VERSION_MINOR(version) ((version & 0xFF00) >> 8)
 #define ASMJIT_LIBRARY_VERSION_PATCH(version) (version & 0xFF)
 #define countof(x) (sizeof(x) / sizeof(*x))
-
-// Version
-#define __YAP_VERSION__ "0.0.0"
-#define __YAP_VERSION_MASK_DEBUG__ 0xFF000000
-#define __YAP_VERSION_MASK_MAJOR__ 0x000000FF
-#define __YAP_VERSION_MASK_MINOR__ 0x0000FF00
-#define __YAP_VERSION_MASK_PATCH__ 0x00FF0000
-#ifdef _DEBUG
-#define __YAP_BUILD__ "DEBUG"
-#define DEBUG_ONLY(x) x
-#define RELEASE_ONLY(x)
-#define __YAP_VERSION_NUM__ 0xFF000000
-#else
-#define __YAP_BUILD__ "RELEASE"
-#define DEBUG_ONLY(x)
-#define RELEASE_ONLY(x) x
-#define __YAP_VERSION_NUM__ 0x00000000
-#endif
 
 const int VMMinimumSize = 21;
 
