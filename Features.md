@@ -19,11 +19,23 @@ Each packed application receives it's own unique assembly, preventing signature 
 
 ### IAT Obfuscation
 
-Imported function names get stored as SHA-256 hashes and are resolved when your application is started. You can also optionally add an extra wrapper to any imported functions, making IAT reconstruction more difficult.
+Imported function names are stored as SHA-256 hashes and get resolved when your application is started. You can also optionally add an extra wrapper to imports, and emulate some API functions.
 
 ### Delayed Entry Point
 
 Sets the entry point to an area of memory that is uninitialized, just to add an additional headache to anything that uses static analysis.
+
+### DLL sideloading mitigation
+
+Prioritize loading DLLs in the Windows directory, and/or only allow DLLs signed by Microsoft to be loaded.
+
+### Direct Syscalls
+
+Makes syscalls directly where possible, going around user-mode WINAPI hooks on those functions.
+
+### Anti-dump
+
+Makes it harder for software like Scylla to dump the running process back to disk.
 
 ### Partial Unpacking
 
@@ -33,9 +45,9 @@ Instead of unpacking the whole application at once, parts of the code segment ge
 
 Changes some details about the packed executable to cause programs like [Detect It Easy](https://github.com/horsicq/Detect-It-Easy) to believe it uses a different protection system. Currently supported protectors are: Themida/WinLicense, UPX, MPRESS, Enigma, and ExeStealth. (ExeStealth is only available if Delayed Entry Point is disabled).
 
-### SDK & Direct Syscalls
+### SDK
 
-Makes syscalls directly where possible, going around user-mode WINAPI hooks on those functions. Includes a library to allow communication between your code and the packer, which also provides access to some syscall functions.
+Provides a communication layer between your application and the packer.
 
 ### Other
 
@@ -44,10 +56,13 @@ Includes other features like anti-debug, anti-dump, anti-vm, anti-patch, and oth
 
 ## Reassembler
 
-### Symbol Stripping
+### Information Stripping
 
-Removes debugging symbols from the selected binary, similar to the `strip` command.
+Options to remove the DOS stub, unnecessary header info, and debugging symbols (similar to the `strip` command).
 
+### Mutation
+
+Assembles the original binary using the same mutation engine used for the packer, with options to protect the full program or only select segments (through the SDK).
 
 ## VM
 

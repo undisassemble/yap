@@ -16,3 +16,4 @@ tester.exe
 yap.log.txt
 yap.config
 .cache
+*.a
