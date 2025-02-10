@@ -28,18 +28,17 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
-/// <summary>
-/// Manually check for attached debuggers.
+/// 
+/// Check for attached debuggers.
 /// It is highly recommended that you use this in your main thread, as no protective threads are spawned by the packer.
 /// Only the main thread of the application can check for hardware breakpoints.
-/// </summary>
-/// <returns>true if debugger is found, false otherwise</returns>
+/// 
 YAP_IMPORT(bool) CheckForDebuggers();
 
-/// <summary>
+/// 
+/// Retrieves the base address of the running executable.
 /// If using anti-dump, GetModuleHandle(NULL) will return NULL, use this instead.
-/// </summary>
-/// <returns>Program base address</returns>
+/// 
 YAP_IMPORT(HMODULE) GetSelf();
 
 #ifdef __cplusplus
@@ -57,8 +56,14 @@ YAP_IMPORT(HMODULE) GetSelf();
 #define YAP_OP(x) __asm nop qword [0x89658000 | (x)]
 #endif
 
-// Set mutation level (0 = disabled)
+/// 
+/// Changes the reassemblers mutation setting.
+/// NOTE: This is all linear, any control flow changes/optimizations might change how you expect this to behave!
+/// 
 #define YAP_MUTATIONLEVEL(level) YAP_OP(YAP_OP_REASM_MUTATION | (level & 0b1111111))
 
-// Enable/disable substitution (1/0 or true/false, only checks lower bit)
+/// 
+/// Changes the substitution mutation setting.
+/// NOTE: This is all linear, any control flow changes/optimizations might change how you expect this to behave!
+/// 
 #define YAP_SUBSTITUTION(enabled) YAP_OP(YAP_OP_REASM_SUB | (enabled & 1))

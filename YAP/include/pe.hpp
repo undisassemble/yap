@@ -23,9 +23,9 @@ typedef struct {
 	DWORD ThunkRVA;
 } IAT_ENTRY;
 
-/// <summary>
+/// 
 /// Parses portable executable formats
-/// </summary>
+/// 
 class PE {
 protected:
 	DWORD OverlayOffset = 0;
@@ -39,76 +39,70 @@ public:
 	IMAGE_DOS_HEADER DosHeader = { 0 };
 	ComboNTHeaders NTHeaders = { 0 };
 
-	/// <summary>
-	/// Creates PE object with given file
-	/// </summary>
-	/// <param name="sFileName">Path to the file to be read</param>
+	/// 
+	/// Creates PE object with given file.
+	/// 
 	PE(_In_ char* sFileName);
 	
-	/// <summary>
-	/// Creates PE object with given file
-	/// </summary>
-	/// <param name="hFile">Handle to a file with GENERIC_READ permissions</param>
+	/// 
+	/// Creates PE object with given file.
+	/// 
 	PE(_In_ HANDLE hFile);
 
-	/// <summary>
-	/// Creates empty PE object
-	/// </summary>
-	/// <param name="x86">True if the binary is 32-bit</param>
+	/// 
+	/// Creates empty PE object.
+	/// 
 	PE(_In_ bool x86);
 
-	/// <summary>
-	/// Duplicates a PE object
-	/// </summary>
-	/// <param name="pOther">Object to duplicate</param>
+	/// 
+	/// Duplicates an existing PE object.
+	/// 
 	PE(_In_ PE* pOther);
 
 	~PE();
 
-	/// <summary>
-	/// Retrieves the TLS callback array (can be written to/modified)
-	/// </summary>
-	/// <returns>Pointer to TLS callbacks</returns>
+	/// 
+	/// Retrieves the TLS callback array (can be written to/modified).
+	/// `NULL` or points to `NULL` if no TLS callbacks are present.
+	/// 
 	uint64_t* GetTLSCallbacks();
 
-	/// <summary>
-	/// Parses a file
-	/// </summary>
-	/// <param name="hFile">Handle to a file with GENERIC_READ permissions</param>
+	/// 
+	/// Parses a file.
+	/// 
 	bool ParseFile(_In_ HANDLE hFile);
 
-	/// <summary>
-	/// Changes a PEs base address (and handles relocations)
-	/// </summary>
-	/// <param name="u64NewBase">New base address</param>
+	/// 
+	/// Changes a PEs base address (and handles relocations).
+	/// 
 	void RebaseImage(_In_ uint64_t u64NewBase);
 
-	/// <summary>
-	/// Get binary machine type
-	/// </summary>
-	/// <returns>ZydisMachineMode of the PE</returns>
+	/// 
+	/// Get PE architecture.
+	/// 
 	ZydisMachineMode GetMachine();
 
+	/// 
+	/// Writes data at the RVA.
+	/// 
 	void WriteRVA(_In_ DWORD dwRVA, _In_ void* pData, _In_ size_t szData);
+	
+	/// 
+	/// Reads data at the RVA.
+	/// 
 	void ReadRVA(_In_ DWORD dwRVA, _Out_ void* pData, _In_ size_t szData);
 
-	/// <summary>
-	/// Writes data to a given RVA
-	/// </summary>
-	/// <typeparam name="T">Data type</typeparam>
-	/// <param name="u64Address">RVA to write to</param>
-	/// <param name="Data">Data to write</param>
+	/// 
+	/// Writes data at the RVA.
+	/// 
 	template <typename T>
 	void WriteRVA(_In_ DWORD dwRVA, _In_ T Data) {
 		WriteRVA(dwRVA, &Data, sizeof(T));
 	}
 
-	/// <summary>
-	/// Read bytes from binary using a RVA
-	/// </summary>
-	/// <typeparam name="T">Data type</typeparam>
-	/// <param name="u64Address">Address of value to be read</param>
-	/// <returns>Value at address</returns>
+	/// 
+	/// Reads data at the RVA.
+	/// 
 	template <typename T>
 	T ReadRVA(_In_ DWORD dwRVA) {
 		T ret;
@@ -116,64 +110,105 @@ public:
 		return ret;
 	}
 
-	/// <summary>
-	/// Fixes headers and moves sections
-	/// </summary>
+	/// 
+	/// Fixes headers and moves sections.
+	/// 
 	void FixHeaders();
 
+	/// 
+	/// Deletes a section.
+	/// 
 	virtual void DeleteSection(_In_ WORD wIndex);
+
+	/// 
+	/// Overwrites a section with new data.
+	/// 
 	void OverwriteSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_opt_ size_t szBytes);
+	
+	/// 
+	/// Inserts a new section.
+	/// 
 	void InsertSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_ IMAGE_SECTION_HEADER Header);
+	
+	/// 
+	/// Finds the section containing the raw address.
+	/// Returns `_UI16_MAX` if not found.
+	/// 
 	WORD FindSectionByRaw(_In_ DWORD dwRaw);
+
+	/// 
+	/// Removes the DOS stub.
+	/// 
 	void StripDosStub();
+	
+	/// 
+	/// Gets import tables.
+	/// 
 	IAT_ENTRY* GetIAT();
+	
+	/// 
+	/// Removes PE overlay.
+	/// 
 	void DiscardOverlay();
+	
+	/// 
+	/// Gets the offset for the overlay, or 0 if no overlay.
+	/// 
 	DWORD GetOverlayOffset();
 	
-	/// <summary>
-	/// Finds a section by RVA
-	/// </summary>
-	/// <param name="dwRVA">RVA</param>
-	/// <returns>Section index (or -1 if not found)</returns>
+	/// 
+	/// Finds the section containing the RVA.
+	/// Returns `_UI16_MAX` if not found.
+	/// 
 	WORD FindSectionByRVA(_In_ DWORD dwRVA);
 
-	/// <summary>
+	/// 
 	/// Retrieves the (prefered) base address when the image is loaded into memory
-	/// </summary>
-	/// <returns>Base address of the image</returns>
+	/// 
 	uint64_t GetBaseAddress();
 
-	/// <summary>
-	/// Translates a runtime offset to a file offset
-	/// </summary>
-	/// <param name="dwRVA">Runtime offset</param>
-	/// <returns>File offset</returns>
+	/// 
+	/// Translates a runtime offset to a file offset.
+	/// 
 	DWORD RVAToRaw(_In_ DWORD dwRVA);
 
-	/// <summary>
-	/// Translates a file offset to a runtime offset
-	/// </summary>
-	/// <param name="dwRaw">File offset</param>
-	/// <returns>Runtime offset</returns>
+	/// 
+	/// Translates a file offset to a runtime offset.
+	/// 
 	DWORD RawToRVA(_In_ DWORD dwRaw);
 
-	/// <summary>
-	/// Dumps all data into a single binary
-	/// </summary>
-	/// <param name="hFile">Handle to output file (must have GENERIC_WRITE perms)</param>
-	/// <returns>true on success</returns>
+	/// 
+	/// Formats and writes PE to disk.
+	/// 
 	bool ProduceBinary(_In_ HANDLE hFile);
 
-	/// <summary>
-	/// Dumps all data into a single binary
-	/// </summary>
-	/// <param name="sName">Name of the output file</param>
-	/// <returns>true on success</returns>
+	/// 
+	/// Formats and writes PE to disk.
+	/// 
 	bool ProduceBinary(_In_ char* sName);
 
+	/// 
+	/// Gets RVAs of exported functions.
+	/// 
 	Vector<DWORD> GetExportedFunctionRVAs();
+	
+	/// 
+	/// Gets names of exported functions.
+	/// 
 	Vector<char*> GetExportedFunctionNames();
+	
+	/// 
+	/// Gets list of imported DLLs.
+	/// 
 	Vector<IMAGE_IMPORT_DESCRIPTOR> GetImportedDLLs();
+	
+	/// 
+	/// Reads string at RVA (because `ReadRVA<char*>` does not work).
+	/// 
 	char* ReadRVAString(_In_ DWORD dwRVA);
+
+	/// 
+	/// Gets list of addresses that get relocated.
+	/// 
 	Vector<DWORD> GetRelocations();
 };

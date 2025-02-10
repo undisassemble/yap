@@ -15,8 +15,8 @@ enum LineType : BYTE {
 
 struct Line {
 	LineType Type : 4;
-	bool bRelative : 1 = false; // Jump table is relative to first entry or request holds instruction index instead of absolute address (i.e. jmp 0 is jumping to the first instruction in the index, if doing this, make the instruction RIP-relative anyway)
-	bool bRelocate : 1 = false; // For requests that point to an old RVA and need to be relocated
+	bool bRelative : 1 = false; ///< Jump table is relative to first entry or request holds instruction index instead of absolute address (i.e. jmp 0 is jumping to the first instruction in the index, if doing this, make the instruction RIP-relative anyway)
+	bool bRelocate : 1 = false; ///< For requests that point to an old RVA and need to be relocated
 	DWORD OldRVA = 0;
 	DWORD NewRVA = 0;
 	union {
@@ -33,7 +33,7 @@ struct Line {
 		} Padding;
 		struct {
 			DWORD Value;
-			DWORD Base; // Only if it's relative
+			DWORD Base; ///< Only used if `bRelative` is set
 		} JumpTable;
 		struct {
 			union {
@@ -60,18 +60,20 @@ struct FunctionRange {
 	DWORD dwSize = 0;
 };
 
+/// 
+/// Retrieves the encoded size of a line, in bytes.
+/// 
 DWORD GetLineSize(_In_ const Line& line);
 
-/// <summary>
-/// Encodes an array of relocation RVAs into the relocation directory.
-/// </summary>
-/// <param name="Relocations">Array of RVAs that need relocations, should be sorted from least to greatest.</param>
-/// <returns>Buffer containing relocation directory</returns>
+/// 
+/// Encodes an array of relocation RVAs into a valid relocation directory.
+/// Relocations must be sorted from least to greatest.
+/// 
 Buffer GenerateRelocSection(Vector<DWORD> Relocations);
 
-/// <summary>
+/// 
 /// Handles disassembly, assembly, and assembly modifications
-/// </summary>
+/// 
 class Asm : public PE {
 private:
 	bool DisasmRecursive(_In_ DWORD dwRVA);
@@ -87,64 +89,95 @@ protected:
 	Vector<FunctionRange> FunctionRanges;
 
 public:
-	Vector<FunctionRange> GetDisassembledFunctionRanges();
 
 	Asm();
 	Asm(_In_ char* sFileName);
 	Asm(_In_ HANDLE hFile);
 	~Asm();
 
+	/// 
+	/// Finds functions compatible with partial loading.
+	/// 
 	bool Analyze();
 
-	/// <summary>
+	/// 
+	/// Retrieves the function ranges found by `Analyze()`.
+	/// 
+	Vector<FunctionRange> GetDisassembledFunctionRanges();
+
+	/// 
 	/// Strips debug info & symbols.
-	/// </summary>
-	/// <returns>Success/failure</returns>
+	/// 
 	bool Strip();
+	
+	/// 
+	/// Removes unnecessary data from the PE headers.
+	/// 
 	void CleanHeaders();
 
+	/// 
+	/// Translates a RVA from pre-assembly to post-assembly.
+	/// Should only be used after a successful `Assemble()`.
+	/// 
 	DWORD TranslateOldAddress(_In_ DWORD dwRVA);
 
-	/// <summary>
+	/// 
 	/// Finds position where line with given RVA should be inserted.
-	/// </summary>
-	/// <param name="dwSec">Section index</param>
-	/// <param name="dwRVA">RVA</param>
-	/// <returns>Index to insert at, or _UI32_MAX - 1 if already exists</returns>
+	/// Returns `_UI32_MAX - 1` if RVA already exists or `_UI32_MAX` on error.
+	/// 
 	DWORD FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA);
 	
-	/// <summary>
-	/// Finds line with given RVA.
-	/// </summary>
-	/// <param name="dwSec">Section index</param>
-	/// <param name="dwRVA">RVA</param>
-	/// <returns>Index of line, or _UI32_MAX if not found</returns>
+	/// 
+	/// Finds line in section with given RVA.
+	/// Returns `_UI32_MAX` if not found.
+	/// 
 	DWORD FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA);
 	
+	/// 
+	/// Finds section that contains the given RVA.
+	/// 
 	DWORD FindSectionIndex(_In_ DWORD dwRVA);
 
+	/// 
+	/// Disassembles application.
+	/// 
 	bool Disassemble();
 
-	/// <summary>
-	/// Assembles existing assembly
-	/// </summary>
-	/// <returns>Success/failure</returns>
+	/// 
+	/// Assembles application.
+	/// 
 	bool Assemble();
 
-	/// <summary>
-	/// Inserts new asm instruction
-	/// </summary>
-	/// <param name="iIndex">Index to insert asm</param>
-	/// <param name="pLine">Assembly to be inserted</param>
-	/// <returns>Success/failure</returns>
+	/// 
+	/// Inserts new asm instruction.
+	/// Use this as little as possible please, it's very slow.
+	/// 
 	void InsertLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ Line Line);
 
+	/// 
+	/// Deletes asm instruction.
+	/// 
 	void DeleteLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex);
+	
+	/// 
+	/// Removes data from given range.
+	/// 
 	void RemoveData(_In_ DWORD dwRVA, _In_ DWORD dwSize);
 
+	/// 
+	/// Gets the new size of a section.
+	/// Should only be used after a successful `Assemble()`.
+	/// 
 	DWORD GetAssembledSize(_In_ DWORD SectionIndex);
 
+	/// 
+	/// Gets the total number of lines.
+	/// 
 	size_t GetNumLines();
+	
+	/// 
+	/// Gets section at index.
+	/// 
 	Vector<AsmSection> GetSections();
 
 	void DeleteSection(_In_ WORD wIndex) override;
