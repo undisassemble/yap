@@ -82,6 +82,30 @@ struct Buffer {
 	}
 };
 
+struct Data_t {
+	char Project[MAX_PATH] = { 0 };
+	char SaveFileName[MAX_PATH] = { 0 };
+	HWND hWnd = NULL;
+	bool bParsing : 1 = false;
+	bool bUserCancelled : 1 = false;
+	bool bUsingConsole : 1 = false;
+	bool bRunning : 1 = false;
+#ifdef _DEBUG // Using DEBUG_ONLY macro doesnt work
+	uint64_t TimeSpentSearching = 0;
+	uint64_t TimeSpentFilling = 0;
+	uint64_t TimeSpentInserting = 0;
+	union {
+		uint64_t TimeSpentDisassembling = 0;
+		uint64_t TimeSpentAssembling;
+	};
+#endif
+};
+
+DWORD WINAPI Begin(void* args);
+extern Data_t Data;
+extern HANDLE hLogFile;
+extern HANDLE hStdOut;
+
 template <typename T>
 struct Vector {
 	Buffer raw = { 0 };
@@ -276,30 +300,6 @@ struct Vector {
 		//Release();
 	//}
 };
-
-struct Data_t {
-	char Project[MAX_PATH] = { 0 };
-	char SaveFileName[MAX_PATH] = { 0 };
-	HWND hWnd = NULL;
-	bool bParsing : 1 = false;
-	bool bUserCancelled : 1 = false;
-	bool bUsingConsole : 1 = false;
-	bool bRunning : 1 = false;
-#ifdef _DEBUG // Using DEBUG_ONLY macro doesnt work
-	uint64_t TimeSpentSearching = 0;
-	uint64_t TimeSpentFilling = 0;
-	uint64_t TimeSpentInserting = 0;
-	union {
-		uint64_t TimeSpentDisassembling = 0;
-		uint64_t TimeSpentAssembling;
-	};
-#endif
-};
-
-DWORD WINAPI Begin(void* args);
-extern Data_t Data;
-extern HANDLE hLogFile;
-extern HANDLE hStdOut;
 
 struct ToVirt_t {
 	bool bRemoveExport : 1 = true;

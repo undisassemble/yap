@@ -8,7 +8,9 @@ elseif (NOT (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "Rel
 endif()
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}/garbage")
 configure_file("YAP/include/version.hpp.in" "YAP/include/version.hpp")
+configure_file("SDK/yap.h.in" "SDK/yap.h")
 
 # Cross-compilation stuff
 set(CMAKE_SYSTEM_NAME Windows)

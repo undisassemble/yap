@@ -15,5 +15,6 @@ out.exe
 tester.exe
 yap.log.txt
 yap.config
+yap.h
 .cache
 *.a
