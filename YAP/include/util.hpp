@@ -55,31 +55,9 @@ struct Buffer {
 	BYTE* pBytes;
 	uint64_t u64Size;
 
-	void Merge(_In_ Buffer Other, _In_ bool bDontFree = false) {
-		if (!Other.pBytes || !Other.u64Size) {
-			return;
-		} else if (!pBytes || !u64Size) {
-			pBytes = Other.pBytes;
-			u64Size = Other.u64Size;
-		} else {
-			u64Size += Other.u64Size;
-			pBytes = reinterpret_cast<BYTE*>(realloc(pBytes, u64Size));
-			if (!pBytes) {
-				DebugBreak();
-				exit(1);
-			}
-			memcpy(pBytes + u64Size - Other.u64Size, Other.pBytes, Other.u64Size);
-			if (!bDontFree) {
-				Other.Release();
-			}
-		}
-	}
+	void Merge(_In_ Buffer Other, _In_ bool bDontFree = false);
 
-	void Release() {
-		if (pBytes) free(pBytes);
-		pBytes = NULL;
-		u64Size = 0;
-	}
+	void Release();
 };
 
 struct Data_t {
@@ -389,11 +367,12 @@ extern Options_t Options;
 
 uint64_t rand64();
 
-/// <summary>
+/// 
 /// Similar to MessageBox, opens a modal and waits for user input.
-/// </summary>
-/// <param name="pText">Body of modal</param>
-/// <param name="pTitle">Title of modal</param>
-/// <param name="uType">Buttons to include</param>
-/// <returns>Button pressed</returns>
+/// 
 int Modal(_In_ char* pText, _In_ char* pTitle = "Error", _In_ UINT uType = MB_OK);
+
+bool LoadProject();
+bool SaveProject();
+void SaveSettings();
+void LoadSettings();
