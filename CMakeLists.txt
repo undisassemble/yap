@@ -9,8 +9,12 @@ endif()
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}/garbage")
+
+# Versioning stuff
 configure_file("YAP/include/version.hpp.in" "YAP/include/version.hpp")
+configure_file("YAP/meta/YAPClient.rc.in" "YAP/meta/YAPClient.rc")
 configure_file("SDK/yap.h.in" "SDK/yap.h")
+configure_file("SDK/yap.rc.in" "SDK/yap.rc")
 
 # Cross-compilation stuff
 set(CMAKE_SYSTEM_NAME Windows)
@@ -78,10 +82,11 @@ include_directories(
 	"YAP/dependencies/glfw/include"
 )
 
-# glfw
+# glfw3
 file(GLOB SOURCES_GLFW
 	"YAP/dependencies/glfw/src/*.c"
 	"YAP/dependencies/glfw/deps/*.c"
+	"YAP/meta/glfw3.rc"
 )
 add_library(glfw3 SHARED ${SOURCES_GLFW})
 set_target_properties(glfw3 PROPERTIES PREFIX "")
@@ -95,6 +100,7 @@ file(GLOB SOURCES_IMGUI
 	"YAP/dependencies/imgui/*.cpp"
 	"YAP/dependencies/imgui/backends/imgui_impl_opengl3.cpp"
 	"YAP/dependencies/imgui/backends/imgui_impl_glfw.cpp"
+	"YAP/meta/imgui.rc"
 )
 add_library(imgui SHARED ${SOURCES_IMGUI})
 target_link_libraries(imgui glfw3)
@@ -108,6 +114,7 @@ endif()
 file(GLOB SOURCES_ASMJIT
 	"YAP/dependencies/asmjit/src/asmjit/core/*.cpp"
 	"YAP/dependencies/asmjit/src/asmjit/x86/*.cpp"
+	"YAP/meta/asmjit.rc"
 )
 add_library(asmjit SHARED ${SOURCES_ASMJIT})
 set_target_properties(asmjit PROPERTIES PREFIX "")
@@ -122,6 +129,7 @@ file(GLOB SOURCES_ZYDIS
 	"YAP/dependencies/zydis/src/Generated/*.inc"
 	"YAP/dependencies/zydis/dependencies/src/*.c"
 	"YAP/dependencies/zydis/dependencies/src/API/*.c"
+	"YAP/meta/zydis.rc"
 )
 add_library(zydis SHARED ${SOURCES_ZYDIS})
 set_target_properties(zydis PROPERTIES PREFIX "")
@@ -135,7 +143,7 @@ endif()
 ##### YAP #####
 
 # yap.dll
-add_library(yap SHARED "SDK/yap_sdk.cpp")
+add_library(yap SHARED "SDK/yap_sdk.cpp" "SDK/yap.rc")
 set_target_properties(yap PROPERTIES PREFIX "")
 set_target_properties(yap PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -146,6 +154,7 @@ endif()
 file(GLOB SOURCES
 	"YAP/src/*.cpp"
 	"YAP/dependencies/lzma/*.c"
+	"YAP/meta/YAPClient.rc"
 )
 add_executable(YAPClient WIN32 ${SOURCES})
 target_link_libraries(YAPClient d3d11)

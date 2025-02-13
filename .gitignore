@@ -18,3 +18,5 @@ yap.config
 yap.h
 .cache
 *.a
+YAPClient.rc
+yap.rc

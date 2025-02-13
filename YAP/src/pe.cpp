@@ -475,7 +475,7 @@ void PE::WriteRVA(_In_ DWORD dwRVA, _In_ void* pData, _In_ size_t szData) {
 void PE::ReadRVA(_In_ DWORD dwRVA, _Out_ void* pData, _In_ size_t szData) {
 	WORD wSectionIndex = FindSectionByRVA(dwRVA);
 	if (!pData || !szData || wSectionIndex > NTHeaders.x64.FileHeader.NumberOfSections - 1 || !SectionHeaders[wSectionIndex].SizeOfRawData || SectionHeaders[wSectionIndex].VirtualAddress > dwRVA || SectionHeaders[wSectionIndex].VirtualAddress + SectionHeaders[wSectionIndex].SizeOfRawData < dwRVA + szData) {
-		ZeroMemory(pData, szData); // This region is defaulted to zero anyways so ¯\_(._.)_/¯
+		ZeroMemory(pData, szData); // This region is defaulted to zero anyways so ï¿½\_(._.)_/ï¿½
 		return;
 	}
 

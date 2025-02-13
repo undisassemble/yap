@@ -59,7 +59,7 @@ public:
 	/// 
 	PE(_In_ PE* pOther);
 
-	~PE();
+	virtual ~PE();
 
 	/// 
 	/// Retrieves the TLS callback array (can be written to/modified).
