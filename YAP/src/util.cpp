@@ -153,8 +153,7 @@ void Buffer::Merge(_In_ Buffer Other, _In_ bool bDontFree) {
         pBytes = Other.pBytes;
         u64Size = Other.u64Size;
     } else {
-        u64Size += Other.u64Size;
-        pBytes = reinterpret_cast<BYTE*>(realloc(pBytes, u64Size));
+        Allocate(u64Size + Other.u64Size);
         if (!pBytes) {
             DebugBreak();
             exit(1);
@@ -166,8 +165,31 @@ void Buffer::Merge(_In_ Buffer Other, _In_ bool bDontFree) {
     }
 }
 
+void Buffer::Allocate(_In_ uint64_t Size) {
+	if (!Size) {
+		Release();
+		return;
+	}
+	Data.Reserved += Size - u64Size;
+	Data.InUse += Size - u64Size;
+	u64Size = Size;
+	pBytes = reinterpret_cast<BYTE*>(realloc(pBytes, u64Size));
+}
+
 void Buffer::Release() {
-    if (pBytes) free(pBytes);
+    if (pBytes) {
+		free(pBytes);
+		Data.Reserved -= u64Size;
+		Data.InUse -= u64Size;
+	}
     pBytes = NULL;
     u64Size = 0;
+}
+
+uint64_t rand64() {
+	uint64_t ret = rand();
+	ret = ret << 16 | rand();
+	ret = ret << 16 | rand();
+	ret = ret << 16 | rand();
+	return ret;
 }

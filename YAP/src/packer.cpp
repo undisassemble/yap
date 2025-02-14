@@ -69,8 +69,7 @@ SRes PackingProgress(ICompressProgressPtr p, UInt64 inSize, UInt64 outSize) { re
 
 Buffer PackSection(_In_ Buffer SectionData) {
 	Buffer data = { 0 };
-	data.u64Size = SectionData.u64Size * 1.1 + 0x4000;
-	data.pBytes = reinterpret_cast<BYTE*>(malloc(data.u64Size));
+	data.Allocate(SectionData.u64Size * 1.1 + 0x4000);
 
 	// Gen algorithm
 	if (!DecoderProc.Size()) {
@@ -103,15 +102,14 @@ Buffer PackSection(_In_ Buffer SectionData) {
 	alloc.Alloc = Alloc;
 	alloc.Free = Free;
 	size_t propssz = LZMA_PROPS_SIZE;
-	SRes res = LzmaEncode(data.pBytes, &data.u64Size, SectionData.pBytes, SectionData.u64Size, &props, ShellcodeData.UnpackData.EncodedProp, &propssz, 0, &progress, &alloc, &alloc);
+	uint64_t OldSize = data.u64Size;
+	SRes res = LzmaEncode(data.pBytes, &OldSize, SectionData.pBytes, SectionData.u64Size, &props, ShellcodeData.UnpackData.EncodedProp, &propssz, 0, &progress, &alloc, &alloc);
 	if (res != SZ_OK) {
 		LOG(Failed, MODULE_PACKER, "Failed to compress data (%d)\n", res);
-		free(data.pBytes);
-		data.pBytes = NULL;
-		data.u64Size = 0;
+		data.Release();
 		return data;
 	}
-	data.pBytes = reinterpret_cast<BYTE*>(realloc(data.pBytes, data.u64Size));
+	data.Allocate(OldSize);
 
 	// Encode (inverse cause yeah)
 	BYTE key = DecoderProc[0].value;
@@ -597,8 +595,7 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate TLS shellcode\n");
 		return buf;
 	}
-	buf.u64Size = holder.textSection()->buffer().size();
-	buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+	buf.Allocate(holder.textSection()->buffer().size());
 	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
 	LOG(Success, MODULE_PACKER, "Generated TLS shellcode\n");
 	return buf;
@@ -1403,8 +1400,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	ShellcodeData.Sha256_UpdateOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Update);
 	ShellcodeData.Sha256_FinalOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Final);
 	LOG(Info_Extended, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
-	buf.u64Size = holder.textSection()->buffer().size();
-	buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+	buf.Allocate(holder.textSection()->buffer().size());
 	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
 	if (Options.Packing.bAntiDump) *reinterpret_cast<QWORD*>(buf.pBytes + szOffSzShell) = buf.u64Size;
 	CompressedInternal.Release();
@@ -2074,8 +2070,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 		}
 
 		Buffer zero;
-		zero.u64Size = pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[5].Size;
-		zero.pBytes = reinterpret_cast<BYTE*>(malloc(zero.u64Size));
+		zero.Allocate(pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[5].Size);
 		ZeroMemory(zero.pBytes, zero.u64Size);
 		pOriginal->WriteRVA(pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress, zero.pBytes, zero.u64Size);
 		zero.Release();
@@ -2119,8 +2114,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 		}
 
 		Buffer zero;
-		zero.u64Size = pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[9].Size;
-		zero.pBytes = reinterpret_cast<BYTE*>(malloc(zero.u64Size));
+		zero.Allocate(pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[9].Size);
 		ZeroMemory(zero.pBytes, zero.u64Size);
 		pOriginal->WriteRVA(pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[9].VirtualAddress, zero.pBytes, zero.u64Size);
 		zero.Release();
@@ -2860,8 +2854,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			int count = 0;
 			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
 				Buffer buf;
-				buf.u64Size = FunctionRanges[i].dwSize;
-				buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+				buf.Allocate(FunctionRanges[i].dwSize);
 				pOriginal->ReadRVA(FunctionRanges[i].dwStart, buf.pBytes, buf.u64Size);
 				FunctionBodies.Push(PackSection(buf));
 				ZeroMemory(buf.pBytes, buf.u64Size);
@@ -3088,7 +3081,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			a.bind(Compressed);
 			for (int i = 0; i < FunctionBodies.Size(); i++) {
 				a.embed(FunctionBodies[i].pBytes, FunctionBodies[i].u64Size);
-				free(FunctionBodies[i].pBytes);
+				FunctionBodies[i].Release();
 			}
 			FunctionBodies.Release();
 
@@ -3112,8 +3105,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 		}
 	}
 
-	buf.u64Size = holder.textSection()->buffer().size();
-	buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+	buf.Allocate(holder.textSection()->buffer().size());
 	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
 	LOG(Success, MODULE_PACKER, "Generated internal shellcode\n");
 	return buf;
@@ -3173,8 +3165,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	}
 
 	// Setup DOS header & stub (e_lfanew is managed by PE)
-	pPackedBinary->DosStub.u64Size = pOriginal->DosStub.u64Size;
-	pPackedBinary->DosStub.pBytes = reinterpret_cast<BYTE*>(malloc(pPackedBinary->DosStub.u64Size));
+	pPackedBinary->DosStub.Allocate(pOriginal->DosStub.u64Size);
 	memcpy(pPackedBinary->DosStub.pBytes, pOriginal->DosStub.pBytes, pOriginal->DosStub.u64Size);
 	pPackedBinary->DosHeader.e_magic = IMAGE_DOS_SIGNATURE;
 	pPackedBinary->DosHeader.e_lfanew = sizeof(IMAGE_DOS_HEADER) + pPackedBinary->DosStub.u64Size;
@@ -3188,7 +3179,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		if (!raw.pBytes || !raw.u64Size || !Header.PointerToRawData) {
 			LOG(Warning, MODULE_PACKER, "A resource section was present, but resources could not be read! (RVA: %x)\n", rsrc.VirtualAddress);
 		} else {
-			resources.pBytes = reinterpret_cast<BYTE*>(malloc(resources.u64Size = rsrc.Size));
+			resources.Allocate(rsrc.Size);
 			memcpy(resources.pBytes, raw.pBytes + rsrc.VirtualAddress - Header.VirtualAddress, resources.u64Size);
 			ZeroMemory(raw.pBytes + rsrc.VirtualAddress - Header.VirtualAddress, resources.u64Size);
 		}
@@ -3328,8 +3319,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		TLSDataDir.AddressOfCallBacks = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_TLS_DIRECTORY64) + pPackedBinary->GetBaseAddress();
 		TLSDataDir.AddressOfIndex = TLSDataDir.StartAddressOfRawData = TLSDataDir.AddressOfCallBacks + sizeof(uint64_t) * nTLSEntries;
 		TLSDataDir.EndAddressOfRawData = TLSDataDir.StartAddressOfRawData + sizeof(uint64_t) * nTLSEntries;
-		shell.u64Size += sizeof(uint64_t) * (nTLSEntries + 1) + sizeof(IMAGE_TLS_DIRECTORY64) + TLSCode.u64Size;
-		shell.pBytes = reinterpret_cast<BYTE*>(realloc(shell.pBytes, shell.u64Size));
+		shell.Allocate(shell.u64Size + sizeof(uint64_t) * (nTLSEntries + 1) + sizeof(IMAGE_TLS_DIRECTORY64) + TLSCode.u64Size);
 		memcpy(shell.pBytes + shell.u64Size - (sizeof(uint64_t) * (nFalseEntries + 2) + sizeof(IMAGE_TLS_DIRECTORY64) + TLSCode.u64Size), &TLSDataDir, sizeof(IMAGE_TLS_DIRECTORY64));
 		memcpy(shell.pBytes + shell.u64Size - TLSCode.u64Size, TLSCode.pBytes, TLSCode.u64Size);
 		uint64_t* pEntries = reinterpret_cast<uint64_t*>(shell.pBytes + shell.u64Size - (sizeof(uint64_t) * (nTLSEntries + 1) + TLSCode.u64Size));
@@ -3407,20 +3397,17 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		Exports.AddressOfNames = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_EXPORT_DIRECTORY) + sizeof(DWORD) * Exports.NumberOfFunctions;
 		Exports.AddressOfNameOrdinals = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_EXPORT_DIRECTORY) + sizeof(DWORD) * (Exports.NumberOfFunctions + Exports.NumberOfNames);
 		pNT->OptionalHeader.DataDirectory[0].Size = sizeof(IMAGE_EXPORT_DIRECTORY) + sizeof(DWORD) * (Exports.NumberOfFunctions + Exports.NumberOfNames) + sizeof(WORD) * Exports.NumberOfNames;
-		shell.u64Size += sizeof(IMAGE_EXPORT_DIRECTORY);
-		shell.pBytes = reinterpret_cast<BYTE*>(realloc(shell.pBytes, shell.u64Size));
+		shell.Allocate(shell.u64Size + sizeof(IMAGE_EXPORT_DIRECTORY));
 		memcpy(shell.pBytes + shell.u64Size - sizeof(IMAGE_EXPORT_DIRECTORY), &Exports, sizeof(IMAGE_EXPORT_DIRECTORY));
 
 		// Export RVAs
-		shell.u64Size += exports.Size() * sizeof(DWORD);
-		shell.pBytes = reinterpret_cast<BYTE*>(realloc(shell.pBytes, shell.u64Size));
+		shell.Allocate(shell.u64Size + exports.Size() * sizeof(DWORD));
 		for (int i = 0; i < exports.Size(); i++) {
 			*reinterpret_cast<DWORD*>(shell.pBytes + shell.u64Size - sizeof(DWORD) * (exports.Size() - i)) = exports[i] + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders;
 		}
 
 		// Export names
-		shell.u64Size += names.Size() * sizeof(DWORD);
-		shell.pBytes = reinterpret_cast<BYTE*>(realloc(shell.pBytes, shell.u64Size));
+		shell.Allocate(shell.u64Size + names.Size() * sizeof(DWORD));
 		DWORD rva = Exports.AddressOfNameOrdinals + sizeof(WORD) * names.Size();
 		for (int i = 0; i < names.Size(); i++) {
 			*reinterpret_cast<DWORD*>(shell.pBytes + shell.u64Size - sizeof(DWORD) * (names.Size() - i)) = rva;
@@ -3428,8 +3415,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		}
 
 		// Export ordinals
-		shell.u64Size += names.Size() * sizeof(WORD);
-		shell.pBytes = reinterpret_cast<BYTE*>(realloc(shell.pBytes, shell.u64Size));
+		shell.Allocate(shell.u64Size + names.Size() * sizeof(WORD));
 		for (WORD i = 0; i < names.Size(); i++) {
 			*reinterpret_cast<WORD*>(shell.pBytes + shell.u64Size - sizeof(WORD) * (names.Size() - i)) = i;
 		}
@@ -3437,8 +3423,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		// Export names
 		for (int i = 0; i < names.Size(); i++) {
 			int len = lstrlenA(names[i]) + 1;
-			shell.u64Size += len;
-			shell.pBytes = reinterpret_cast<BYTE*>(realloc(shell.pBytes, shell.u64Size));
+			shell.Allocate(shell.u64Size + len);
 			memcpy(shell.pBytes + shell.u64Size - len, names[i], len);
 			pNT->OptionalHeader.DataDirectory[0].Size += len;
 		}

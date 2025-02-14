@@ -550,6 +550,7 @@ bool Asm::CheckRuntimeFunction(_In_ RUNTIME_FUNCTION* pFunc, _In_ bool bFixAddr)
 }
 
 bool Asm::Disassemble() {
+	Data.State = Disassembling;
 	DEBUG_ONLY(uint64_t TickCount = GetTickCount64());
 	if (Status) {
 		LOG(Failed, MODULE_REASSEMBLER, "Could not begin disassembly, as no binary is loaded (%hhd)\n", Status);
@@ -829,10 +830,15 @@ bool Asm::Disassemble() {
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent inserting: %llu\n", Data.TimeSpentInserting));
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent filling gaps: %llu\n", Data.TimeSpentFilling));
 	LOG(Success, MODULE_REASSEMBLER, "Finished disassembly\n");
+	Data.State = Idle;
+	Data.fTotalProgress = 0.f;
+	Data.fTaskProgress = 0.f;
+	Data.sTask = NULL;
 	return true;
 }
 
 bool Asm::Analyze() {
+	Data.sTask = "Analyzing";
 	// Function ranges
 	if (Options.Packing.bPartialUnpacking) {
 		FunctionRange range = { 0 };
@@ -858,8 +864,7 @@ bool Asm::Analyze() {
 			dwRVA = Functions[i];
 			ToDo.Push(dwRVA);
 			range.Entries.nItems = 0;
-			range.Entries.raw.pBytes = NULL;
-			range.Entries.raw.u64Size = 0;
+			range.Entries.raw.Release();
 			range.Entries.Push(dwRVA);
 			range.dwStart = dwRVA;
 			range.dwSize = 0;
@@ -982,10 +987,15 @@ bool Asm::Analyze() {
 	}
 
 	LOG(Success, MODULE_REASSEMBLER, "Finished analysis\n");
+	Data.State = Idle;
+	Data.fTotalProgress = 0.f;
+	Data.fTaskProgress = 0.f;
+	Data.sTask = NULL;
 	return true;
 }
 
 bool Asm::Assemble() {
+	Data.State = Assembling;
 	// Setup
 	LOG(Info, MODULE_REASSEMBLER, "Assembling\n");
 	if (!Sections.Size()) return false;
@@ -1063,8 +1073,7 @@ bool Asm::Assemble() {
 			}
 			case Embed: {
 				Buffer buf = { 0 };
-				buf.u64Size = line.Embed.Size;
-				buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+				buf.Allocate(line.Embed.Size);
 				ReadRVA(line.OldRVA, buf.pBytes, line.Embed.Size);
 				a.embed(buf.pBytes, buf.u64Size);
 				buf.Release();
@@ -1191,8 +1200,7 @@ bool Asm::Assemble() {
 			DeleteSection(i);
 			i--;
 		}
-		buf.u64Size = Sections[i].NewRawSize;
-		buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+		buf.Allocate(Sections[i].NewRawSize);
 		if (holder.textSection()->buffer().size() < Sections[i].NewRVA - SectionHeaders[0].VirtualAddress + buf.u64Size) {
 			LOG(Failed, MODULE_REASSEMBLER, "Failed to read assembled code (size: %p, expected: %p)\n", holder.textSection()->buffer().size(), Sections[i].NewRVA - SectionHeaders[0].VirtualAddress + buf.u64Size);
 			return false;
@@ -1284,6 +1292,10 @@ bool Asm::Assemble() {
 
 	FixHeaders();
 	LOG(Success, MODULE_REASSEMBLER, "Finished assembly\n");
+	Data.State = Idle;
+	Data.fTotalProgress = 0.f;
+	Data.fTaskProgress = 0.f;
+	Data.sTask = NULL;
 	return true;
 }
 
@@ -1523,8 +1535,7 @@ Vector<AsmSection> Asm::GetSections() {
 Buffer GenerateRelocSection(Vector<DWORD> Relocations) {
 	Buffer ret = { 0 };
 	WORD current = 0;
-	ret.u64Size = sizeof(IMAGE_BASE_RELOCATION);
-	ret.pBytes = reinterpret_cast<BYTE*>(malloc(ret.u64Size));
+	ret.Allocate(sizeof(IMAGE_BASE_RELOCATION));
 	IMAGE_BASE_RELOCATION* pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes);
 	pReloc->SizeOfBlock = sizeof(IMAGE_BASE_RELOCATION);
 	pReloc->VirtualAddress = 0;
@@ -1540,8 +1551,7 @@ Buffer GenerateRelocSection(Vector<DWORD> Relocations) {
 
 		// Generate new rva
 		if (pReloc->VirtualAddress + 0x1000 <= Relocations[i]) {
-			ret.u64Size += sizeof(IMAGE_BASE_RELOCATION);
-			ret.pBytes = reinterpret_cast<BYTE*>(realloc(ret.pBytes, ret.u64Size));
+			ret.Allocate(ret.u64Size + sizeof(IMAGE_BASE_RELOCATION));
 			RelocOff = ret.u64Size - sizeof(IMAGE_BASE_RELOCATION);
 			pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
 			pReloc->SizeOfBlock = sizeof(IMAGE_BASE_RELOCATION);
@@ -1550,8 +1560,7 @@ Buffer GenerateRelocSection(Vector<DWORD> Relocations) {
 
 		// Add entry
 		current |= (Relocations[i] - pReloc->VirtualAddress) & 0b0000111111111111;
-		ret.u64Size += sizeof(WORD);
-		ret.pBytes = reinterpret_cast<BYTE*>(realloc(ret.pBytes, ret.u64Size));
+		ret.Allocate(ret.u64Size + sizeof(WORD));
 		pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
 		pReloc->SizeOfBlock += sizeof(WORD);
 		*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = current;

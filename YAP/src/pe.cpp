@@ -40,18 +40,15 @@ PE::PE(_In_ PE* pOther) {
 	x86 = pOther->x86;
 	DosHeader = pOther->DosHeader;
 	NTHeaders = pOther->NTHeaders;
-	DosStub = pOther->DosStub;
-	DosStub.pBytes = reinterpret_cast<BYTE*>(malloc(DosStub.u64Size));
+	DosStub.Allocate(pOther->DosStub.u64Size);
 	memcpy(DosStub.pBytes, pOther->DosStub.pBytes, DosStub.u64Size);
-	SectionHeaders.raw.u64Size = pOther->SectionHeaders.raw.u64Size;
-	SectionHeaders.raw.pBytes = reinterpret_cast<BYTE*>(malloc(SectionHeaders.raw.u64Size));
+	SectionHeaders.raw.Allocate(pOther->SectionHeaders.raw.u64Size);
 	SectionHeaders.nItems = pOther->SectionHeaders.nItems;
 	memcpy(SectionHeaders.raw.pBytes, pOther->SectionHeaders.raw.pBytes, SectionHeaders.raw.u64Size);
 	for (int i = 0; i < NTHeaders.x64.FileHeader.NumberOfSections; i++) {
 		Buffer buf = { 0 };
 		if (pOther->SectionData[i].u64Size) {
-			buf.u64Size = pOther->SectionData[i].u64Size;
-			buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
+			buf.Allocate(pOther->SectionData[i].u64Size);
 			memcpy(buf.pBytes, pOther->SectionData[i].pBytes, buf.u64Size);
 		}
 		SectionData.Push(buf);
@@ -82,9 +79,8 @@ bool PE::ParseFile(_In_ HANDLE hFile) {
 	}
 
 	// DOS stub
-	DosStub.u64Size = DosHeader.e_lfanew - sizeof(IMAGE_DOS_HEADER);
-	if (DosStub.u64Size) DosStub.pBytes = reinterpret_cast<BYTE*>(malloc(DosStub.u64Size));
-	memcpy(DosStub.pBytes, pBytes + sizeof(IMAGE_DOS_HEADER), DosStub.u64Size);
+	DosStub.Allocate(DosHeader.e_lfanew - sizeof(IMAGE_DOS_HEADER));
+	if (DosStub.u64Size) memcpy(DosStub.pBytes, pBytes + sizeof(IMAGE_DOS_HEADER), DosStub.u64Size);
 
 	// NT headers
 	memcpy(&NTHeaders.x86, pBytes + DosHeader.e_lfanew, sizeof(IMAGE_NT_HEADERS64));
@@ -119,25 +115,21 @@ bool PE::ParseFile(_In_ HANDLE hFile) {
 	if (IMAGE_NUMBEROF_DIRECTORY_ENTRIES - NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes)
 		memset(&NTHeaders.x64.OptionalHeader.DataDirectory[NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes], 0, sizeof(IMAGE_DATA_DIRECTORY) * (IMAGE_NUMBEROF_DIRECTORY_ENTRIES - NTHeaders.x64.OptionalHeader.NumberOfRvaAndSizes));
 
-	SectionHeaders.raw.u64Size = sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections;
-	SectionHeaders.raw.pBytes = reinterpret_cast<BYTE*>(malloc(SectionHeaders.raw.u64Size));
+	SectionHeaders.raw.Allocate(sizeof(IMAGE_SECTION_HEADER) * NTHeaders.x64.FileHeader.NumberOfSections);
 	SectionHeaders.nItems = NTHeaders.x64.FileHeader.NumberOfSections;
 	memcpy(SectionHeaders.raw.pBytes, pBytes + DosHeader.e_lfanew + NTHeaders.x64.FileHeader.SizeOfOptionalHeader + sizeof(IMAGE_FILE_HEADER) + 4, SectionHeaders.raw.u64Size);
 	
 	for (int i = 0; i < SectionHeaders.Size(); i++) {
 		Buffer buf = { 0 };
-		if ((buf.u64Size = SectionHeaders[i].SizeOfRawData)) {
-			buf.pBytes = reinterpret_cast<BYTE*>(malloc(buf.u64Size));
-			memcpy(buf.pBytes, pBytes + SectionHeaders[i].PointerToRawData, buf.u64Size);
-		}
+		buf.Allocate(SectionHeaders[i].SizeOfRawData);
+		if (buf.u64Size) memcpy(buf.pBytes, pBytes + SectionHeaders[i].PointerToRawData, buf.u64Size);
 		SectionData.Push(buf);
 	}
 
 	// Overlay
 	OverlayOffset = SectionHeaders[SectionHeaders.Size() - 1].PointerToRawData + SectionHeaders[SectionHeaders.Size() - 1].SizeOfRawData;
-	Overlay.u64Size = szBytes - OverlayOffset;
+	Overlay.Allocate(szBytes - OverlayOffset);
 	if (Overlay.u64Size) {
-		Overlay.pBytes = reinterpret_cast<BYTE*>(malloc(Overlay.u64Size));
 		memcpy(Overlay.pBytes, pBytes + szBytes - Overlay.u64Size, Overlay.u64Size);
 	} else {
 		OverlayOffset = 0;

@@ -49,6 +49,13 @@ enum PackerTypes_t : int {
 	Enigma,
 	ExeStealth
 };
+
+enum State_t : BYTE {
+	Idle,
+	Packing,
+	Disassembling,
+	Assembling
+};
 #endif // UTIL_STRUCT_ONLY
 
 struct Buffer {
@@ -56,13 +63,19 @@ struct Buffer {
 	uint64_t u64Size;
 
 	void Merge(_In_ Buffer Other, _In_ bool bDontFree = false);
-
+	void Allocate(_In_ uint64_t Size);
 	void Release();
 };
 
 struct Data_t {
 	char Project[MAX_PATH] = { 0 };
 	char SaveFileName[MAX_PATH] = { 0 };
+	float fTotalProgress = 0.f;
+	float fTaskProgress = 0.f;
+	char* sTask = NULL;
+	State_t State = Idle;
+	uint64_t Reserved = 0;
+	uint64_t InUse = 0;
 	HWND hWnd = NULL;
 	bool bParsing : 1 = false;
 	bool bUserCancelled : 1 = false;
@@ -93,8 +106,10 @@ struct Vector {
 
 	void Merge(_In_ Vector<T> Other, _In_ bool bDontFree = false) {
 		raw.u64Size = nItems * sizeof(T);
-		raw.Merge(Other.raw, bDontFree);
+		raw.Merge(Other.raw, true);
+		if (!bDontFree) Other.Release();
 		nItems += Other.nItems;
+		Data.InUse += Other.nItems * sizeof(T);
 	}
 
 	size_t Size() {
@@ -110,8 +125,7 @@ struct Vector {
 
 		// Create buffer
 		if (raw.u64Size < sizeof(T) || !raw.pBytes || !raw.u64Size) {
-			raw.u64Size = sizeof(T) * (bExponentialGrowth ? 10 : 1);
-			raw.pBytes = reinterpret_cast<BYTE*>(realloc(raw.pBytes, raw.u64Size));
+			raw.Allocate(sizeof(T) * (bExponentialGrowth ? 10 : 1));
 			if (!raw.pBytes) {
 				DebugBreak();
 				exit(1);
@@ -122,19 +136,20 @@ struct Vector {
 		// Expand buffer
 		else if (raw.u64Size < nItems * sizeof(T)) {
 			uint64_t OldSize = raw.u64Size;
+			uint64_t NewSize = OldSize;
 			if (bExponentialGrowth) {
-				while (raw.u64Size < nItems * sizeof(T)) {
-					raw.u64Size = sizeof(T) * (raw.u64Size / sizeof(T)) * 1.1;
+				while (NewSize < nItems * sizeof(T)) {
+					NewSize = sizeof(T) * (NewSize / sizeof(T)) * 1.1;
 				}
 			} else {
-				raw.u64Size = nItems * sizeof(T);
+				NewSize = nItems * sizeof(T);
 			}
-			raw.pBytes = reinterpret_cast<BYTE*>(realloc(raw.pBytes, raw.u64Size));
+			raw.Allocate(NewSize);
 			if (!raw.pBytes) {
 				DebugBreak();
 				exit(1);
 			}
-			ZeroMemory(raw.pBytes + OldSize, raw.u64Size - OldSize);
+			ZeroMemory(raw.pBytes + OldSize, NewSize - OldSize);
 		}
 	}
 
@@ -156,6 +171,7 @@ struct Vector {
 		nItems++;
 		Grow();
 		memcpy(raw.pBytes + (nItems - 1) * sizeof(T), &Item, sizeof(T));
+		Data.InUse += sizeof(T);
 	}
 
 	void Push(Vector<T> Items) {
@@ -171,6 +187,7 @@ struct Vector {
 			return ret;
 		}
 		T ret = At(Size() - 1);
+		Data.InUse -= sizeof(T);
 		if (Size() == 1) {
 			Release();
 		} else {
@@ -208,6 +225,7 @@ struct Vector {
 	void Release() {
 		if (!bCannotBeReleased) {
 			raw.Release();
+			Data.InUse -= sizeof(T) * nItems;
 			nItems = 0;
 		}
 	}
@@ -256,6 +274,7 @@ struct Vector {
 		if (!raw.u64Size || !raw.pBytes || i >= Size() || bCannotBeReleased) return;
 		memcpy(raw.pBytes + sizeof(T) * i, raw.pBytes + sizeof(T) * (i + 1), (nItems * sizeof(T)) - sizeof(T) * (i + 1));
 		nItems--;
+		Data.InUse -= sizeof(T);
 	}
 
 	/// <summary>

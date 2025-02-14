@@ -336,8 +336,30 @@ void DrawGUI() {
 
 	// Data
 	else {
-		ImGui::SetCursorPos(ImVec2((ImGui::GetWindowSize().x - ImGui::CalcTextSize("Doing Magical Things...").x) / 2, (ImGui::GetWindowSize().y - ImGui::GetTextLineHeight()) / 2));
-		ImGui::Text("Doing Magical Things...");
+		ImGui::SeparatorText("Overall");
+		ImGui::Text("Memory Usage Status (%d KB committed)", Data.Reserved / 1000);
+		ImGui::SameLine();
+		ImGui::ProgressBar(Data.Reserved ? ((double)Data.InUse / Data.Reserved) : (double)0);
+		switch (Data.State) {
+		case Packing:
+			ImGui::SeparatorText("Packing");
+			break;
+		case Disassembling:
+			ImGui::SeparatorText("Disassembling");
+			break;
+		case Assembling:
+			ImGui::SeparatorText("Assembling");
+			break;
+		default:
+			ImGui::Separator();
+		}
+		ImGui::Text("Total progress");
+		ImGui::SameLine();
+		ImGui::ProgressBar(Data.fTotalProgress);
+		ImGui::Text("Task: %s", Data.sTask);
+		ImGui::Text("Task progress");
+		ImGui::SameLine();
+		ImGui::ProgressBar(Data.fTaskProgress);
 	}
 
 	// Modals
@@ -588,38 +610,11 @@ int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
 
 void ApplyImGuiTheme() {
 	ImGuiStyle& style = ImGui::GetStyle();
-
-	style.Alpha = 1.0f;
-	style.DisabledAlpha = 0.6f;
-	style.WindowPadding = ImVec2(8.0f, 8.0f);
 	style.WindowRounding = 10.0f;
 	style.WindowBorderSize = 0.0f;
-	style.WindowMinSize = ImVec2(32.0f, 32.0f);
-	style.WindowTitleAlign = ImVec2(0.0f, 0.5f);
-	style.WindowMenuButtonPosition = ImGuiDir_Right;
-	style.ChildRounding = 0.0f;
-	style.ChildBorderSize = 1.0f;
-	style.PopupRounding = 0.0f;
-	style.PopupBorderSize = 1.0f;
-	style.FramePadding = ImVec2(4.0f, 3.0f);
 	style.FrameRounding = 5.0f;
-	style.FrameBorderSize = 0.0f;
-	style.ItemSpacing = ImVec2(8.0f, 4.0f);
-	style.ItemInnerSpacing = ImVec2(4.0f, 4.0f);
-	style.CellPadding = ImVec2(4.0f, 2.0f);
-	style.IndentSpacing = 21.0f;
-	style.ColumnsMinSpacing = 6.0f;
-	style.ScrollbarSize = 14.0f;
-	style.ScrollbarRounding = 9.0f;
 	style.GrabMinSize = 10.0f;
 	style.GrabRounding = 5.0f;
-	style.TabRounding = 4.0f;
-	style.TabBorderSize = 0.0f;
-	style.TabMinWidthForCloseButton = 0.0f;
-	style.ColorButtonPosition = ImGuiDir_Right;
-	style.ButtonTextAlign = ImVec2(0.5f, 0.5f);
-	style.SelectableTextAlign = ImVec2(0.0f, 0.0f);
-
 	style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 	style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.4980392158031464f, 0.4980392158031464f, 0.4980392158031464f, 1.0f);
 	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.09871244430541992f, 0.09871145337820053f, 0.09871145337820053f, 1.0f);
@@ -674,11 +669,4 @@ void ApplyImGuiTheme() {
 	style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.0f, 1.0f, 1.0f, 0.699999988079071f);
 	style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.800000011920929f, 0.800000011920929f, 0.800000011920929f, 0.2000000029802322f);
 	style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.800000011920929f, 0.800000011920929f, 0.800000011920929f, 0.3499999940395355f);
-
-	// Invert
-	if (Settings.bLight) {
-		for (int i = 0; i < ImGuiCol_COUNT; i++) {
-			style.Colors[i] = ImVec4(1.f - style.Colors[i].x, 1.f - style.Colors[i].y, 1.f - style.Colors[i].z, style.Colors[i].w);
-		}
-	}
 }

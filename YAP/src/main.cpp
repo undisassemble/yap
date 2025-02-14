@@ -24,18 +24,9 @@ HANDLE hLogFile = NULL;
 HANDLE hStdOut = NULL;
 Asm* pAssembly = NULL;
 
-uint64_t rand64() {
-	uint64_t ret = rand();
-	ret = ret << 16 | rand();
-	ret = ret << 16 | rand();
-	ret = ret << 16 | rand();
-	return ret;
-}
-
 // Main function
 int main(int argc, char** argv) {
 	// General setup
-	
 	srand(time(NULL));
 	hLogFile = CreateFile("yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hLogFile || hLogFile == INVALID_HANDLE_VALUE) {
