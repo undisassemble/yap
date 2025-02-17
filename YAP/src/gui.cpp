@@ -9,6 +9,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "asm.hpp"
+#include <Zycore/Zycore.h>
 
 // Globals
 bool bMinimized = false, bOpen = true, bInitialized = false;
@@ -304,6 +305,7 @@ void DrawGUI() {
 			ImGui::Text("YAP: " __YAP_VERSION__);
 			ImGui::Text("ImGui: " IMGUI_VERSION);
 			ImGui::Text("Zydis: %d.%d.%d", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
+			ImGui::Text("Zycore: %d.%d.%d", ZYCORE_VERSION_MAJOR(ZYCORE_VERSION), ZYCORE_VERSION_MINOR(ZYCORE_VERSION), ZYCORE_VERSION_PATCH(ZYCORE_VERSION));
 			ImGui::Text("AsmJit: %d.%d.%d", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
 			ImGui::Text("GLFW: %s", glfwGetVersionString());
 			// ImGui::Text("OpenGL: %s", glGetString(GL_VERSION));

@@ -129,7 +129,7 @@ file(GLOB SOURCES_ZYDIS
 	"YAP/dependencies/zydis/src/Generated/*.inc"
 	"YAP/dependencies/zydis/dependencies/src/*.c"
 	"YAP/dependencies/zydis/dependencies/src/API/*.c"
-	"YAP/meta/zydis.rc"
+	"YAP/dependencies/zydis/resources/VersionInfo.rc"
 )
 add_library(zydis SHARED ${SOURCES_ZYDIS})
 set_target_properties(zydis PROPERTIES PREFIX "")
