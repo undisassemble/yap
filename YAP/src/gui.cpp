@@ -1,7 +1,12 @@
+#include "asmjit/core/cpuinfo.h"
+#include "imgui.h"
+#include "util.hpp"
+#include "wingdi.h"
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include "gui.hpp"
 #include "font.hpp"
 #include "icons.hpp"
+#include "theme.hpp"
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <ctime>
@@ -53,7 +58,24 @@ bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _
 	return bRet;
 }
 
-#define WARN_DEBUG() ImGui::SameLine(); ImGui::Text(ICON_BUG); ImGui::SetItemTooltip("This feature is experimental, use with caution!");
+#ifdef _DEBUG
+void DebugWarning() {
+	ImGui::SameLine();
+	ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_WARNING]);
+	ImGui::Text(ICON_BUG);
+	ImGui::PopStyleColor();
+	ImGui::SetItemTooltip("This feature is experimental, use with caution!");
+}
+#endif
+
+void FeatureWarning(_In_ char* text = NULL) {
+	ImGui::SameLine();
+	ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_WARNING]);
+	ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
+	ImGui::PopStyleColor();
+	if (text) ImGui::SetItemTooltip(text);
+}
+
 void DrawGUI() {
 // Dont do anything if window is not shown
 	if (!bOpen || bMinimized) return;
@@ -69,11 +91,28 @@ void DrawGUI() {
 			if (!Data.Project[0]) ImGui::BeginDisabled();
 			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveProject(); }
 			if (!Data.Project[0]) ImGui::EndDisabled();
-			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save As", "Ctrl + Shift + S")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
+			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Settings")) {
+			if (ImGui::MenuItem(ICON_DOWNLOAD " Auto update", NULL, &Settings.bCheckForUpdates)) SaveSettings();
+			if (ImGui::BeginMenu(ICON_PALETTE " Theme")) {
+				if (ImGui::MenuItem("Dark", ICON_MOON, Settings.Theme == 0)) {
+					Settings.Theme = 0;
+					ApplyImGuiTheme();
+					SaveSettings();
+				}
+				if (ImGui::MenuItem("Light", ICON_SUN, Settings.Theme == 1)) {
+					Settings.Theme = 1;
+					ApplyImGuiTheme();
+					SaveSettings();
+				}
+				ImGui::EndMenu();
+			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
-			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Feature Help")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Features.md", NULL, NULL, 0); }
+			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Feature help")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Features.md", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { Modal("MIT License\n\nCopyright (c) 2024-2025 undisassemble\nCopyright (c) 2014-2025 Omar Cornut\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.", ICON_CIRCLE_INFO " License", MB_OK); }
 			ImGui::EndMenu();
@@ -93,56 +132,54 @@ void DrawGUI() {
 			IMGUI_TOGGLE("Enable Packer", Options.Packing.bEnabled);
 			ImGui::SetItemTooltip("Wraps the original binary with a custom loader.");
 			ImGui::SameLine();
-			IMGUI_TOGGLE("Don't Pack Resources", Options.Packing.bDontCompressRsrc);
+			IMGUI_TOGGLE("Don't pack resources", Options.Packing.bDontCompressRsrc);
 			ImGui::SetItemTooltip("Preserves everything in the resource directory, keeping details such as icons and privileges.");
 			ImGui::SliderInt("Depth", &Options.Packing.EncodingCounts, 1, 10);
 			ImGui::SetItemTooltip("Number of times the application should be packed.\n1: packed app\n2: packed packed app\n3: packed packed packed app\netc.");
-			ImGui::SliderInt("Compression Level", &Options.Packing.CompressionLevel, 1, 9);
+			ImGui::SliderInt("Compression level", &Options.Packing.CompressionLevel, 1, 9);
 			ImGui::SetItemTooltip("How compressed the binary should be.");
-			ImGui::SliderInt("Mutation Level", &Options.Packing.MutationLevel, 1, 5);
+			ImGui::SliderInt("Mutation level", &Options.Packing.MutationLevel, 1, 5);
 			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
 			IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT);
 			ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT.");
 			ImGui::SameLine();
-			IMGUI_TOGGLE("API Emulation", Options.Packing.bAPIEmulation);
+			IMGUI_TOGGLE("API emulation", Options.Packing.bAPIEmulation);
 			ImGui::SetItemTooltip("Emulate some simple WINAPI functions.\n");
-			IMGUI_TOGGLE("Delayed Entry Point", Options.Packing.bDelayedEntry);
+			IMGUI_TOGGLE("Delayed entry point", Options.Packing.bDelayedEntry);
 			ImGui::SetItemTooltip("Changes the behavior of the entry point before it is run.");
-			IMGUI_TOGGLE("DLL Sideloading Mitigations", Options.Packing.bMitigateSideloading);
+			IMGUI_TOGGLE("DLL sideloading mitigations", Options.Packing.bMitigateSideloading);
 			ImGui::SetItemTooltip("Prioritizes DLLs in Windows directories, loading those first instead of DLLs placed in the local directory.");
 			ImGui::SameLine();
-			IMGUI_TOGGLE("Only Load Microsoft Signed DLLs", Options.Packing.bOnlyLoadMicrosoft);
+			IMGUI_TOGGLE("Only load microsoft signed DLLs", Options.Packing.bOnlyLoadMicrosoft);
 			ImGui::SetItemTooltip("Only allows DLLs that have been signed by Microsoft to be loaded.");
-			IMGUI_TOGGLE("Direct Syscalls", Options.Packing.bDirectSyscalls);
+			IMGUI_TOGGLE("Direct syscalls", Options.Packing.bDirectSyscalls);
 			ImGui::SetItemTooltip("Skips use of some windows API functions and instead makes calls directly to the kernel, can break with future Windows updates.");
-			IMGUI_TOGGLE("Anti-Dump", Options.Packing.bAntiDump);
+			IMGUI_TOGGLE("Anti-dump", Options.Packing.bAntiDump);
 			ImGui::SetItemTooltip("Prevent PE dumpers and reconstructors from dumping the running process.");
-			IMGUI_TOGGLE("Anti-Debug", Options.Packing.bAntiDebug);
+			IMGUI_TOGGLE("Anti-debug", Options.Packing.bAntiDebug);
 			ImGui::SetItemTooltip("Prevent debuggers from attaching to process.");
-			DEBUG_ONLY(IMGUI_TOGGLE("Anti-Patch", Options.Packing.bAntiPatch));
+			DEBUG_ONLY(IMGUI_TOGGLE("Anti-patch", Options.Packing.bAntiPatch));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Verify signature of binary before loading.\n"));
-			DEBUG_ONLY(WARN_DEBUG());
+			DEBUG_ONLY(DebugWarning());
 			DEBUG_ONLY(IMGUI_TOGGLE("Anti-VM", Options.Packing.bAntiVM));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a virtual machine."));
 			DEBUG_ONLY(ImGui::SameLine());
 			DEBUG_ONLY(IMGUI_TOGGLE("Allow Hyper-V", Options.Packing.bAllowHyperV));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Still run if the detected VM is only MS Hyper-V."));
-			DEBUG_ONLY(WARN_DEBUG());
-			DEBUG_ONLY(IMGUI_TOGGLE("Anti-Sandbox", Options.Packing.bAntiSandbox));
+			DEBUG_ONLY(DebugWarning());
+			DEBUG_ONLY(IMGUI_TOGGLE("Anti-sandbox", Options.Packing.bAntiSandbox));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a sandboxed environment."));
-			DEBUG_ONLY(WARN_DEBUG());
+			DEBUG_ONLY(DebugWarning());
 			DEBUG_ONLY(if (Options.Packing.bDelayedEntry && Options.Packing.Immitate == ExeStealth) Options.Packing.Immitate = YAP);
 			DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::BeginDisabled());
-			DEBUG_ONLY(IMGUI_TOGGLE("Partial Unpacking", Options.Packing.bPartialUnpacking));
+			DEBUG_ONLY(IMGUI_TOGGLE("Partial unpacking", Options.Packing.bPartialUnpacking));
 			DEBUG_ONLY(ImGui::SetItemTooltip(Options.Reassembly.bEnabled ? "Only allows one function to be loaded at a time, preventing the whole program from being dumped at once." : "Requires reassembler to be enabled"));
-			DEBUG_ONLY(ImGui::SameLine());
-			DEBUG_ONLY(ImGui::Text(ICON_TRIANGLE_EXCLAMATION));
-			DEBUG_ONLY(ImGui::SetItemTooltip("This feature is not threadsafe, and only works on single threaded apps."));
-			DEBUG_ONLY(WARN_DEBUG());
+			DEBUG_ONLY(FeatureWarning("This feature is not threadsafe, and only works on single threaded apps."));
+			DEBUG_ONLY(DebugWarning());
 			DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::EndDisabled());
-			ImGui::Combo("Immitate Packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
+			ImGui::Combo("Immitate packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
 			ImGui::SetItemTooltip("Changes some details about the packed binary to make it look like another packer.");
-			IMGUI_TOGGLE("Enable Process Masquerading", Options.Packing.bEnableMasquerade);
+			IMGUI_TOGGLE("Enable process masquerading", Options.Packing.bEnableMasquerade);
 			ImGui::SetItemTooltip("Makes the packed executable appear as a different process (NOT process hollowing).\nPlease note that the smaller the path the easier it is to use.");
 			ImGui::SameLine();
 			ImGui::SetNextItemWidth(width / 2);
@@ -156,10 +193,10 @@ void DrawGUI() {
 				}
 			}
 			ImGui::SetItemTooltip("Set to randomized string.");
-			DEBUG_ONLY(IMGUI_TOGGLE("Mark Critical (Requires Admin)", Options.Packing.bMarkCritical));
+			DEBUG_ONLY(IMGUI_TOGGLE("Mark critical (requires admin)", Options.Packing.bMarkCritical));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Marks the process as critical, causing the system to bluescreen when the process crashes or is killed.\nRequires the packed process to be run with administrator privileges.\n\nDoes not bluescreen if the process exits gracefully."));
-			DEBUG_ONLY(WARN_DEBUG());
-			ImGui::InputText("Leave a Message", Options.Packing.Message, 64);
+			DEBUG_ONLY(DebugWarning());
+			ImGui::InputText("Leave a message", Options.Packing.Message, 64);
 			ImGui::SetItemTooltip("Leave a little message for any possible reverse engineers.");
 			ImGui::EndTabItem();
 		}
@@ -167,17 +204,17 @@ void DrawGUI() {
 		if (ImGui::BeginTabItem(ICON_CODE " Reassembler")) {
 			IMGUI_TOGGLE("Enabled", Options.Reassembly.bEnabled);
 			ImGui::SetItemTooltip("Disassembles your application, and assembles a new modified version.");
-			ImGui::SliderInt("Mutation Level", &Options.Reassembly.MutationLevel, 0, 4);
+			ImGui::SliderInt("Mutation level", &Options.Reassembly.MutationLevel, 0, 4);
 			ImGui::SetItemTooltip("How much garbage code should be inserted between real code (more -> slower).");
-			IMGUI_TOGGLE("Remove Useless Data", Options.Reassembly.bRemoveData);
+			IMGUI_TOGGLE("Remove useless data", Options.Reassembly.bRemoveData);
 			ImGui::SetItemTooltip("Removes some data from the PE headers.");
-			IMGUI_TOGGLE("Strip Debug Symbols", Options.Reassembly.bStrip);
+			IMGUI_TOGGLE("Strip debug symbols", Options.Reassembly.bStrip);
 			ImGui::SetItemTooltip("Remove debugging information from the PE.");
-			IMGUI_TOGGLE("Strip DOS Stub", Options.Reassembly.bStripDOSStub);
+			IMGUI_TOGGLE("Strip DOS stub", Options.Reassembly.bStripDOSStub);
 			ImGui::SetItemTooltip("Remove DOS stub from the PE.");
-			IMGUI_TOGGLE("Instruction Substitution", Options.Reassembly.bSubstitution);
+			IMGUI_TOGGLE("Instruction substitution", Options.Reassembly.bSubstitution);
 			ImGui::SetItemTooltip("Replaces some existing instructions with other, more complicated alternatives.");
-			ImGui::InputScalar("Rebase Image", ImGuiDataType_U64, &Options.Reassembly.Rebase, NULL, NULL, "%p", ImGuiInputTextFlags_CharsHexadecimal);
+			ImGui::InputScalar("Rebase image", ImGuiDataType_U64, &Options.Reassembly.Rebase, NULL, NULL, "%p", ImGuiInputTextFlags_CharsHexadecimal);
 			ImGui::SetItemTooltip("Changes images prefered base address. (0 to disable)");
 			ImGui::EndTabItem();
 		}
@@ -259,19 +296,20 @@ void DrawGUI() {
 				ImGui::DragScalar(".", ImGuiDataType_U8, &Options.Advanced.UPXVersionMinor, 1.f, &MIN, &MAX);
 				ImGui::PopID();
 				ImGui::SameLine();
-				ImGui::DragScalar("UPX Version", ImGuiDataType_U8, &Options.Advanced.UPXVersionPatch, 1.f, &MIN, &MAX);
+				ImGui::DragScalar("UPX version", ImGuiDataType_U8, &Options.Advanced.UPXVersionPatch, 1.f, &MIN, &MAX);
 				ImGui::PopStyleVar();
 				ImGui::PopItemWidth();
-				IMGUI_TOGGLE("Fake Symbol Table", Options.Advanced.bFakeSymbols);
-				IMGUI_TOGGLE("Mutate " ICON_TRIANGLE_EXCLAMATION, Options.Advanced.bMutateAssembly);
-				IMGUI_TOGGLE("Semi-random Section Names", Options.Advanced.bSemiRandomSecNames);
-				IMGUI_TOGGLE("Full-random Section Names", Options.Advanced.bTrueRandomSecNames);
-				ImGui::InputText("Section 1 Name", Options.Advanced.Sec1Name, 9);
-				ImGui::InputText("Section 2 Name", Options.Advanced.Sec2Name, 9);
+				IMGUI_TOGGLE("Fake symbol table", Options.Advanced.bFakeSymbols);
+				IMGUI_TOGGLE("Mutate", Options.Advanced.bMutateAssembly);
+				FeatureWarning("I highly recommend keeping this setting enabled.");
+				IMGUI_TOGGLE("Semi-random section names", Options.Advanced.bSemiRandomSecNames);
+				IMGUI_TOGGLE("Full-random section names", Options.Advanced.bTrueRandomSecNames);
+				ImGui::InputText("Section 1 name", Options.Advanced.Sec1Name, 9);
+				ImGui::InputText("Section 2 name", Options.Advanced.Sec2Name, 9);
 				ImGui::TreePop();
 			}
 			if (ImGui::TreeNode("VM")) {
-				IMGUI_TOGGLE("Delete Virtualized Functions", Options.Advanced.bDeleteVirtualizedFunctions);
+				IMGUI_TOGGLE("Delete virtualized functions", Options.Advanced.bDeleteVirtualizedFunctions);
 				ImGui::TreePop();
 			}
 			ImGui::EndTabItem();
@@ -506,6 +544,12 @@ bool BeginGUI() {
 	config.GlyphMinAdvanceX = 16.f;
 	io.Fonts->AddFontFromMemoryCompressedTTF(icons_compressed_data, icons_compressed_size, 16.f, &config, range);
 	if (!io.Fonts->Build()) return false;
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.WindowRounding = 10.0f;
+	style.WindowBorderSize = 0.0f;
+	style.FrameRounding = 5.0f;
+	style.GrabMinSize = 10.0f;
+	style.GrabRounding = 5.0f;
 
 	// Create window
 	glfwWindowHint(GLFW_RESIZABLE, 0);
@@ -612,63 +656,7 @@ int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
 
 void ApplyImGuiTheme() {
 	ImGuiStyle& style = ImGui::GetStyle();
-	style.WindowRounding = 10.0f;
-	style.WindowBorderSize = 0.0f;
-	style.FrameRounding = 5.0f;
-	style.GrabMinSize = 10.0f;
-	style.GrabRounding = 5.0f;
-	style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-	style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.4980392158031464f, 0.4980392158031464f, 0.4980392158031464f, 1.0f);
-	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.09871244430541992f, 0.09871145337820053f, 0.09871145337820053f, 1.0f);
-	style.Colors[ImGuiCol_ChildBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-	style.Colors[ImGuiCol_PopupBg] = ImVec4(0.0784313753247261f, 0.0784313753247261f, 0.0784313753247261f, 0.9399999976158142f);
-	style.Colors[ImGuiCol_Border] = ImVec4(0.4274509847164154f, 0.4274509847164154f, 0.4980392158031464f, 0.5f);
-	style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-	style.Colors[ImGuiCol_FrameBg] = ImVec4(0.1587982773780823f, 0.1587966829538345f, 0.1587966829538345f, 1.0f);
-	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.2360491305589676f, 0.2360502332448959f, 0.2360514998435974f, 1.0f);
-	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.3133015930652618f, 0.313303142786026f, 0.3133047223091125f, 1.0f);
-	style.Colors[ImGuiCol_TitleBg] = ImVec4(0.09803921729326248f, 0.09803921729326248f, 0.09803921729326248f, 1.0f);
-	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.09803921729326248f, 0.09803921729326248f, 0.09803921729326248f, 1.0f);
-	style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.0f, 0.0f, 0.0f, 0.5099999904632568f);
-	style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.1372549086809158f, 0.1372549086809158f, 0.1372549086809158f, 1.0f);
-	style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.01960784383118153f, 0.01960784383118153f, 0.01960784383118153f, 0.5299999713897705f);
-	style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.3098039329051971f, 0.3098039329051971f, 0.3098039329051971f, 1.0f);
-	style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.407843142747879f, 0.407843142747879f, 0.407843142747879f, 1.0f);
-	style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.5098039507865906f, 0.5098039507865906f, 0.5098039507865906f, 1.0f);
-	style.Colors[ImGuiCol_CheckMark] = ImVec4(0.3921568691730499f, 0.3921568691730499f, 0.3921568691730499f, 1.0f);
-	style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.3133047223091125f, 0.3133015930652618f, 0.3133015930652618f, 1.0f);
-	style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.3905579447746277f, 0.3905540406703949f, 0.3905540406703949f, 1.0f);
-	style.Colors[ImGuiCol_Button] = ImVec4(0.1568627506494522f, 0.1568627506494522f, 0.1568627506494522f, 1.0f);
-	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.2352941185235977f, 0.2352941185235977f, 0.2352941185235977f, 1.0f);
-	style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.3137255012989044f, 0.3137255012989044f, 0.3137255012989044f, 1.0f);
-	style.Colors[ImGuiCol_Header] = ImVec4(0.1568627506494522f, 0.1568627506494522f, 0.1568627506494522f, 1.0f);
-	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.2352941185235977f, 0.2352941185235977f, 0.2352941185235977f, 1.0f);
-	style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.3137255012989044f, 0.3137255012989044f, 0.3137255012989044f, 1.0f);
-	style.Colors[ImGuiCol_Separator] = ImVec4(0.1568627506494522f, 0.1568627506494522f, 0.1568627506494522f, 1.0f);
-	style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.2352941185235977f, 0.2352941185235977f, 0.2352941185235977f, 1.0f);
-	style.Colors[ImGuiCol_SeparatorActive] = ImVec4(0.3137255012989044f, 0.3137255012989044f, 0.3137255012989044f, 1.0f);
-	style.Colors[ImGuiCol_ResizeGrip] = ImVec4(0.1568627506494522f, 0.1568627506494522f, 0.1568627506494522f, 1.0f);
-	style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.2352941185235977f, 0.2352941185235977f, 0.2352941185235977f, 1.0f);
-	style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.3137255012989044f, 0.3137255012989044f, 0.3137255012989044f, 1.0f);
-	style.Colors[ImGuiCol_Tab] = ImVec4(0.1568627506494522f, 0.1568627506494522f, 0.1568627506494522f, 1.0f);
-	style.Colors[ImGuiCol_TabHovered] = ImVec4(0.2352941185235977f, 0.2352941185235977f, 0.2352941185235977f, 1.0f);
-	style.Colors[ImGuiCol_TabActive] = ImVec4(0.3137255012989044f, 0.3137255012989044f, 0.3137255012989044f, 1.0f);
-	style.Colors[ImGuiCol_TabUnfocused] = ImVec4(0.06666667014360428f, 0.1019607856869698f, 0.1450980454683304f, 1.0f);
-	style.Colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.1333333402872086f, 0.2588235437870026f, 0.4235294163227081f, 1.0f);
-	style.Colors[ImGuiCol_PlotLines] = ImVec4(0.6078431606292725f, 0.6078431606292725f, 0.6078431606292725f, 1.0f);
-	style.Colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.0f, 0.4274509847164154f, 0.3490196168422699f, 1.0f);
-	style.Colors[ImGuiCol_PlotHistogram] = ImVec4(0.8980392217636108f, 0.6980392336845398f, 0.0f, 1.0f);
-	style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.0f, 0.6000000238418579f, 0.0f, 1.0f);
-	style.Colors[ImGuiCol_TableHeaderBg] = ImVec4(0.1882352977991104f, 0.1882352977991104f, 0.2000000029802322f, 1.0f);
-	style.Colors[ImGuiCol_TableBorderStrong] = ImVec4(0.3098039329051971f, 0.3098039329051971f, 0.3490196168422699f, 1.0f);
-	style.Colors[ImGuiCol_TableBorderLight] = ImVec4(0.2274509817361832f, 0.2274509817361832f, 0.2470588237047195f, 1.0f);
-	style.Colors[ImGuiCol_TableRowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-	style.Colors[ImGuiCol_TableRowBgAlt] = ImVec4(1.0f, 1.0f, 1.0f, 0.05999999865889549f);
-	style.Colors[ImGuiCol_TextLink] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-	style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-	style.Colors[ImGuiCol_DragDropTarget] = ImVec4(1.0f, 1.0f, 0.0f, 0.8999999761581421f);
-	style.Colors[ImGuiCol_NavHighlight] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-	style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.0f, 1.0f, 1.0f, 0.699999988079071f);
-	style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.800000011920929f, 0.800000011920929f, 0.800000011920929f, 0.2000000029802322f);
-	style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.800000011920929f, 0.800000011920929f, 0.800000011920929f, 0.3499999940395355f);
+	for (int i = 0; i < ImGuiCol_COUNT; i++) {
+		style.Colors[i] = Themes[Settings.Theme][i];
+	}
 }

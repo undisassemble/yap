@@ -376,8 +376,8 @@ struct Options_t {
 };
 
 struct Settings_t {
-	bool bLight = false;
 	bool bCheckForUpdates = true;
+	int Theme = 0;
 };
 
 extern Settings_t Settings;
