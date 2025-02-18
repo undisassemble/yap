@@ -105,16 +105,11 @@ void DrawGUI() {
 		if (ImGui::BeginMenu("Settings")) {
 			if (ImGui::MenuItem(ICON_DOWNLOAD " Auto update", NULL, &Settings.bCheckForUpdates)) SaveSettings();
 			if (ImGui::BeginMenu(ICON_PALETTE " Theme")) {
-				if (ImGui::MenuItem("Dark", ICON_MOON, Settings.Theme == 0)) {
-					Settings.Theme = 0;
-					ApplyImGuiTheme();
-					SaveSettings();
-				}
-				if (ImGui::MenuItem("Light", ICON_SUN, Settings.Theme == 1)) {
-					Settings.Theme = 1;
-					ApplyImGuiTheme();
-					SaveSettings();
-				}
+#define ADD_MENU_THEME(name, icon, id) if (ImGui::MenuItem(name, icon, Settings.Theme == id)) { Settings.Theme = id; ApplyImGuiTheme(); SaveSettings(); }
+				ADD_MENU_THEME("Default Dark", ICON_MOON, 0);
+				ADD_MENU_THEME("Open Dark", ICON_MOON, 1);
+				ADD_MENU_THEME("Open Light", ICON_SUN, 2);
+#undef ADD_MENU_THEME
 				ImGui::EndMenu();
 			}
 			ImGui::EndMenu();

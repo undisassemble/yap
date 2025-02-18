@@ -370,8 +370,7 @@ void Console::SetupConsole() {
 		if (!SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING)) {
 			LOG(Warning, MODULE_YAP, "Colors wont work, terminal output will be ugly af\n");
 		}
-	}
-	else {
+	} else {
 		LOG(Failed, MODULE_YAP, "Failed to attach to console (%d)\n", GetLastError());
 	}
 }
