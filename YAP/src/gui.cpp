@@ -76,6 +76,14 @@ void FeatureWarning(_In_ char* text = NULL) {
 	if (text) ImGui::SetItemTooltip(text);
 }
 
+void FeatureInfo(_In_ char* text = NULL) {
+	ImGui::SameLine();
+	ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_INFO]);
+	ImGui::Text(ICON_CIRCLE_INFO);
+	ImGui::PopStyleColor();
+	if (text) ImGui::SetItemTooltip(text);
+}
+
 void DrawGUI() {
 // Dont do anything if window is not shown
 	if (!bOpen || bMinimized) return;
@@ -114,7 +122,7 @@ void DrawGUI() {
 		if (ImGui::BeginMenu("About")) {
 			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Feature help")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Features.md", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
-			if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { Modal("MIT License\n\nCopyright (c) 2024-2025 undisassemble\nCopyright (c) 2014-2025 Omar Cornut\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.", ICON_CIRCLE_INFO " License", MB_OK); }
+			if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
 			ImGui::EndMenu();
 		}
 		//ImGui::SetCursorPos(ImVec2((width - ImGui::CalcTextSize("Yet Another Packer").x) / 2, 0));
@@ -156,6 +164,7 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("Skips use of some windows API functions and instead makes calls directly to the kernel, can break with future Windows updates.");
 			IMGUI_TOGGLE("Anti-dump", Options.Packing.bAntiDump);
 			ImGui::SetItemTooltip("Prevent PE dumpers and reconstructors from dumping the running process.");
+			FeatureInfo("If enabled, you must use GetSelf() instead of GetModuleHandleA(NULL) to get the applications base address.");
 			IMGUI_TOGGLE("Anti-debug", Options.Packing.bAntiDebug);
 			ImGui::SetItemTooltip("Prevent debuggers from attaching to process.");
 			DEBUG_ONLY(IMGUI_TOGGLE("Anti-patch", Options.Packing.bAntiPatch));
@@ -322,13 +331,18 @@ void DrawGUI() {
 		}
 
 		if (ImGui::BeginTabItem(ICON_BUG " Debug")) {
-			IMGUI_TOGGLE("Dump Disassembly", Options.Debug.bDumpAsm);
-			IMGUI_TOGGLE("Dump Individual Sections", Options.Debug.bDumpSections);
-			IMGUI_TOGGLE("Dump Function Ranges", Options.Debug.bDumpFunctions);
-			IMGUI_TOGGLE("Create Breakpoints", Options.Debug.bGenerateBreakpoints);
-			IMGUI_TOGGLE("Wrap Real Instructions in NOPs", Options.Debug.bGenerateMarks);
-			IMGUI_TOGGLE("Strict Mutation", Options.Debug.bStrictMutation);
-			IMGUI_TOGGLE("Disable Relocations", Options.Debug.bDisableRelocations);
+			IMGUI_TOGGLE("Dump disassembly", Options.Debug.bDumpAsm);
+			IMGUI_TOGGLE("Dump individual sections", Options.Debug.bDumpSections);
+			IMGUI_TOGGLE("Dump function ranges", Options.Debug.bDumpFunctions);
+			IMGUI_TOGGLE("Create breakpoints", Options.Debug.bGenerateBreakpoints);
+			IMGUI_TOGGLE("Wrap real instructions in NOPs", Options.Debug.bGenerateMarks);
+			IMGUI_TOGGLE("Strict mutation", Options.Debug.bStrictMutation);
+			IMGUI_TOGGLE("Disable relocations", Options.Debug.bDisableRelocations);
+			if (ImGui::Button("Test error")) Modal("Test error", "Error", MB_OK | MB_ICONERROR);
+			ImGui::SameLine();
+			if (ImGui::Button("Test warning")) Modal("Test warning", "Warning", MB_OK | MB_ICONWARNING);
+			ImGui::SameLine();
+			if (ImGui::Button("Test info")) Modal("Test info", "Information", MB_OK | MB_ICONINFORMATION);
 			if (ImGui::TreeNode("Icon Tests")) {
 				ImGui::DebugTextEncoding(ICON_FILE_SHIELD ICON_SHIELD ICON_SHIELD_HALVED ICON_TRIANGLE_EXCLAMATION ICON_CIRCLE_INFO ICON_CIRCLE_QUESTION ICON_FOLDER_OPEN ICON_FILE ICON_FLOPPY_DISK ICON_CODE ICON_MICROCHIP ICON_BOX ICON_BOX_OPEN ICON_BOX_ARCHIVE ICON_BUG);
 				ImGui::TreePop();
@@ -358,12 +372,12 @@ void DrawGUI() {
 		if (ImGui::Button(ICON_SHIELD_HALVED " Protect")) {
 			char file[MAX_PATH] = { 0 };
 			if (!OpenFileDialogue(file, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, false)) {
-				Modal("Failed to get file name");
+				Modal("Failed to get file name", "Error", MB_OK | MB_ICONERROR);
 				LOG(Failed, MODULE_YAP, "Failed to open file dialogue: %d\n", CommDlgExtendedError());
 			} else {
 				pAssembly = new Asm(file);
 				if (pAssembly->Status) {
-					Modal("Unable to parse binary\n");
+					Modal("Unable to parse binary\n", "Error", MB_OK | MB_ICONERROR);
 					LOG(Failed, MODULE_YAP, "Failed to parse binary (%d)\n", pAssembly->Status);
 					delete pAssembly;
 					pAssembly = NULL;
@@ -407,10 +421,30 @@ void DrawGUI() {
 		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), 0, ImVec2(0.5f, 0.5f));
 		ImGui::OpenPopup(CurrentModal.pTitle);
 		if (ImGui::BeginPopupModal(CurrentModal.pTitle, NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+			switch (CurrentModal.uType & MB_ICONMASK) {
+			case MB_ICONERROR:
+				ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_ERROR]);
+				ImGui::Text(ICON_CIRCLE_EXCLAMATION);
+				ImGui::PopStyleColor();
+				ImGui::SameLine();
+				break;
+			case MB_ICONINFORMATION:
+				ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_INFO]);
+				ImGui::Text(ICON_CIRCLE_INFO);
+				ImGui::PopStyleColor();
+				ImGui::SameLine();
+				break;
+			case MB_ICONWARNING:
+				ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_WARNING]);
+				ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
+				ImGui::PopStyleColor();
+				ImGui::SameLine();
+			}
+			
 			ImGui::Text(CurrentModal.pText);
 
 			// Beautiful, isnt it?
-			switch (CurrentModal.uType) {
+			switch (CurrentModal.uType & MB_TYPEMASK) {
 			case MB_OKCANCEL:
 				if (ImGui::Button("OK")) {
 					ImGui::CloseCurrentPopup();
@@ -645,7 +679,7 @@ int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
 	CurrentModal.pText = pText;
 	CurrentModal.pTitle = pTitle;
 	CurrentModal.uType = uType;
-	if (uType == MB_OK) {
+	if ((uType & MB_TYPEMASK) == MB_OK) {
 		ReleaseMutex(hMutex);
 		return IDOK;
 	}

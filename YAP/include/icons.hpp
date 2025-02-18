@@ -9,6 +9,7 @@
 #define ICON_DOWNLOAD             "\xEF\x80\x99" // F019
 #define ICON_CIRCLE_QUESTION      "\xEF\x81\x99" // F059
 #define ICON_CIRCLE_INFO          "\xEF\x81\x9A" // F05A
+#define ICON_CIRCLE_EXCLAMATION   "\xEF\x81\xAA" // F06A
 #define ICON_TRIANGLE_EXCLAMATION "\xEF\x81\xB1" // F071
 #define ICON_FOLDER_OPEN          "\xEF\x81\xBC" // F07C
 #define ICON_GEARS                "\xEF\x82\x85" // F085
@@ -23,7 +24,7 @@
 #define ICON_SHIELD_HALVED        "\xEF\x8F\xAD" // F3ED
 #define ICON_BOX                  "\xEF\x91\xA6" // F466
 #define ICON_BOX_OPEN             "\xEF\x92\x9E" // F49E
-#define ICON_PALETTE              "\xEF\x94\xBF" // f53f
+#define ICON_PALETTE              "\xEF\x94\xBF" // F53F
 
 static const unsigned int icons_compressed_size = 245474;
 static const unsigned int icons_compressed_data[245476/4] =

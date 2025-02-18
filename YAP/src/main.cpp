@@ -102,14 +102,14 @@ DWORD WINAPI Begin(void* args) {
 
 		// Disassemble
 		if (!pAssembly->Disassemble()) {
-			Modal("Disassembly failed");
+			Modal("Disassembly failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Disassembly failed\n");
 			goto th_exit;
 		}
 
 		// Analyze
 		if (!pAssembly->Analyze()) {
-			Modal("Asm analysis failed");
+			Modal("Asm analysis failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Asm analysis failed\n");
 			goto th_exit;
 		}
@@ -172,7 +172,7 @@ DWORD WINAPI Begin(void* args) {
 
 		// Modify
 		if (Options.Reassembly.bStrip && !pAssembly->Strip()) {
-			Modal("Failed to strip PE");
+			Modal("Failed to strip PE", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Failed to strip PE\n");
 			goto th_exit;
 		}
@@ -182,14 +182,14 @@ DWORD WINAPI Begin(void* args) {
 
 		// Virtualize
 		if (Options.VM.bEnabled && !Virtualize(pAssembly)) {
-			Modal("Failed to virtualize PE");
+			Modal("Failed to virtualize PE", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Failed to virtualize PE\n");
 			goto th_exit;
 		}
 
 		// Assemble
 		if (!pAssembly->Assemble()) {
-			Modal("Assembly failed");
+			Modal("Assembly failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Assembly failed\n");
 			goto th_exit;
 		}
@@ -225,7 +225,7 @@ DWORD WINAPI Begin(void* args) {
 		Asm* pPacked = new Asm();
 		pPacked->Status = Normal;
 		if (!Pack(pAssembly, pPacked)) {
-			Modal("Failed to pack PE");
+			Modal("Failed to pack PE", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Packer failed\n");
 			delete pPacked;
 			goto th_exit;
@@ -239,13 +239,13 @@ DWORD WINAPI Begin(void* args) {
 	if (Data.hWnd) {
 		do {
 			while (!OpenFileDialogue(Data.SaveFileName, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, true)) {
-				if (Modal("Failed to get save file name", "Error", MB_RETRYCANCEL) == IDCANCEL) {
+				if (Modal("Failed to get save file name", "Error", MB_RETRYCANCEL | MB_ICONERROR) == IDCANCEL) {
 					Data.bUserCancelled = true;
 					break;
 				}
 			}
 			if (!pAssembly->ProduceBinary(Data.SaveFileName)) {
-				Modal("Failed to save file");
+				Modal("Failed to save file", "Error", MB_OK | MB_ICONERROR);
 				LOG(Failed, MODULE_YAP, "Failed to save file\n");
 				goto th_exit;
 			} else {
@@ -259,7 +259,7 @@ DWORD WINAPI Begin(void* args) {
 		}
 	} else {
 		if (!pAssembly->ProduceBinary(reinterpret_cast<char*>(args))) {
-			Modal("Failed to save file");
+			Modal("Failed to save file", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Failed to save file\n");
 		} else {
 			LOG(Info_Extended, MODULE_YAP, "Save to: %s\n", reinterpret_cast<char*>(args));

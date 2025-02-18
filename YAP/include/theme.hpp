@@ -3,10 +3,11 @@
 
 #define IMRGBA(r, g, b, a) ImVec4(r / 255.f, g / 255.f, b / 255.f, a / 255.f)
 #define THEME_COL_UNUSED ImVec4(0.f, 0.f, 0.f, 0.f)
-#define THEME_COL_WARNING ImGuiCol_COUNT
-#define THEME_COL_ERROR (ImGuiCol_COUNT + 1)
+#define THEME_COL_INFO (ImGuiCol_COUNT)
+#define THEME_COL_WARNING (ImGuiCol_COUNT + 1)
+#define THEME_COL_ERROR (ImGuiCol_COUNT + 2)
 
-ImVec4 Dark[ImGuiCol_COUNT + 2] = {
+ImVec4 Dark[ImGuiCol_COUNT + 3] = {
     IMRGBA(255, 255, 255, 255),
     IMRGBA(127, 127, 127, 255),
     IMRGBA(25, 25, 25, 255),
@@ -21,7 +22,7 @@ ImVec4 Dark[ImGuiCol_COUNT + 2] = {
     IMRGBA(25, 25, 25, 255),
     IMRGBA(0, 0, 0, 130),
     IMRGBA(35, 35, 35, 255),
-    IMRGBA(5, 5, 5, 135),
+    THEME_COL_UNUSED,
     IMRGBA(75, 75, 75, 255),
     IMRGBA(100, 100, 100, 255),
     IMRGBA(130, 130, 130, 255),
@@ -42,10 +43,10 @@ ImVec4 Dark[ImGuiCol_COUNT + 2] = {
     IMRGBA(80, 80, 80, 255),
     IMRGBA(60, 60, 60, 255),
     IMRGBA(40, 40, 40, 255),
-    IMRGBA(80, 80, 80, 255),
+    IMRGBA(60, 60, 60, 255),
     THEME_COL_UNUSED,
-    IMRGBA(20, 25, 35, 255),
-    IMRGBA(35, 60, 105, 255),
+    THEME_COL_UNUSED,
+    THEME_COL_UNUSED,
     THEME_COL_UNUSED,
     IMRGBA(150, 150, 150, 255),
     IMRGBA(255, 110, 90, 255),
@@ -65,13 +66,13 @@ ImVec4 Dark[ImGuiCol_COUNT + 2] = {
     IMRGBA(204, 204, 204, 90),
 
     // SPECIAL COLORS
-    IMRGBA(255, 255, 255, 255),
-    IMRGBA(255, 255, 255, 255)
+    IMRGBA(152, 205, 253, 255),
+    IMRGBA(227, 185, 104, 255),
+    IMRGBA(228, 83, 83, 255)
 };
 
-ImVec4 Light[ImGuiCol_COUNT + 2] = {
-
-    // SPECIAL COLORS
+ImVec4 Light[ImGuiCol_COUNT + 3] = {
+    // TODO
 };
 
 ImVec4* Themes[] = {

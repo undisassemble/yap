@@ -7,12 +7,12 @@ void SaveSettings() {
 	char path[MAX_PATH];
 	DWORD sz = MAX_PATH;
 	if (!QueryFullProcessImageNameA(GetCurrentProcess(), 0, path, &sz)) {
-		Modal("Failed to save settings");
+		Modal("Failed to save settings", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Failed to save settings: %d (%s)\n", GetLastError(), path);
 		return;
 	}
 	if (!PathRemoveFileSpecA(path) || lstrlenA(path) > MAX_PATH - 12) {
-		Modal("Failed to save settings");
+		Modal("Failed to save settings", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Failed to save settings (misc)\n");
 		return;
 	}
@@ -21,7 +21,7 @@ void SaveSettings() {
 	// Write settings
 	HANDLE hFile = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		Modal("Failed to save settings");
+		Modal("Failed to save settings", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Failed to save settings: %d (%s)\n", GetLastError(), path);
 		return;
 	}
@@ -34,12 +34,12 @@ void LoadSettings() {
 	char path[MAX_PATH];
 	DWORD sz = MAX_PATH;
 	if (!QueryFullProcessImageNameA(GetCurrentProcess(), 0, path, &sz)) {
-		Modal("Failed to load settings");
+		Modal("Failed to load settings", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Failed to load settings: %d (%s)\n", GetLastError(), path);
 		return;
 	}
 	if (!PathRemoveFileSpecA(path) || lstrlenA(path) > MAX_PATH - 12) {
-		Modal("Failed to load settings");
+		Modal("Failed to load settings", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Failed to load settings (misc)\n");
 		return;
 	}
@@ -48,7 +48,7 @@ void LoadSettings() {
 	// Read settings
 	HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		Modal("Failed to load settings");
+		Modal("Failed to load settings", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Failed to load settings: %d (%s)\n", GetLastError(), path);
 		return;
 	}
@@ -72,7 +72,7 @@ bool SaveProject() {
 	// Open file
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		Modal("Failed to save project");
+		Modal("Failed to save project", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Failed to save project: %d\n", GetLastError());
 		return false;
 	}
@@ -105,7 +105,7 @@ bool LoadProject() {
 	// Open file
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		Modal("Failed to load project");
+		Modal("Failed to load project", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Failed to load project: %d\n", GetLastError());
 		Data.Project[0] = 0;
 		return false;
@@ -114,7 +114,7 @@ bool LoadProject() {
 	// Read signature
 	ReadFile(hFile, sig, 3, NULL, NULL);
 	if (memcmp(sig, "YAP", 3)) {
-		Modal("Invalid/corrupt project");
+		Modal("Invalid/corrupt project", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Invalid/corrupt project\n");
 		CloseHandle(hFile);
 		Data.Project[0] = 0;
@@ -124,7 +124,7 @@ bool LoadProject() {
 	// Read version
 	ReadFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
 	if ((ver & ~__YAP_VERSION_MASK_PATCH__) != (__YAP_VERSION_NUM__ & ~__YAP_VERSION_MASK_PATCH__)) {
-		Modal("Version mismatch");
+		Modal("Version mismatch", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Version mismatch\n");
 		LOG(Info_Extended, MODULE_YAP, "Current version: " __YAP_VERSION__ " " __YAP_BUILD__ "\n");
 		LOG(Info_Extended, MODULE_YAP, "Project version: %d.%d.%d %s\n", ver & __YAP_VERSION_MASK_MAJOR__, ver & __YAP_VERSION_MASK_MINOR__, ver & __YAP_VERSION_MASK_PATCH__, (ver & __YAP_VERSION_MASK_DEBUG__) ? "DEBUG" : "RELEASE");
