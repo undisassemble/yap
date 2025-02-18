@@ -307,7 +307,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 		}
 		SectionIndex = FindSectionIndex(dwRVA);
 		if (SectionIndex > Sections.Size()) {
-			LOG(Failed, MODULE_REASSEMBLER, "Failed to find index of section at %u\n", dwRVA);
+			LOG(Failed, MODULE_REASSEMBLER, "Failed to find index of section at 0x%p\n", GetBaseAddress() + dwRVA);
 			return false;
 		}
 		Lines = Sections[SectionIndex].Lines;
@@ -316,7 +316,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 			RawBytes = SectionData[FindSectionByRVA(dwRVA)];
 			IMAGE_SECTION_HEADER Header = SectionHeaders[FindSectionByRVA(dwRVA)];
 			if (!RawBytes.pBytes || !RawBytes.u64Size || !Header.Misc.VirtualSize) {
-				LOG(Warning, MODULE_REASSEMBLER, "Failed to get bytes for RVA %lu\n", dwRVA);
+				LOG(Warning, MODULE_REASSEMBLER, "Failed to get bytes at 0x%p\n", GetBaseAddress() + dwRVA);
 				continue;
 			}
 			RawBytes.pBytes += dwRVA - Header.VirtualAddress;
@@ -327,7 +327,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 		DWORD i = FindPosition(SectionIndex, dwRVA);
 		if (i > Lines->Size()) {
 			if (i == _UI32_MAX - 1) continue; // Already disassembled
-			LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for instruction at %u\n", dwRVA);
+			LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for instruction at 0x%p\n", GetBaseAddress() + dwRVA);
 			return false;
 		}
 
@@ -366,7 +366,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 					WORD SecIndex = FindSectionIndex(disp);
 					DWORD i = FindPosition(SecIndex, disp);
 					if (i == _UI32_MAX) {
-						LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for %#x\n", disp);
+						LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for 0x%p\n", GetBaseAddress() + disp);
 						return false;
 					}
 					if (i != _UI32_MAX - 1) Sections[SecIndex].Lines->Insert(i, TempJumpTable);
@@ -385,7 +385,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 					WORD SecIndex = FindSectionIndex(disp);
 					DWORD i = FindPosition(SecIndex, disp);
 					if (i == _UI32_MAX) {
-						LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for %#x\n", disp);
+						LOG(Failed, MODULE_REASSEMBLER, "Failed to find position for 0x%p\n", GetBaseAddress() + disp);
 						return false;
 					}
 					if (i != _UI32_MAX - 1) Sections[SecIndex].Lines->Insert(i, TempJumpTable);
@@ -397,7 +397,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 				// Make sure the operand is an address, dont jump to registers yet
 				if ((CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_MEMORY && CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE) || (CraftedLine.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && (CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_RIP && CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_NONE))) {
 					ZydisFormatterFormatInstruction(&Formatter, &CraftedLine.Decoded.Instruction, CraftedLine.Decoded.Operands, CraftedLine.Decoded.Instruction.operand_count_visible, FormattedBuf, 128, GetBaseAddress() + dwRVA, NULL);
-					LOG(Warning, MODULE_REASSEMBLER, "Can\'t resolve jump-to address at %#x (%s)\n", dwRVA, FormattedBuf);
+					LOG(Warning, MODULE_REASSEMBLER, "Can\'t resolve jump-to address at 0x%p (%s)\n", GetBaseAddress() + dwRVA, FormattedBuf);
 				}
 
 				// Calculate absolute address
@@ -421,7 +421,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 						else {
 							WORD wContainingIndex = FindSectionByRVA(u64Referencing);
 							if (wContainingIndex >= SectionHeaders.Size()) {
-								LOG(Failed, MODULE_REASSEMBLER, "Failed to disassemble code pointed to at %#x\n", u64Referencing);
+								LOG(Failed, MODULE_REASSEMBLER, "Failed to disassemble code pointed to at 0x%p\n", GetBaseAddress() + u64Referencing);
 								TempLines.Release();
 								return false;
 							}
@@ -431,7 +431,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 							insert.OldRVA = u64Referencing;
 							u64Referencing = ReadRVA<uint64_t>(u64Referencing);
 							if (!u64Referencing) {
-								LOG(Warning, MODULE_REASSEMBLER, "Failed to retrieve address at VA 0x%p\n", u64Referencing);
+								LOG(Warning, MODULE_REASSEMBLER, "Failed to retrieve address at 0x%p\n", u64Referencing);
 								u64Referencing = 0;
 							}
 							
@@ -878,12 +878,12 @@ bool Asm::Analyze() {
 					DWORD secIndex = FindSectionIndex(dwRVA);
 					pLines = Sections[secIndex].Lines;
 					if (!pLines) {
-						LOG(Warning, MODULE_REASSEMBLER, "Line not found for RVA 0x%08x\n", dwRVA);
+						LOG(Warning, MODULE_REASSEMBLER, "Line not found for address 0x%p\n", GetBaseAddress() + dwRVA);
 						continue;
 					}
 					index = FindIndex(secIndex, dwRVA);
 					if (index == _UI32_MAX) {
-						LOG(Warning, MODULE_REASSEMBLER, "Section not found for RVA 0x%08x\n", dwRVA);
+						LOG(Warning, MODULE_REASSEMBLER, "Section not found for address 0x%p\n", GetBaseAddress() + dwRVA);
 						continue;
 					}
 				}
@@ -901,7 +901,7 @@ bool Asm::Analyze() {
 						uint64_t r = 0;
 						ZydisCalcAbsoluteAddress(&pLines->At(index).Decoded.Instruction, &pLines->At(index).Decoded.Operands[0], pLines->At(index).OldRVA, &r);
 						if (!r) {
-							LOG(Warning, MODULE_REASSEMBLER, "Failed to calculate jump-to address at 0x%08x\n", pLines->At(index).OldRVA);
+							LOG(Warning, MODULE_REASSEMBLER, "Failed to calculate jump-to address at 0x%p\n", GetBaseAddress() + pLines->At(index).OldRVA);
 						} else if (!Done.Includes(r) && !Functions.Includes(r) && !(IAT.VirtualAddress && IAT.Size && r >= IAT.VirtualAddress && r < IAT.VirtualAddress + IAT.Size)) {
 							ToDo.Push(r);
 						}
@@ -1054,7 +1054,7 @@ bool Asm::Assemble() {
 				}
 				if (rel >= 0) {
 					if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&line.Decoded.Instruction, &line.Decoded.Operands[rel], line.OldRVA, &refs))) {
-						LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate reference address of instruction at %p\n", GetBaseAddress() + line.OldRVA);
+						LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate reference address of instruction at 0x%p\n", GetBaseAddress() + line.OldRVA);
 						return false;
 					}
 					int loc = XREFs.Find(refs);
@@ -1202,7 +1202,7 @@ bool Asm::Assemble() {
 		}
 		buf.Allocate(Sections[i].NewRawSize);
 		if (holder.textSection()->buffer().size() < Sections[i].NewRVA - SectionHeaders[0].VirtualAddress + buf.u64Size) {
-			LOG(Failed, MODULE_REASSEMBLER, "Failed to read assembled code (size: %p, expected: %p)\n", holder.textSection()->buffer().size(), Sections[i].NewRVA - SectionHeaders[0].VirtualAddress + buf.u64Size);
+			LOG(Failed, MODULE_REASSEMBLER, "Failed to read assembled code (size: 0x%p, expected: 0x%p)\n", holder.textSection()->buffer().size(), Sections[i].NewRVA - SectionHeaders[0].VirtualAddress + buf.u64Size);
 			return false;
 		}
 		memcpy(buf.pBytes, holder.textSection()->buffer().data() + Sections[i].NewRVA - SectionHeaders[0].VirtualAddress, buf.u64Size);
@@ -1448,7 +1448,7 @@ DWORD Asm::TranslateOldAddress(_In_ DWORD dwRVA) {
 
 	DWORD szIndex = FindIndex(SecIndex, dwRVA);
 	if (szIndex == _UI32_MAX) {
-		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate address %#x\n", dwRVA);
+		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate address 0x%p\n", GetBaseAddress() + dwRVA);
 		return 0;
 	}
 	if (szIndex < Sections[SecIndex].Lines->Size()) {
@@ -1466,13 +1466,13 @@ void Asm::RemoveData(_In_ DWORD dwRVA, _In_ DWORD dwSize) {
 	DWORD sec = FindSectionIndex(dwRVA);
 	DWORD i = FindIndex(sec, dwRVA);
 	if (i == _UI32_MAX) {
-		LOG(Warning, MODULE_REASSEMBLER, "Failed to remove data at range %#x - %#x\n", dwRVA, dwRVA + dwSize);
+		LOG(Warning, MODULE_REASSEMBLER, "Failed to remove data at range 0x%p - 0x%p\n", GetBaseAddress() + dwRVA, GetBaseAddress() + dwRVA + dwSize);
 		return;
 	}
 
 	Line data = Sections[sec].Lines->At(i);
 	if (data.Type != Embed || data.OldRVA > dwRVA || data.OldRVA + GetLineSize(data) < dwRVA + dwSize) {
-		LOG(Warning, MODULE_REASSEMBLER, "Failed to remove data at range %#x - %#x (this version can be fixed later)\n", dwRVA, dwRVA + dwSize);
+		LOG(Warning, MODULE_REASSEMBLER, "Failed to remove data at range 0x%p - 0x%p (this version can be fixed later)\n", GetBaseAddress() + dwRVA, GetBaseAddress() + dwRVA + dwSize);
 		return;
 	}
 

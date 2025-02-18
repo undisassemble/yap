@@ -1836,7 +1836,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 				} else {
 					name = pOriginal->ReadRVAString(rva) + 2;
 					if (name == (char*)2) {
-						LOG(Failed, MODULE_PACKER, "Failed to read string from rva %x!\n", rva);
+						LOG(Failed, MODULE_PACKER, "Failed to read string at 0x%p!\n", pOriginal->GetBaseAddress() + rva);
 						return buf;
 					}
 					if (ShellcodeData.RequestedFunctions.iIndex != i) {
@@ -1857,7 +1857,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 								pRequest->dwRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
 								pRequest->Func = a.newLabel();
 								ZeroMemory(&digest, sizeof(Sha256Digest));
-								LOG(Success, MODULE_PACKER, "Emulating function at %#x\n", pRequest->dwRVA);
+								LOG(Success, MODULE_PACKER, "Emulating function at 0x%p\n", pOriginal->GetBaseAddress() + pRequest->dwRVA);
 							}
 						}
 						a.embed(&digest, sizeof(Sha256Digest));
@@ -1874,7 +1874,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 							pRequest->bRequested = true;
 							pRequest->dwRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
 							pRequest->Func = a.newLabel();
-							LOG(Success, MODULE_PACKER, "Imported SDK function at %#x\n", pRequest->dwRVA);
+							LOG(Success, MODULE_PACKER, "Imported SDK function at 0x%p\n", pOriginal->GetBaseAddress() + pRequest->dwRVA);
 						}
 					}
 					ZeroMemory(name, lstrlenA(name));
@@ -3177,7 +3177,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		IMAGE_SECTION_HEADER Header = pOriginal->SectionHeaders[pOriginal->FindSectionByRVA(rsrc.VirtualAddress)];
 		Buffer raw = pOriginal->SectionData[pOriginal->FindSectionByRVA(rsrc.VirtualAddress)];
 		if (!raw.pBytes || !raw.u64Size || !Header.PointerToRawData) {
-			LOG(Warning, MODULE_PACKER, "A resource section was present, but resources could not be read! (RVA: %x)\n", rsrc.VirtualAddress);
+			LOG(Warning, MODULE_PACKER, "A resource section was present, but resources could not be read! (0x%p)\n", pOriginal->GetBaseAddress() + rsrc.VirtualAddress);
 		} else {
 			resources.Allocate(rsrc.Size);
 			memcpy(resources.pBytes, raw.pBytes + rsrc.VirtualAddress - Header.VirtualAddress, resources.u64Size);
