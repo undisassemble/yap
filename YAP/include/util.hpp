@@ -355,9 +355,9 @@ struct Options_t {
 		bool bSemiRandomSecNames : 1 = true;
 		bool bFakeSymbols : 1 = true;
 		bool bMutateAssembly : 1 = true;
-		BYTE UPXVersionMajor = 4;
-		BYTE UPXVersionMinor = 2;
-		BYTE UPXVersionPatch = 4;
+		BYTE UPXVersionMajor = 5;
+		BYTE UPXVersionMinor = 0;
+		BYTE UPXVersionPatch = 0;
 		char Sec1Name[9] = { 0 };
 		char Sec2Name[9] = { 0 };
 	} Advanced;
