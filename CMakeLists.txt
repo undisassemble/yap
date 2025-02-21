@@ -126,14 +126,15 @@ endif()
 # zydis
 file(GLOB SOURCES_ZYDIS
 	"YAP/dependencies/zydis/src/*.c"
-	"YAP/dependencies/zydis/src/Generated/*.inc"
-	"YAP/dependencies/zydis/dependencies/src/*.c"
-	"YAP/dependencies/zydis/dependencies/src/API/*.c"
+	"YAP/dependencies/zydis/dependencies/zycore/src/*.c"
+	"YAP/dependencies/zydis/dependencies/zycore/src/API/*.c"
 	"YAP/dependencies/zydis/resources/VersionInfo.rc"
 )
 add_library(zydis SHARED ${SOURCES_ZYDIS})
 set_target_properties(zydis PROPERTIES PREFIX "")
 set_target_properties(zydis PROPERTIES SUFFIX ".dll")
+target_compile_definitions(zydis PUBLIC ZYCORE_SHOULD_EXPORT)
+target_compile_definitions(zydis PUBLIC ZYDIS_SHOULD_EXPORT)
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_custom_command(TARGET zydis POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:zydis>)
 endif()
@@ -174,27 +175,42 @@ endif()
 
 ##### INSTALLER #####
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
-	# install(TARGETS YAPClient asmjit imgui zydis glfw3 DESTINATION "bin" RUNTIME)
-	# install(TARGETS yap DESTINATION "SDK")
+	# Create zip
 	install(FILES bin/Release/yap.dll SDK/yap.h DESTINATION "SDK")
 	install(FILES bin/Release/YAPClient.exe bin/Release/asmjit.dll bin/Release/imgui.dll bin/Release/zydis.dll bin/Release/glfw3.dll Installer/yap.bat DESTINATION "bin")
-	set(CPACK_GENERATOR NSIS)
-	set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")
-	set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+	install(FILES LICENSE DESTINATION ".")
+	set(CPACK_GENERATOR ZIP)
+	set(CPACK_PACKAGE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE}")
+	include(CPack)
+
+	# Create installer
+	find_program(NSIS_PATH makensis)
+	if (NOT NSIS_PATH)
+		message(WARNING "makensis command not found, skipping installer.")
+	else()
+		configure_file("SDK/yap.h.in" "bin/Release/yap.h")
+		file(COPY "Installer/build.bat" DESTINATION "bin/Release")
+	endif()
+	# set(CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut \\\"$SMPPROGRAMS\\\\Yet Another Packer.lnk\\\" \\\"$INSTDIR\\\\bin\\\\YAPClient.exe\\\"")
+	# set(CPACK_NSIS_DELETE_ICONS_EXTRA "Delete \\\"$SMPPROGRAMS\\\\Yet Another Packer.lnk\\\"")
+	# set(CPACK_GENERATOR NSIS)
+	# set(CPACK_NSIS_BRANDING_TEXT " ")
+	# set(CPACK_NSIS_MUI_FINISHPAGE_RUN "YAPClient.exe")
+	# set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")
+	# set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 	# set(CPACK_NSIS_MUI_ICON "INSTALLER ICON")
 	# set(CPACK_NSIS_MUI_UNIICON "UNINSTALLER ICON")
 	# set(CPACK_NSIS_MUI_HEADERIMAGE "HEADER IMAGE")
-	set(CPACK_NSIS_COMPRESSOR "lzma")
-	set(CPACK_NSIS_MODIFY_PATH ON)
-	set(CPACK_NSIS_DISPLAY_NAME "${CMAKE_PROJECT_NAME}")
-	set(CPACK_NSIS_PACKAGE_NAME "${CMAKE_PROJECT_NAME}")
-	set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/undisassemble/yap")
+	# set(CPACK_NSIS_COMPRESSOR "lzma")
+	# set(CPACK_NSIS_MODIFY_PATH ON) # broken
+	# set(CPACK_NSIS_DISPLAY_NAME "${CMAKE_PROJECT_NAME}")
+	# set(CPACK_NSIS_PACKAGE_NAME "${CMAKE_PROJECT_NAME}")
+	# set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/undisassemble/yap")
 	# set(CPACK_NSIS_CREATE_ICONS "ON")
-	set(CPACK_NSIS_MUI_WELCOMEPAGE_TITLE "Welcome")
-	set(CPACK_NSIS_MUI_LICENSEPAGE_TEXT "License Agreement")
-	set(CPACK_NSIS_MUI_FINISHPAGE_TITLE "Finished")
-	set(CPACK_NSIS_MUI_FINISHPAGE_TEXT "Thank you for installing ${CMAKE_PROJECT_NAME}.")
-	set(CPACK_PACKAGE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE}")
+	# set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL "ON")
+	# set(CPACK_NSIS_MUI_WELCOMEPAGE_TITLE "Welcome")
+	# set(CPACK_NSIS_MUI_LICENSEPAGE_TEXT "License Agreement")
+	# set(CPACK_NSIS_MUI_FINISHPAGE_TITLE "Finished")
+	# set(CPACK_NSIS_MUI_FINISHPAGE_TEXT "Thank you for installing ${CMAKE_PROJECT_NAME}.")
 
-	include(CPack)
 endif()
