@@ -17,12 +17,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Omar Cornut"
             VALUE "FileDescription", "Bloat-free Graphical User interface for C++ with minimal dependencies"
-            VALUE "FileVersion", "1.91.8.0"
+            VALUE "FileVersion", "1.91.8"
             VALUE "InternalName", "imgui.dll"
             VALUE "LegalCopyright", "Copyright (c) 2014-2025 Omar Cornut"
             VALUE "OriginalFilename", "imgui.dll"
             VALUE "ProductName", "ImGui"
-            VALUE "ProductVersion", "1.91.8.0"
+            VALUE "ProductVersion", "1.91.8"
         END
     END
     BLOCK "VarFileInfo"

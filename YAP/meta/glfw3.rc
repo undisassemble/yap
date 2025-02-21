@@ -17,12 +17,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "GLFW"
             VALUE "FileDescription", "A multi-platform library for OpenGL, OpenGL ES, Vulkan, window and input"
-            VALUE "FileVersion", "3.4.0.0"
+            VALUE "FileVersion", "3.4.0"
             VALUE "InternalName", "glfw3.dll"
             VALUE "LegalCopyright", "Copyright (c) 2002-2006 Marcus Geelnard, Camilla Löwy"
             VALUE "OriginalFilename", "glfw3.dll"
             VALUE "ProductName", "GLFW"
-            VALUE "ProductVersion", "3.4.0.0"
+            VALUE "ProductVersion", "3.4.0"
         END
     END
     BLOCK "VarFileInfo"

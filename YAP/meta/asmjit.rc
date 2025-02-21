@@ -17,12 +17,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "AsmJit"
             VALUE "FileDescription", "Low-latency machine code generation"
-            VALUE "FileVersion", "1.13.0.0"
+            VALUE "FileVersion", "1.13.0"
             VALUE "InternalName", "asmjit.dll"
             VALUE "LegalCopyright", "Copyright (c) 2008-2024 The AsmJit Authors"
             VALUE "OriginalFilename", "asmjit.dll"
             VALUE "ProductName", "AsmJit"
-            VALUE "ProductVersion", "1.13.0.0"
+            VALUE "ProductVersion", "1.13.0"
         END
     END
     BLOCK "VarFileInfo"

@@ -17,12 +17,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "undisassemble"
             VALUE "FileDescription", "Protector for x64 native Windows PEs"
-            VALUE "FileVersion", "@PROJECT_VERSION@.0"
+            VALUE "FileVersion", "@PROJECT_VERSION@"
             VALUE "InternalName", "YAPClient.exe"
             VALUE "LegalCopyright", "Copyright (c) 2024-2025 undisassemble"
             VALUE "OriginalFilename", "YAPClient.exe"
             VALUE "ProductName", "Yet Another Packer"
-            VALUE "ProductVersion", "@PROJECT_VERSION@.0"
+            VALUE "ProductVersion", "@PROJECT_VERSION@"
         END
     END
     BLOCK "VarFileInfo"
