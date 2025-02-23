@@ -355,7 +355,7 @@ void DrawGUI() {
 			ImGui::Text("Zycore: %d.%d.%d", ZYCORE_VERSION_MAJOR(ZYCORE_VERSION), ZYCORE_VERSION_MINOR(ZYCORE_VERSION), ZYCORE_VERSION_PATCH(ZYCORE_VERSION));
 			ImGui::Text("AsmJit: %d.%d.%d", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
 			ImGui::Text("GLFW: %s", glfwGetVersionString());
-			// ImGui::Text("OpenGL: %s", glGetString(GL_VERSION));
+			ImGui::Text("OpenGL: %s", glGetString(GL_VERSION));
 			ImGui::SeparatorText("Build information");
 			ImGui::Text("Build: " __YAP_BUILD__);
 			ImGui::Text("Time: " __DATE__ " @ " __TIME__);

@@ -17,6 +17,7 @@ namespace Console {
 	void SetupConsole();
 }
 
+// Globals
 Options_t Options;
 Settings_t Settings;
 Data_t Data;
@@ -293,7 +294,7 @@ void Console::buildversion() {
 	LOG(Nothing, MODULE_YAP, "Zydis: %d.%d.%d\n", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
 	LOG(Nothing, MODULE_YAP, "AsmJit: %d.%d.%d\n", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
 	LOG(Nothing, MODULE_YAP, "GLFW: %s\n", glfwGetVersionString());
-	// LOG(Nothing, MODULE_YAP, "OpenGL: %s\n", glGetString(GL_VERSION));
+	LOG(Nothing, MODULE_YAP, "OpenGL: %s\n", glGetString(GL_VERSION));
 	LOG(Nothing, MODULE_YAP, "Build: " __YAP_BUILD__ "\n");
 	LOG(Nothing, MODULE_YAP, "Build Time: " __DATE__ " " __TIME__ "\n");
 }

@@ -34,12 +34,12 @@ public:
 	IMAGE_NT_HEADERS64 NTHeaders = { 0 };
 
 	/// 
-	/// Creates PE object with given file.
+	/// Parses PE from file.
 	/// 
 	PE(_In_ char* sFileName);
 	
 	/// 
-	/// Creates PE object with given file.
+	/// Parses PE from file.
 	/// 
 	PE(_In_ HANDLE hFile);
 
