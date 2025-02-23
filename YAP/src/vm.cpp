@@ -23,7 +23,7 @@ bool Virtualize(_In_ Asm* pPE) {
 			LOG(Failed, MODULE_VM, "Failed to located function \'%s\'\n", Options.VM.VMFuncs[i].Name);
 			continue;
 		}
-		LOG(Info_Extended, MODULE_VM, "Function address: 0x%p\n", pPE->GetBaseAddress() + dwRVA);
+		LOG(Info_Extended, MODULE_VM, "Function address: 0x%p\n", pPE->NTHeaders.OptionalHeader.ImageBase + dwRVA);
 
 		// Output results
 		if (Total) {
@@ -36,7 +36,6 @@ bool Virtualize(_In_ Asm* pPE) {
 	LOG(Success, MODULE_VM, "Finished virtualization\n");
 	return true;
 }
-
 
 DWORD GetExportRVA(Asm* pPE, char* name) {
 	Vector<char*> ExportNames = pPE->GetExportedFunctionNames();

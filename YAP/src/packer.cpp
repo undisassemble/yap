@@ -420,7 +420,7 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
 
 	// Otherwise do stuff
 	a.bind(reloc);
-	a.dq(ShellcodeData.BaseAddress + pPackedBinary->GetBaseAddress() + a.offset());
+	a.dq(ShellcodeData.BaseAddress + pPackedBinary->NTHeaders.OptionalHeader.ImageBase + a.offset());
 	a.bind(_do);
 	a.desync_mov(rdx);
 	if (Options.Packing.bAntiDebug) a.call(hidethread);
@@ -459,7 +459,7 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
 		DEBUG_ONLY(if (Options.Debug.bGenerateBreakpoints) a.int3(); a.block());
 		a.popfq();
 		a.block();
-		a.jz(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress - (rand() & 0xFFFF));
+		a.jz(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseAddress - (rand() & 0xFFFF));
 	}
 	if (Options.Packing.bAntiPatch) {
 		Label hash = a.newLabel();
@@ -481,17 +481,17 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
 		a.bind(checksigs);
 		a.lea(rcx, ptr(hash));
 		a.push(rcx);
-		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.Sha256_InitOff);
+		a.call(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.Sha256_InitOff);
 		a.mov(rcx, ptr(rsp));
-		a.mov(rdx, pPackedBinary->GetBaseAddress());
+		a.mov(rdx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase);
 		a.add(rdx, ptr(reloc));
-		a.mov(r8, pPackedBinary->NTHeaders.x64.OptionalHeader.SizeOfHeaders);
-		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.Sha256_UpdateOff);
+		a.mov(r8, pPackedBinary->NTHeaders.OptionalHeader.SizeOfHeaders);
+		a.call(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.Sha256_UpdateOff);
 		a.pop(rcx);
 		a.mov(rdx, rcx);
 		a.add(rdx, sizeof(CSha256)); // rdx -> garbage
 		a.push(rdx);
-		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.Sha256_FinalOff);
+		a.call(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.Sha256_FinalOff);
 		a.mov(rcx, ptr(rsp)); // rcx -> rdx
 		a.pop(rdx);
 		a.sub(rcx, sizeof(Sha256Digest) + sizeof(CSha256)); // rcx -> HeaderDigest
@@ -505,7 +505,7 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
 		// fuck me (check the thingymadoodle)
 	}
 	if (Options.Packing.bDelayedEntry) {
-		a.mov(rax, pPackedBinary->GetBaseAddress() + pPackedBinary->SectionHeaders[0].VirtualAddress);
+		a.mov(rax, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + pPackedBinary->SectionHeaders[0].VirtualAddress);
 		a.add(rax, ptr(reloc));
 		if (Options.Packing.bAntiDebug) {
 			a.cmp(byte_ptr(rax), 0xCC);
@@ -526,7 +526,7 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
 		a.add(rax, 2 * (rand64() % (pPackedBinary->SectionHeaders[0].Misc.VirtualSize / 2)));
 		a.mov(word_ptr(rax), 0xB848);
 		a.add(rax, 2);
-		a.mov(rcx, pPackedBinary->GetBaseAddress() + pPackedBinary->NTHeaders.x64.OptionalHeader.AddressOfEntryPoint + ShellcodeData.EntryOff);
+		a.mov(rcx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + pPackedBinary->NTHeaders.OptionalHeader.AddressOfEntryPoint + ShellcodeData.EntryOff);
 		a.add(rcx, ptr(reloc));
 		a.mov(qword_ptr(rax), rcx);
 		a.add(rax, 8);
@@ -553,10 +553,10 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
 		a.embed(&Sha256Str("NtSetInformationThread"), sizeof(Sha256Digest));
 		a.bind(hidethread);
 		a.lea(rcx, ptr(NTD));
-		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.GetModuleHandleWOff);
+		a.call(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.GetModuleHandleWOff);
 		a.mov(rcx, rax);
 		a.lea(rdx, ptr(STI));
-		a.call(pPackedBinary->GetBaseAddress() + ShellcodeData.GetProcAddressOff);
+		a.call(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.GetProcAddressOff);
 		a.mov(Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
 		a.mov(r8, rsp);
 		a.and_(r8, 0b1111);
@@ -590,7 +590,7 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
 
 	// Return data
 	holder.flatten();
-	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
+	holder.relocateToBase(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseAddress);
 	if (a.bFailed) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate TLS shellcode\n");
 		return buf;
@@ -682,7 +682,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	a.jmp(SkipReloc);
 	Label Reloc = a.newLabel();
 	a.bind(Reloc);
-	a.dq(ShellcodeData.BaseAddress + a.offset() + pPackedBinary->GetBaseAddress());
+	a.dq(ShellcodeData.BaseAddress + a.offset() + pPackedBinary->NTHeaders.OptionalHeader.ImageBase);
 	Label NTD = a.newLabel();
 	Label SIP = a.newLabel();
 	if (Options.Packing.bOnlyLoadMicrosoft) {
@@ -977,7 +977,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 		a.test(rax, rax);
 		a.strict();
 		a.jz(ret);
-		a.mov(rcx, pPackedBinary->GetBaseAddress());
+		a.mov(rcx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase);
 		a.add(rcx, ptr(Reloc));
 		a.mov(edx, ptr(rcx, offsetof(IMAGE_DOS_HEADER, e_lfanew)));
 		a.add(rdx, rcx);
@@ -1030,7 +1030,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	}
 	a.mov(rsi, 0);
 	a.lea(rcx, ptr(CompressedSections));
-	a.mov(rbp, pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA);
+	a.mov(rbp, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA);
 	uint64_t DecompressKey = rand64();
 	Label decompressloop = a.newLabel();
 	a.bind(decompressloop);
@@ -1058,7 +1058,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	if (!CompressedInternal.pBytes || !CompressedInternal.u64Size) return buf;
 	a.lea(rcx, ptr(InternalShell));
 	a.mov(rdx, CompressedInternal.u64Size);
-	a.mov(r8, pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders);
+	a.mov(r8, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders);
 	a.add(r8, ptr(Reloc));
 	a.mov(r9, InternalShellcode.u64Size);
 	a.call(unpack);
@@ -1067,7 +1067,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	a.mov(rax, ptr(Reloc));
 	if (ShellcodeData.Relocations.Relocations.Size()) {
 		for (int i = 0, n = ShellcodeData.Relocations.Relocations.Size(); i < n; i++) {
-			a.mov(r10, pPackedBinary->GetBaseAddress() + ShellcodeData.Relocations.Relocations[i]);
+			a.mov(r10, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.Relocations.Relocations[i]);
 			a.add(r10, rax);
 			a.add(ptr(r10), rax);
 		}
@@ -1076,7 +1076,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	a.mov(rcx, rax);
 
 	a.desync();
-	a.mov(rax, pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders);
+	a.mov(rax, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders);
 	a.add(rax, rcx);
 	Label szshell = a.newLabel();
 	if (Options.Packing.bAntiDump) {
@@ -1090,7 +1090,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 
 	// Insert compressed data
 	a.bind(CompressedSections);
-	for (WORD i = 0, n = pOriginal->NTHeaders.x64.FileHeader.NumberOfSections; i < n; i++) {
+	for (WORD i = 0, n = pOriginal->NTHeaders.FileHeader.NumberOfSections; i < n; i++) {
 		if (!pOriginal->SectionHeaders[i].Misc.VirtualSize || !pOriginal->SectionHeaders[i].SizeOfRawData) continue;
 		Buffer buf = Copied.SectionData[i];
 		for (int j = 0; j < buf.u64Size; j++) a.db(buf.pBytes[j]);
@@ -1105,21 +1105,21 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	a.embed(CompressedInternal.pBytes, CompressedInternal.u64Size);
 	
 	a.bind(CompressedSizes);
-	for (int i = 0; i < Copied.NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+	for (int i = 0; i < Copied.NTHeaders.FileHeader.NumberOfSections; i++) {
 		if (!pOriginal->SectionHeaders[i].Misc.VirtualSize || !pOriginal->SectionHeaders[i].SizeOfRawData) continue;
 		a.dq(Copied.SectionHeaders[i].SizeOfRawData ^ DecompressKey);
 	}
 
 	a.bind(DecompressedSizes);
-	for (int i = 0; i < pOriginal->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+	for (int i = 0; i < pOriginal->NTHeaders.FileHeader.NumberOfSections; i++) {
 		if (!pOriginal->SectionHeaders[i].Misc.VirtualSize || !pOriginal->SectionHeaders[i].SizeOfRawData) continue;
 		a.dq(pOriginal->SectionHeaders[i].SizeOfRawData ^ DecompressKey);
 	}
 	
 	a.bind(VirtualAddrs);
-	for (int i = 0; i < pOriginal->NTHeaders.x64.FileHeader.NumberOfSections; i++) {
+	for (int i = 0; i < pOriginal->NTHeaders.FileHeader.NumberOfSections; i++) {
 		if (!pOriginal->SectionHeaders[i].Misc.VirtualSize || !pOriginal->SectionHeaders[i].SizeOfRawData) continue;
-		a.dq((pOriginal->SectionHeaders[i].VirtualAddress - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders) ^ DecompressKey);
+		a.dq((pOriginal->SectionHeaders[i].VirtualAddress - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders) ^ DecompressKey);
 	}
 
 	// GetModuleHandleW
@@ -1389,7 +1389,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 
 	// Return data
 	holder.flatten();
-	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
+	holder.relocateToBase(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseAddress);
 	if (a.bFailed) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate loader shellcode\n");
 		return buf;
@@ -1675,7 +1675,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 		a.embed(&Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest));
 		InternalRelOff = a.newLabel();
 		a.bind(InternalRelOff);
-		a.dq(ShellcodeData.BaseAddress + pPackedBinary->GetBaseAddress() + a.offset());
+		a.dq(ShellcodeData.BaseAddress + pPackedBinary->NTHeaders.OptionalHeader.ImageBase + a.offset());
 		a.bind(skip);
 		a.lea(rax, ptr(InternalRelOff));
 		a.sub(rax, ptr(rax));
@@ -1774,7 +1774,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 
 		InternalRelOff = a.newLabel();
 		a.bind(InternalRelOff);
-		a.dq(ShellcodeData.BaseAddress + pPackedBinary->GetBaseAddress() + a.offset());
+		a.dq(ShellcodeData.BaseAddress + pPackedBinary->NTHeaders.OptionalHeader.ImageBase + a.offset());
 		
 		// Offsets
 		Label import_offsets = a.newLabel();
@@ -1799,7 +1799,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			j = 0;
 			a.dd(0);
 			while (pOriginal->ReadRVA<uint64_t>(Imports[i].OriginalFirstThunk + sizeof(uint64_t) * j)) {
-				a.dd(offset + (pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - Imports[i].FirstThunk - sizeof(uint64_t) * j));
+				a.dd(offset + (pOriginal->NTHeaders.OptionalHeader.SizeOfImage - Imports[i].FirstThunk - sizeof(uint64_t) * j));
 				j++;
 			}
 		}
@@ -1836,7 +1836,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 				} else {
 					name = pOriginal->ReadRVAString(rva) + 2;
 					if (name == (char*)2) {
-						LOG(Failed, MODULE_PACKER, "Failed to read string at 0x%p!\n", pOriginal->GetBaseAddress() + rva);
+						LOG(Failed, MODULE_PACKER, "Failed to read string at 0x%p!\n", pOriginal->NTHeaders.OptionalHeader.ImageBase + rva);
 						return buf;
 					}
 					if (ShellcodeData.RequestedFunctions.iIndex != i) {
@@ -1857,7 +1857,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 								pRequest->dwRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
 								pRequest->Func = a.newLabel();
 								ZeroMemory(&digest, sizeof(Sha256Digest));
-								LOG(Success, MODULE_PACKER, "Emulating function at 0x%p\n", pOriginal->GetBaseAddress() + pRequest->dwRVA);
+								LOG(Success, MODULE_PACKER, "Emulating function at 0x%p\n", pOriginal->NTHeaders.OptionalHeader.ImageBase + pRequest->dwRVA);
 							}
 						}
 						a.embed(&digest, sizeof(Sha256Digest));
@@ -1874,7 +1874,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 							pRequest->bRequested = true;
 							pRequest->dwRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
 							pRequest->Func = a.newLabel();
-							LOG(Success, MODULE_PACKER, "Imported SDK function at 0x%p\n", pOriginal->GetBaseAddress() + pRequest->dwRVA);
+							LOG(Success, MODULE_PACKER, "Imported SDK function at 0x%p\n", pOriginal->NTHeaders.OptionalHeader.ImageBase + pRequest->dwRVA);
 						}
 					}
 					ZeroMemory(name, lstrlenA(name));
@@ -2033,10 +2033,10 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	}
 
 	// Rebase image
-	pOriginal->RebaseImage(pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders);
+	pOriginal->RebaseImage(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders);
 
 	// Handle PEs relocations
-	if (!(pOriginal->NTHeaders.x64.FileHeader.Characteristics & IMAGE_FILE_RELOCS_STRIPPED)) {
+	if (!(pOriginal->NTHeaders.FileHeader.Characteristics & IMAGE_FILE_RELOCS_STRIPPED)) {
 		Vector<DWORD> Relocations = pOriginal->GetRelocations();
 
 		if (Relocations.Size()) {
@@ -2052,7 +2052,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 
 			WORD nOff = 0;
 			a.bind(skipdata);
-			a.mov(rcx, pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders);
+			a.mov(rcx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders);
 			a.mov(rax, ptr(InternalRelOff));
 			a.add(rcx, rax);
 			a.mov(r8, 0);
@@ -2070,15 +2070,15 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 		}
 
 		Buffer zero;
-		zero.Allocate(pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[5].Size);
+		zero.Allocate(pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].Size);
 		ZeroMemory(zero.pBytes, zero.u64Size);
-		pOriginal->WriteRVA(pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress, zero.pBytes, zero.u64Size);
+		pOriginal->WriteRVA(pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].VirtualAddress, zero.pBytes, zero.u64Size);
 		zero.Release();
-		pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[5].VirtualAddress = pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[5].Size = 0;
+		pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].VirtualAddress = pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].Size = 0;
 	}
 
 	// Load SDK
-#define LOAD_IMPORT(name) if (ShellcodeData.RequestedFunctions.name.bRequested) { a.lea(rax, ptr(ShellcodeData.RequestedFunctions.name.Func)); a.mov(rcx, pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders + ShellcodeData.RequestedFunctions.name.dwRVA); a.add(rcx, ptr(InternalRelOff)); a.mov(qword_ptr(rcx), rax); }
+#define LOAD_IMPORT(name) if (ShellcodeData.RequestedFunctions.name.bRequested) { a.lea(rax, ptr(ShellcodeData.RequestedFunctions.name.Func)); a.mov(rcx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders + ShellcodeData.RequestedFunctions.name.dwRVA); a.add(rcx, ptr(InternalRelOff)); a.mov(qword_ptr(rcx), rax); }
 	LOAD_IMPORT(CheckForDebuggers);
 	LOAD_IMPORT(GetSelf);
 	LOAD_IMPORT(GetCurrentThread);
@@ -2102,7 +2102,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	{
 		uint64_t* pCallbacks = pOriginal->GetTLSCallbacks();
 		for (int i = 0; pCallbacks && pCallbacks[i]; i++) {
-			a.mov(rcx, pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase);
+			a.mov(rcx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase);
 			a.add(rcx, ptr(InternalRelOff));
 			a.mov(rdx, DLL_PROCESS_ATTACH);
 			a.mov(r8d, 0);
@@ -2114,16 +2114,16 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 		}
 
 		Buffer zero;
-		zero.Allocate(pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[9].Size);
+		zero.Allocate(pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].Size);
 		ZeroMemory(zero.pBytes, zero.u64Size);
-		pOriginal->WriteRVA(pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[9].VirtualAddress, zero.pBytes, zero.u64Size);
+		pOriginal->WriteRVA(pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].VirtualAddress, zero.pBytes, zero.u64Size);
 		zero.Release();
-		pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[9].VirtualAddress = pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[9].Size = 0;
+		pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].VirtualAddress = pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].Size = 0;
 	}
 
 	// Run main entry point (if applicable)
-	if (pOriginal->NTHeaders.x64.OptionalHeader.AddressOfEntryPoint) {
-		a.mov(rax, pOriginal->NTHeaders.x64.OptionalHeader.AddressOfEntryPoint + ShellcodeData.OldPENewBaseRVA + pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders);
+	if (pOriginal->NTHeaders.OptionalHeader.AddressOfEntryPoint) {
+		a.mov(rax, pOriginal->NTHeaders.OptionalHeader.AddressOfEntryPoint + ShellcodeData.OldPENewBaseRVA + pPackedBinary->NTHeaders.OptionalHeader.ImageBase - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders);
 		a.add(rax, ptr(InternalRelOff));
 		a.push(rax);
 		a.garbage();
@@ -2156,7 +2156,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	// GetSelf
 	if (ShellcodeData.RequestedFunctions.GetSelf.bRequested) {
 		a.bind(ShellcodeData.RequestedFunctions.GetSelf.Func);
-		a.mov(rax, pPackedBinary->GetBaseAddress());
+		a.mov(rax, pPackedBinary->NTHeaders.OptionalHeader.ImageBase);
 		a.add(rax, ptr(InternalRelOff));
 		a.ret();
 	}
@@ -2833,7 +2833,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			Label PointerArray = a.newLabel();
 			a.bind(PointerArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
-				a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders + FunctionRanges[i].dwStart, FunctionRanges[i].Entries.Size());
+				a.dq(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders + FunctionRanges[i].dwStart, FunctionRanges[i].Entries.Size());
 			}
 			Label SizeArray = a.newLabel();
 			a.bind(SizeArray);
@@ -2844,7 +2844,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			a.bind(EntryArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
 				for (int j = 0; j < FunctionRanges[i].Entries.Size(); j++) {
-					a.dq(pPackedBinary->GetBaseAddress() + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders + FunctionRanges[i].Entries[j]);
+					a.dq(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders + FunctionRanges[i].Entries[j]);
 				}
 			}
 			Label CompressedSizes = a.newLabel();
@@ -3010,8 +3010,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			// Write function address
 			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
 				for (int j = 0; j < FunctionRanges[i].Entries.Size(); j++) {
-					pOriginal->WriteRVA<uint64_t>(FunctionRanges[i].Entries[j] + 8, pPackedBinary->GetBaseAddress() + holder.labelOffsetFromBase(LoadSegment) + ShellcodeData.BaseAddress);
-					ShellcodeData.Relocations.Relocations.Push(ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders + FunctionRanges[i].Entries[j] + 8);
+					pOriginal->WriteRVA<uint64_t>(FunctionRanges[i].Entries[j] + 8, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + holder.labelOffsetFromBase(LoadSegment) + ShellcodeData.BaseAddress);
+					ShellcodeData.Relocations.Relocations.Push(ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders + FunctionRanges[i].Entries[j] + 8);
 				}
 			}
 
@@ -3091,7 +3091,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 
 	// Return data
 	holder.flatten();
-	holder.relocateToBase(pPackedBinary->GetBaseAddress() + ShellcodeData.BaseAddress);
+	holder.relocateToBase(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseAddress);
 	if (a.bFailed) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate internal shellcode\n");
 		return buf;
@@ -3101,7 +3101,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	if (holder.hasRelocEntries()) {
 		for (int i = 0; i < holder.relocEntries().size(); i++) {
 			if (holder.relocEntries()[i]->_relocType == RelocType::kNone) continue;
-			ShellcodeData.Relocations.Relocations.Push(holder.baseAddress() + holder.relocEntries()[i]->sourceOffset() - pPackedBinary->NTHeaders.x64.OptionalHeader.ImageBase);
+			ShellcodeData.Relocations.Relocations.Push(holder.baseAddress() + holder.relocEntries()[i]->sourceOffset() - pPackedBinary->NTHeaders.OptionalHeader.ImageBase);
 		}
 	}
 
@@ -3117,7 +3117,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		LOG(Failed, MODULE_PACKER, "Invalid arguments\n");
 		return false;
 	}
-	if (!(pOriginal->NTHeaders.x64.OptionalHeader.DllCharacteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE) || (pOriginal->NTHeaders.x64.FileHeader.Characteristics & IMAGE_FILE_RELOCS_STRIPPED)) {
+	if (!(pOriginal->NTHeaders.OptionalHeader.DllCharacteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE) || (pOriginal->NTHeaders.FileHeader.Characteristics & IMAGE_FILE_RELOCS_STRIPPED)) {
 		LOG(Failed, MODULE_PACKER, "Binary must be relocatable to be packed\n");
 		return false;
 	}
@@ -3172,12 +3172,12 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 
 	// Save resources
 	Buffer resources = { 0 };
-	if (Options.Packing.bDontCompressRsrc && pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[2].Size && pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress) {
-		IMAGE_DATA_DIRECTORY rsrc = pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[2];
+	if (Options.Packing.bDontCompressRsrc && pOriginal->NTHeaders.OptionalHeader.DataDirectory[2].Size && pOriginal->NTHeaders.OptionalHeader.DataDirectory[2].VirtualAddress) {
+		IMAGE_DATA_DIRECTORY rsrc = pOriginal->NTHeaders.OptionalHeader.DataDirectory[2];
 		IMAGE_SECTION_HEADER Header = pOriginal->SectionHeaders[pOriginal->FindSectionByRVA(rsrc.VirtualAddress)];
 		Buffer raw = pOriginal->SectionData[pOriginal->FindSectionByRVA(rsrc.VirtualAddress)];
 		if (!raw.pBytes || !raw.u64Size || !Header.PointerToRawData) {
-			LOG(Warning, MODULE_PACKER, "A resource section was present, but resources could not be read! (0x%p)\n", pOriginal->GetBaseAddress() + rsrc.VirtualAddress);
+			LOG(Warning, MODULE_PACKER, "A resource section was present, but resources could not be read! (0x%p)\n", pOriginal->NTHeaders.OptionalHeader.ImageBase + rsrc.VirtualAddress);
 		} else {
 			resources.Allocate(rsrc.Size);
 			memcpy(resources.pBytes, raw.pBytes + rsrc.VirtualAddress - Header.VirtualAddress, resources.u64Size);
@@ -3186,8 +3186,8 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	}
 
 	// NT headers
-	bool bIsDLL = pOriginal->NTHeaders.x64.FileHeader.Characteristics & IMAGE_FILE_DLL;
-	IMAGE_NT_HEADERS64* pNT = &pPackedBinary->NTHeaders.x64;
+	bool bIsDLL = pOriginal->NTHeaders.FileHeader.Characteristics & IMAGE_FILE_DLL;
+	IMAGE_NT_HEADERS64* pNT = &pPackedBinary->NTHeaders;
 	pNT->Signature = IMAGE_NT_SIGNATURE;
 	pNT->FileHeader.Machine = IMAGE_FILE_MACHINE_AMD64;
 	pNT->FileHeader.SizeOfOptionalHeader = sizeof(IMAGE_OPTIONAL_HEADER64);
@@ -3196,11 +3196,11 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	pNT->OptionalHeader.Magic = 0x20B;
 	pNT->OptionalHeader.SectionAlignment = 0x1000;
 	pNT->OptionalHeader.FileAlignment = 0x200;
-	ShellcodeData.ImageBase = pNT->OptionalHeader.ImageBase = pOriginal->GetBaseAddress();
+	ShellcodeData.ImageBase = pNT->OptionalHeader.ImageBase = pOriginal->NTHeaders.OptionalHeader.ImageBase;
 	pNT->OptionalHeader.MajorOperatingSystemVersion = 4;
 	pNT->OptionalHeader.MajorSubsystemVersion = 6;
 	pNT->OptionalHeader.SizeOfHeaders = pPackedBinary->DosHeader.e_lfanew + sizeof(IMAGE_NT_HEADERS64) + sizeof(IMAGE_SECTION_HEADER) * 2;
-	pNT->OptionalHeader.Subsystem = pOriginal->NTHeaders.x64.OptionalHeader.Subsystem;
+	pNT->OptionalHeader.Subsystem = pOriginal->NTHeaders.OptionalHeader.Subsystem;
 	pNT->OptionalHeader.NumberOfRvaAndSizes = 0x10;
 	pNT->OptionalHeader.SizeOfStackReserve = 0x200000;
 	pNT->OptionalHeader.SizeOfHeapReserve = 0x100000;
@@ -3219,12 +3219,12 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	SecHeader.VirtualAddress = pNT->OptionalHeader.SizeOfHeaders;
 	SecHeader.VirtualAddress += (SecHeader.VirtualAddress % 0x1000) ? 0x1000 - (SecHeader.VirtualAddress % 0x1000) : 0;
 	ShellcodeData.OldPENewBaseRVA = SecHeader.VirtualAddress;
-	ShellcodeData.BaseAddress = ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders;
+	ShellcodeData.BaseAddress = ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders;
 	ShellcodeData.bUsingTLSCallbacks = Options.Packing.bDelayedEntry || Options.Packing.bAntiDebug || Options.Packing.bAntiPatch || (pOriginal->GetTLSCallbacks() && *pOriginal->GetTLSCallbacks());
 	ShellcodeData.EntryOff = 0x30 + rand() & 0xCF;
 	Buffer Internal = GenerateInternalShellcode(pOriginal, pPackedBinary);
 	if (!Internal.u64Size || !Internal.pBytes) return false;
-	SecHeader.Misc.VirtualSize = Internal.u64Size + pOriginal->NTHeaders.x64.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders;
+	SecHeader.Misc.VirtualSize = Internal.u64Size + pOriginal->NTHeaders.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders;
 	switch (Options.Packing.Immitate) {
 	case Themida:
 		memcpy(SecHeader.Name, ".themida", 8);
@@ -3316,7 +3316,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 			LOG(Failed, MODULE_PACKER, "Failed to generate TLS shellcode!\n");
 			return false;
 		}
-		TLSDataDir.AddressOfCallBacks = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_TLS_DIRECTORY64) + pPackedBinary->GetBaseAddress();
+		TLSDataDir.AddressOfCallBacks = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_TLS_DIRECTORY64) + pPackedBinary->NTHeaders.OptionalHeader.ImageBase;
 		TLSDataDir.AddressOfIndex = TLSDataDir.StartAddressOfRawData = TLSDataDir.AddressOfCallBacks + sizeof(uint64_t) * nTLSEntries;
 		TLSDataDir.EndAddressOfRawData = TLSDataDir.StartAddressOfRawData + sizeof(uint64_t) * nTLSEntries;
 		shell.Allocate(shell.u64Size + sizeof(uint64_t) * (nTLSEntries + 1) + sizeof(IMAGE_TLS_DIRECTORY64) + TLSCode.u64Size);
@@ -3324,9 +3324,9 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		memcpy(shell.pBytes + shell.u64Size - TLSCode.u64Size, TLSCode.pBytes, TLSCode.u64Size);
 		uint64_t* pEntries = reinterpret_cast<uint64_t*>(shell.pBytes + shell.u64Size - (sizeof(uint64_t) * (nTLSEntries + 1) + TLSCode.u64Size));
 		pEntries[1 + nFalseEntries] = 0;
-		pEntries[0] = SecHeader.VirtualAddress + shell.u64Size - TLSCode.u64Size + pPackedBinary->GetBaseAddress();
+		pEntries[0] = SecHeader.VirtualAddress + shell.u64Size - TLSCode.u64Size + pPackedBinary->NTHeaders.OptionalHeader.ImageBase;
 		for (int i = 1; i < nTLSEntries; i++) {
-			pEntries[i] = pPackedBinary->GetBaseAddress() + SecHeader.VirtualAddress + shell.u64Size + resources.u64Size + pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[0].Size + 0x10000 + rand();
+			pEntries[i] = pPackedBinary->NTHeaders.OptionalHeader.ImageBase + SecHeader.VirtualAddress + shell.u64Size + resources.u64Size + pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].Size + 0x10000 + rand();
 		}
 
 		TLSCode.Release();
@@ -3343,7 +3343,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 			Relocations.Push(pNT->OptionalHeader.DataDirectory[9].VirtualAddress + 0x10);
 			Relocations.Push(pNT->OptionalHeader.DataDirectory[9].VirtualAddress + 0x18);
 			for (int i = 0; i < nTLSEntries; i++) {
-				Relocations.Push(TLSDataDir.AddressOfCallBacks - pPackedBinary->GetBaseAddress() + sizeof(uint64_t) * i);
+				Relocations.Push(TLSDataDir.AddressOfCallBacks - pPackedBinary->NTHeaders.OptionalHeader.ImageBase + sizeof(uint64_t) * i);
 			}
 		}
 		Buffer reloc = GenerateRelocSection(Relocations);
@@ -3357,8 +3357,8 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 
 	// Resources
 	if (Options.Packing.bDontCompressRsrc && resources.pBytes && resources.u64Size) {
-		pPackedBinary->NTHeaders.x64.OptionalHeader.DataDirectory[2].Size = resources.u64Size;
-		pPackedBinary->NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress = SecHeader.VirtualAddress + shell.u64Size;
+		pPackedBinary->NTHeaders.OptionalHeader.DataDirectory[2].Size = resources.u64Size;
+		pPackedBinary->NTHeaders.OptionalHeader.DataDirectory[2].VirtualAddress = SecHeader.VirtualAddress + shell.u64Size;
 
 		// Translate addresses
 		Vector<DWORD> Offsets;
@@ -3374,7 +3374,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 					Offsets.Push(pEntry[i].OffsetToDirectory);
 				} else {
 					IMAGE_RESOURCE_DATA_ENTRY* pResource = reinterpret_cast<IMAGE_RESOURCE_DATA_ENTRY*>(resources.pBytes + pEntry[i].OffsetToData);
-					pResource->OffsetToData += pPackedBinary->NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress - pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[2].VirtualAddress;
+					pResource->OffsetToData += pPackedBinary->NTHeaders.OptionalHeader.DataDirectory[2].VirtualAddress - pOriginal->NTHeaders.OptionalHeader.DataDirectory[2].VirtualAddress;
 				}
 			}
 		} while (Offsets.Size());
@@ -3383,9 +3383,9 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	}
 
 	// Exports
-	if (pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[0].VirtualAddress && pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[0].Size) {
+	if (pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].VirtualAddress && pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].Size) {
 		IMAGE_EXPORT_DIRECTORY Exports = { 0 };
-		IMAGE_EXPORT_DIRECTORY OriginalExports = pOriginal->ReadRVA<IMAGE_EXPORT_DIRECTORY>(pOriginal->NTHeaders.x64.OptionalHeader.DataDirectory[0].VirtualAddress);
+		IMAGE_EXPORT_DIRECTORY OriginalExports = pOriginal->ReadRVA<IMAGE_EXPORT_DIRECTORY>(pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].VirtualAddress);
 		Vector<DWORD> exports = pOriginal->GetExportedFunctionRVAs();
 		Vector<char*> names = pOriginal->GetExportedFunctionNames();
 		pNT->OptionalHeader.DataDirectory[0].VirtualAddress = SecHeader.VirtualAddress + shell.u64Size;
@@ -3403,7 +3403,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		// Export RVAs
 		shell.Allocate(shell.u64Size + exports.Size() * sizeof(DWORD));
 		for (int i = 0; i < exports.Size(); i++) {
-			*reinterpret_cast<DWORD*>(shell.pBytes + shell.u64Size - sizeof(DWORD) * (exports.Size() - i)) = exports[i] + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.x64.OptionalHeader.SizeOfHeaders;
+			*reinterpret_cast<DWORD*>(shell.pBytes + shell.u64Size - sizeof(DWORD) * (exports.Size() - i)) = exports[i] + ShellcodeData.OldPENewBaseRVA - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders;
 		}
 
 		// Export names
@@ -3437,7 +3437,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	pPackedBinary->InsertSection(pNT->FileHeader.NumberOfSections, shell.pBytes, SecHeader);
 	pNT->OptionalHeader.SizeOfImage = SecHeader.VirtualAddress + shell.u64Size;
 	pNT->OptionalHeader.SizeOfImage += (pNT->OptionalHeader.SizeOfImage % 0x1000) ? 0x1000 - (pNT->OptionalHeader.SizeOfImage % 0x1000) : 0;
-	if (Options.Packing.bDelayedEntry) pPackedBinary->NTHeaders.x64.OptionalHeader.AddressOfEntryPoint = pPackedBinary->SectionHeaders[0].VirtualAddress;
+	if (Options.Packing.bDelayedEntry) pPackedBinary->NTHeaders.OptionalHeader.AddressOfEntryPoint = pPackedBinary->SectionHeaders[0].VirtualAddress;
 
 	// MPRESS stuff
 	if (Options.Packing.Immitate == MPRESS) {
@@ -3458,9 +3458,9 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		Sha256_Init(&hash);
 		Sha256_Update(&hash, (Byte*)&pPackedBinary->DosHeader, sizeof(IMAGE_DOS_HEADER));
 		Sha256_Update(&hash, pPackedBinary->DosStub.pBytes, pPackedBinary->DosStub.u64Size);
-		Sha256_Update(&hash, (Byte*)&pPackedBinary->NTHeaders.x64, sizeof(IMAGE_NT_HEADERS64));
+		Sha256_Update(&hash, (Byte*)&pPackedBinary->NTHeaders, sizeof(IMAGE_NT_HEADERS64));
 		Sha256_Final(&hash, (Byte*)&Digest);
-		pPackedBinary->WriteRVA<Sha256Digest>(pPackedBinary->GetTLSCallbacks()[0] - pPackedBinary->GetBaseAddress() + ShellcodeData.AntiPatchData.dwOffHeaderSum, Digest);
+		pPackedBinary->WriteRVA<Sha256Digest>(pPackedBinary->GetTLSCallbacks()[0] - pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.AntiPatchData.dwOffHeaderSum, Digest);
 	}
 
 	// Finalize

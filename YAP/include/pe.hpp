@@ -10,11 +10,6 @@ enum PEStatus_t : BYTE {
 	Unsupported = 4							// PE is an unsupported architecture or format
 };
 
-typedef union {
-	IMAGE_NT_HEADERS32 x86;
-	IMAGE_NT_HEADERS64 x64;
-} ComboNTHeaders;
-
 typedef struct {
 	DWORD LookupRVA;
 	DWORD TimeStamp;
@@ -29,7 +24,6 @@ typedef struct {
 class PE {
 protected:
 	DWORD OverlayOffset = 0;
-	bool x86 = false;
 public:
 	PEStatus_t Status = NotSet;
 	Buffer DosStub = { 0 };
@@ -37,7 +31,7 @@ public:
 	Vector<Buffer> SectionData;
 	Vector<IMAGE_SECTION_HEADER> SectionHeaders;
 	IMAGE_DOS_HEADER DosHeader = { 0 };
-	ComboNTHeaders NTHeaders = { 0 };
+	IMAGE_NT_HEADERS64 NTHeaders = { 0 };
 
 	/// 
 	/// Creates PE object with given file.
@@ -52,7 +46,7 @@ public:
 	/// 
 	/// Creates empty PE object.
 	/// 
-	PE(_In_ bool x86);
+	PE();
 
 	/// 
 	/// Duplicates an existing PE object.
@@ -76,11 +70,6 @@ public:
 	/// Changes a PEs base address (and handles relocations).
 	/// 
 	void RebaseImage(_In_ uint64_t u64NewBase);
-
-	/// 
-	/// Get PE architecture.
-	/// 
-	ZydisMachineMode GetMachine();
 
 	/// 
 	/// Writes data at the RVA.
@@ -161,11 +150,6 @@ public:
 	/// Returns `_UI16_MAX` if not found.
 	/// 
 	WORD FindSectionByRVA(_In_ DWORD dwRVA);
-
-	/// 
-	/// Retrieves the (prefered) base address when the image is loaded into memory
-	/// 
-	uint64_t GetBaseAddress();
 
 	/// 
 	/// Translates a runtime offset to a file offset.
