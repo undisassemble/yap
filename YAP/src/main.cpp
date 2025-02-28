@@ -117,6 +117,7 @@ DWORD WINAPI Begin(void* args) {
 
 		// Dump disassembly
 #ifdef _DEBUG
+#ifdef ENABLE_DUMPING
 		if (Options.Debug.bDumpAsm) {
 			HANDLE hDumped = CreateFile("YAP.dump.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];
@@ -156,6 +157,7 @@ DWORD WINAPI Begin(void* args) {
 			}
 			CloseHandle(hDumped);
 		}
+#endif
 
 		HANDLE hDumped = NULL;
 		if (Options.Debug.bDumpFunctions) {

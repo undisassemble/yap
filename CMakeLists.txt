@@ -9,6 +9,7 @@ endif()
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}/garbage")
+option(ENABLE_DUMPING "Enable option to dump disassembly in debug builds (uses more memory)" OFF)
 
 # Versioning stuff
 configure_file("YAP/include/version.hpp.in" "YAP/include/version.hpp")
@@ -182,6 +183,10 @@ set_target_properties(YAPClient PROPERTIES PREFIX "")
 set_target_properties(YAPClient PROPERTIES SUFFIX ".exe")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_custom_command(TARGET YAPClient POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:YAPClient>)
+endif()
+if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND ENABLE_DUMPING)
+	message(STATUS "Enabled reasm dumps")
+	target_compile_definitions(YAPClient PUBLIC ENABLE_DUMPING)
 endif()
 
 

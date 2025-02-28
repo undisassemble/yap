@@ -1,7 +1,5 @@
 #include "util.hpp"
 
-
-
 void SaveSettings() {
 	// Get file
 	char path[MAX_PATH];

@@ -63,11 +63,15 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 	// Convert mnemonic
 	InstId mnem = ZydisToAsmJit::Mnemonics[pLine->Decoded.Instruction.mnemonic];
 	if (!mnem) {
+#ifdef ENABLE_DUMPING
 		char formatted[MAX_PATH];
 		ZydisFormatter fmt;
 		ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
 		ZydisFormatterFormatInstruction(&fmt, &pLine->Decoded.Instruction, pLine->Decoded.Operands, pLine->Decoded.Instruction.operand_count_visible, formatted, sizeof(formatted), pLine->OldRVA, NULL);
 		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate mnemonic: %s\n", formatted);
+#else
+		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate mnemonic: %d\n", pLine->Decoded.Instruction.mnemonic);
+#endif
 		this->bFailed = true;
 		return false;
 	}
@@ -115,10 +119,14 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 	}
 	if (pLine->Decoded.Instruction.operand_count_visible > 4) {
 		char formatted[MAX_PATH];
+#ifdef ENABLE_DUMPING
 		ZydisFormatter fmt;
 		ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
 		ZydisFormatterFormatInstruction(&fmt, &pLine->Decoded.Instruction, pLine->Decoded.Operands, pLine->Decoded.Instruction.operand_count_visible, formatted, sizeof(formatted), pLine->OldRVA, NULL);
 		LOG(Warning, MODULE_REASSEMBLER, "Unable to process all operands: %s\n", formatted);
+#else
+		LOG(Warning, MODULE_REASSEMBLER, "Unable to process all operands\n");
+#endif
 	}
 	
 	// Substitution

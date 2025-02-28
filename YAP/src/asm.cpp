@@ -295,8 +295,10 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 	Vector<Line> TempLines;
 	DWORD SectionIndex;
 	char FormattedBuf[128];
+#ifdef ENABLE_DUMPING
 	ZydisFormatter Formatter;
 	ZydisFormatterInit(&Formatter, ZYDIS_FORMATTER_STYLE_INTEL);
+#endif
 
 	do {
 		// Setup
@@ -397,8 +399,12 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 			if (IsInstructionCF(CraftedLine.Decoded.Instruction.mnemonic)) {
 				// Make sure the operand is an address, dont jump to registers yet
 				if ((CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_MEMORY && CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE) || (CraftedLine.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && (CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_RIP && CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_NONE))) {
+#ifdef ENABLE_DUMPING
 					ZydisFormatterFormatInstruction(&Formatter, &CraftedLine.Decoded.Instruction, CraftedLine.Decoded.Operands, CraftedLine.Decoded.Instruction.operand_count_visible, FormattedBuf, 128, NTHeaders.OptionalHeader.ImageBase + dwRVA, NULL);
 					LOG(Warning, MODULE_REASSEMBLER, "Can\'t resolve jump-to address at 0x%p (%s)\n", NTHeaders.OptionalHeader.ImageBase + dwRVA, FormattedBuf);
+#else
+					LOG(Warning, MODULE_REASSEMBLER, "Can\'t resolve jump-to address at 0x%p\n", NTHeaders.OptionalHeader.ImageBase + dwRVA);
+#endif
 				}
 
 				// Calculate absolute address

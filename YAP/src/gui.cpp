@@ -326,7 +326,9 @@ void DrawGUI() {
 		}
 
 		if (ImGui::BeginTabItem(ICON_BUG " Debug")) {
+#ifdef ENABLE_DUMPING
 			IMGUI_TOGGLE("Dump disassembly", Options.Debug.bDumpAsm);
+#endif
 			IMGUI_TOGGLE("Dump individual sections", Options.Debug.bDumpSections);
 			IMGUI_TOGGLE("Dump function ranges", Options.Debug.bDumpFunctions);
 			IMGUI_TOGGLE("Create breakpoints", Options.Debug.bGenerateBreakpoints);
