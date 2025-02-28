@@ -21,6 +21,7 @@ INSTALLSIZE=$(($INSTALLSIZE + $(stat --printf="%s" "YAPClient.exe")))
 INSTALLSIZE=$(($INSTALLSIZE + $(stat --printf="%s" "yap.dll")))
 INSTALLSIZE=$(($INSTALLSIZE + $(stat --printf="%s" "yap.h")))
 INSTALLSIZE=$(($INSTALLSIZE + $(stat --printf="%s" "zydis.dll")))
+INSTALLSIZE=$(($INSTALLSIZE + $(stat --printf="%s" "lzma.dll")))
 INSTALLSIZE=$(($INSTALLSIZE + $(stat --printf="%s" "yap.bat")))
 INSTALLSIZE=$(($INSTALLSIZE + $(stat --printf="%s" "LICENSE")))
 

@@ -139,6 +139,18 @@ if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_custom_command(TARGET zydis POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:zydis>)
 endif()
 
+# lzma
+file(GLOB SOURCES_LZMA
+	"YAP/dependencies/lzma/*.c"
+	"YAP/meta/lzma.rc"
+)
+add_library(lzma SHARED ${SOURCES_LZMA})
+set_target_properties(lzma PROPERTIES PREFIX "")
+set_target_properties(lzma PROPERTIES SUFFIX ".dll")
+if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
+	add_custom_command(TARGET lzma POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:lzma>)
+endif()
+
 
 
 ##### YAP #####
@@ -154,7 +166,6 @@ endif()
 # YAPClient.exe
 file(GLOB SOURCES
 	"YAP/src/*.cpp"
-	"YAP/dependencies/lzma/*.c"
 	"YAP/meta/YAPClient.rc"
 )
 add_executable(YAPClient WIN32 ${SOURCES})
@@ -166,6 +177,7 @@ target_link_libraries(YAPClient opengl32)
 target_link_libraries(YAPClient imgui)
 target_link_libraries(YAPClient zydis)
 target_link_libraries(YAPClient asmjit)
+target_link_libraries(YAPClient lzma)
 set_target_properties(YAPClient PROPERTIES PREFIX "")
 set_target_properties(YAPClient PROPERTIES SUFFIX ".exe")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")

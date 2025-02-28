@@ -20,6 +20,7 @@ Section
     File glfw3.dll
     File zydis.dll
     File imgui.dll
+    File lzma.dll
     File YAPClient.exe
     File yap.bat
 
