@@ -8,6 +8,7 @@
 #include <GLFW/glfw3.h>
 
 // Forward declares
+LONG ExceptionHandler(_In_ EXCEPTION_POINTERS* pException);
 DWORD WINAPI Begin(void* args);
 namespace Console {
 	void help(char* name);
@@ -32,6 +33,9 @@ int main(int argc, char** argv) {
 	hLogFile = CreateFile("yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hLogFile || hLogFile == INVALID_HANDLE_VALUE) {
 		LOG(Failed, MODULE_YAP, "Failed to open logging file (%d)\n", GetLastError());
+	}
+	if (!AddVectoredExceptionHandler(0, ExceptionHandler)) {
+		LOG(Warning, MODULE_YAP, "Could not set crash handler\n");
 	}
 	LoadSettings();
 	
@@ -275,6 +279,91 @@ th_exit:
 	Data.bRunning = false;
 	delete pAssembly;
 	return 0;
+}
+
+// Crash handler
+LONG ExceptionHandler(_In_ EXCEPTION_POINTERS* pException) {
+	if (hLogFile && pException && pException->ExceptionRecord && pException->ExceptionRecord->ExceptionFlags & EXCEPTION_NONCONTINUABLE) {
+		LOG(Failed, MODULE_YAP, "Program has crashed!\n");
+		LOG(Info_Extended, MODULE_YAP, "Build: " __YAP_VERSION__ " " __YAP_BUILD__ "\n");
+		switch (pException->ExceptionRecord->ExceptionCode) {
+		case EXCEPTION_ACCESS_VIOLATION:
+			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_ACCESS_VIOLATION\n");
+			break;
+		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n");
+			break;
+		case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_FLT_DIVIDE_BY_ZERO\n");
+			break;
+		case EXCEPTION_FLT_INVALID_OPERATION:
+			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_FLT_INVALID_OPERATION\n");
+			break;
+		case EXCEPTION_FLT_STACK_CHECK:
+			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_FLT_STACK_CHECK\n");
+			break;
+		case EXCEPTION_ILLEGAL_INSTRUCTION:
+			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_ILLEGAL_INSTRUCTION\n");
+			break;
+		case EXCEPTION_IN_PAGE_ERROR:
+			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_IN_PAGE_ERROR\n");
+			break;
+		case EXCEPTION_INT_DIVIDE_BY_ZERO:
+			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_INT_DIVIDE_BY_ZERO\n");
+			break;
+		case EXCEPTION_STACK_OVERFLOW:
+			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_STACK_OVERFLOW\n");
+			break;
+		default:
+			LOG(Info_Extended, MODULE_YAP, "Code: %lu\n", pException->ExceptionRecord->ExceptionCode);
+		}
+		LOG(Info_Extended, MODULE_YAP, "Address: 0x%p\n", pException->ExceptionRecord->ExceptionAddress);
+		char* modules[] = {
+			"YAPClient.exe",
+			"asmjit.dll",
+			"glfw3.dll",
+			"imgui.dll",
+			"lzma.dll",
+			"zydis.dll"
+		};
+		for (int i = 0, n = countof(modules); i < n; i++) {
+			HMODULE mod = GetModuleHandleA(modules[i]);
+			if (!mod) {
+				LOG(Warning, MODULE_YAP, "Could not get base address of %s\n", modules[i]);
+				continue;
+			}
+			MODULEINFO info;
+			if (GetModuleInformation(GetCurrentProcess(), mod, &info, sizeof(MODULEINFO))) {
+				LOG(Info_Extended, MODULE_YAP, "Memory range of %s: %p -> %p\n", modules[i], (uint64_t)info.lpBaseOfDll, (uint64_t)info.lpBaseOfDll + info.SizeOfImage);
+				if (pException->ExceptionRecord->ExceptionAddress >= info.lpBaseOfDll && pException->ExceptionRecord->ExceptionAddress < info.lpBaseOfDll + info.SizeOfImage) {
+					LOG(Info_Extended, MODULE_YAP, "Crash occurred at %s+0x%08x\n", modules[i], (uint64_t)pException->ExceptionRecord->ExceptionAddress - (uint64_t)info.lpBaseOfDll);
+				}
+			} else {
+				LOG(Info_Extended, MODULE_YAP, "Base address of %s: 0x%p\n", modules[i], mod);
+			}
+		}
+		if (!pException->ContextRecord) {
+			LOG(Warning, MODULE_YAP, "Exception did not provide a context record\n");
+			return EXCEPTION_CONTINUE_SEARCH;
+		}
+		LOG(Info_Extended, MODULE_YAP, "RAX: %p\n", pException->ContextRecord->Rax);
+		LOG(Info_Extended, MODULE_YAP, "RCX: %p\n", pException->ContextRecord->Rcx);
+		LOG(Info_Extended, MODULE_YAP, "RDX: %p\n", pException->ContextRecord->Rdx);
+		LOG(Info_Extended, MODULE_YAP, "RBX: %p\n", pException->ContextRecord->Rbx);
+		LOG(Info_Extended, MODULE_YAP, "RSP: %p\n", pException->ContextRecord->Rsp);
+		LOG(Info_Extended, MODULE_YAP, "RBP: %p\n", pException->ContextRecord->Rbp);
+		LOG(Info_Extended, MODULE_YAP, "RSI: %p\n", pException->ContextRecord->Rsi);
+		LOG(Info_Extended, MODULE_YAP, "RDI: %p\n", pException->ContextRecord->Rdi);
+		LOG(Info_Extended, MODULE_YAP, "R8: %p\n", pException->ContextRecord->R8);
+		LOG(Info_Extended, MODULE_YAP, "R9: %p\n", pException->ContextRecord->R9);
+		LOG(Info_Extended, MODULE_YAP, "R10: %p\n", pException->ContextRecord->R10);
+		LOG(Info_Extended, MODULE_YAP, "R11: %p\n", pException->ContextRecord->R11);
+		LOG(Info_Extended, MODULE_YAP, "R12: %p\n", pException->ContextRecord->R12);
+		LOG(Info_Extended, MODULE_YAP, "R13: %p\n", pException->ContextRecord->R13);
+		LOG(Info_Extended, MODULE_YAP, "R14: %p\n", pException->ContextRecord->R14);
+		LOG(Info_Extended, MODULE_YAP, "R15: %p\n", pException->ContextRecord->R15);
+	}
+	return EXCEPTION_CONTINUE_SEARCH;
 }
 
 void Console::help(char* name) {
