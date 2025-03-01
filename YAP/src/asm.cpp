@@ -363,6 +363,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 	ZydisDecodedOperand Operands[ZYDIS_MAX_OPERAND_COUNT];
 	Vector<Line>* Lines;
 	Vector<Line> TempLines;
+	TempLines.bExponentialGrowth = true;
 	DWORD SectionIndex;
 	char FormattedBuf[128];
 #ifdef ENABLE_DUMPING
@@ -415,19 +416,23 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 			}
 			CraftedLine.OldRVA = dwRVA;
 			if (IsInstructionCF(Instruction.mnemonic)) {
-				if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&Instruction, Operands, CraftedLine.OldRVA, &CraftedLine.Decoded.refs))) {
-					LOG(Warning, MODULE_REASSEMBLER, "Could not calculate referenced address (%#p)\n", NTHeaders.OptionalHeader.ImageBase + dwRVA);
+				if (Operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER && ZYAN_FAILED(ZydisCalcAbsoluteAddress(&Instruction, Operands, CraftedLine.OldRVA, &CraftedLine.Decoded.refs))) {
+					LOG(Warning, MODULE_REASSEMBLER, "Could not calculate referenced address (0x%p) (type 1)\n", NTHeaders.OptionalHeader.ImageBase + dwRVA);
 				}
 			} else {
 				for (int i = 0; i < Instruction.operand_count_visible; i++) {
 					if (Operands[i].type == ZYDIS_OPERAND_TYPE_MEMORY && Operands[i].mem.base == ZYDIS_REGISTER_RIP) {
 						if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&Instruction, &Operands[i], CraftedLine.OldRVA, &CraftedLine.Decoded.refs))) {
-							LOG(Warning, MODULE_REASSEMBLER, "Could not calculate referenced address (%#p)\n", NTHeaders.OptionalHeader.ImageBase + dwRVA);
+							LOG(Warning, MODULE_REASSEMBLER, "Could not calculate referenced address (0x%p) (type 2)\n", NTHeaders.OptionalHeader.ImageBase + dwRVA);
 						}
 						break;
 					}
 				}
 			}
+
+			// Edit progress
+			Progress += Instruction.length;
+			Data.fTaskProgress = (float)Progress / (float)ToDo;
 
 			TempLines.Push(CraftedLine);
 
@@ -611,9 +616,16 @@ bool Asm::CheckRuntimeFunction(_In_ RUNTIME_FUNCTION* pFunc, _In_ bool bFixAddr)
 		
 		// Scope table
 		Vector<C_SCOPE_TABLE> Tables;
-		for (int i = 0, n = ReadRVA<DWORD>(pFunc->UnwindData + sizeof(UNWIND_INFO) + UnwindInfo.NumUnwindCodes * sizeof(UNWIND_CODE) + sizeof(DWORD)); i < n; i++) {
+		Tables.nItems = ReadRVA<DWORD>(pFunc->UnwindData + sizeof(UNWIND_INFO) + UnwindInfo.NumUnwindCodes * sizeof(UNWIND_CODE) + sizeof(DWORD));
+		if (Tables.nItems > 10) {
+			LOG(Warning, MODULE_REASSEMBLER, "Exception handler at 0x%p had more than 10 tables, skipping\n", NTHeaders.OptionalHeader.ImageBase + pFunc->UnwindData);
+			return true;
+		}
+		Tables.Grow();
+		LOG(Info, MODULE_REASSEMBLER, "Processing exception exception handler with %lu table(s) (at 0x%p)\n", Tables.nItems, NTHeaders.OptionalHeader.ImageBase + pFunc->UnwindData);
+		for (int i = 0; i < Tables.nItems; i++) {
 			C_SCOPE_TABLE temp = ReadRVA<C_SCOPE_TABLE>(pFunc->UnwindData + sizeof(UNWIND_INFO) + UnwindInfo.NumUnwindCodes * sizeof(UNWIND_CODE) + sizeof(DWORD) * 2 + sizeof(C_SCOPE_TABLE) * i);
-			Tables.Push(temp);
+			Tables.Replace(i, temp);
 		}
 
 		if (bFixAddr) {
@@ -646,11 +658,20 @@ bool Asm::CheckRuntimeFunction(_In_ RUNTIME_FUNCTION* pFunc, _In_ bool bFixAddr)
 
 bool Asm::Disassemble() {
 	Data.State = Disassembling;
+	Data.sTask = "Preparing";
 	DEBUG_ONLY(uint64_t TickCount = GetTickCount64());
 	if (Status) {
 		LOG(Failed, MODULE_REASSEMBLER, "Could not begin disassembly, as no binary is loaded (%hhd)\n", Status);
 		return false;
 	}
+
+	// Calculate estimated size to disassemble
+	for (int i = 0; i < NTHeaders.FileHeader.NumberOfSections; i++) {
+		if (SectionHeaders[i].Characteristics & IMAGE_SCN_CNT_CODE || SectionHeaders[i].Characteristics & IMAGE_SCN_MEM_EXECUTE) {
+			ToDo += SectionHeaders[i].SizeOfRawData;
+		}
+	}
+
 	LOG(Info, MODULE_REASSEMBLER, "Beginning disassembly\n");
 
 	// Insert known absolutes
@@ -787,12 +808,14 @@ bool Asm::Disassemble() {
 	ZydisDecoderInit(&Decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64);
 
 	// Disassemble entry point
+	Data.sTask = "Disassembling entry point";
 	if (!DisasmRecursive(NTHeaders.OptionalHeader.AddressOfEntryPoint)) {
 		return false;
 	}
 	LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled Entry Point (0x%p)\n", NTHeaders.OptionalHeader.ImageBase + NTHeaders.OptionalHeader.AddressOfEntryPoint);
 
 	// Error check (TEMPORARY)
+#ifdef _DEBUG
 	{
 		Vector<Line>* Lines = Sections[FindSectionIndex(NTHeaders.OptionalHeader.AddressOfEntryPoint)].Lines;
 		for (size_t i = 0; i < Lines->Size() - 1; i++) {
@@ -802,8 +825,11 @@ bool Asm::Disassemble() {
 			}
 		}
 	}
+#endif
 
 	// Disassemble TLS callbacks
+	Data.sTask = "Disassembling TLS callbacks";
+	Data.fTotalProgress = 1.f / 6.f;
 	uint64_t* pCallbacks = GetTLSCallbacks();
 	if (pCallbacks) {
 		for (WORD i = 0; pCallbacks[i]; i++) {
@@ -815,6 +841,8 @@ bool Asm::Disassemble() {
 	}
 
 	// Disassemble exports
+	Data.sTask = "Disassembling exports";
+	Data.fTotalProgress = 2.f / 6.f;
 	{
 		Vector<DWORD> Exports = GetExportedFunctionRVAs();
 		Vector<char*> ExportNames = GetExportedFunctionNames();
@@ -828,6 +856,8 @@ bool Asm::Disassemble() {
 	LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled Exports\n");
 
 	// Disassemble exception dir
+	Data.sTask = "Disassembling exceptions";
+	Data.fTotalProgress = 3.f / 6.f;
 	IMAGE_DATA_DIRECTORY ExcDataDir = NTHeaders.OptionalHeader.DataDirectory[3];
 	if (ExcDataDir.VirtualAddress) {
 		Buffer ExcData = SectionData[FindSectionByRVA(ExcDataDir.VirtualAddress)];
@@ -835,6 +865,7 @@ bool Asm::Disassemble() {
 		if (ExcData.pBytes && ExcSecHeader.VirtualAddress) {
 			RUNTIME_FUNCTION* pArray = reinterpret_cast<RUNTIME_FUNCTION*>(ExcData.pBytes + ExcDataDir.VirtualAddress - ExcSecHeader.VirtualAddress);
 			for (uint32_t i = 0, n = ExcDataDir.Size / sizeof(RUNTIME_FUNCTION); i < n; i++) {
+				Data.fTotalProgress = 3.f / 6.f + (float)i / (float)n;
 				if (!CheckRuntimeFunction(&pArray[i])) {
 					return false;
 				}
@@ -844,6 +875,8 @@ bool Asm::Disassemble() {
 	LOG(Info_Extended, MODULE_REASSEMBLER, "Disassembled Exception Directory\n");
 
 	// Disassemble jump tables
+	Data.sTask = "Disassembling jump tables";
+	Data.fTotalProgress = 4.f / 6.f;
 	{
 		DWORD osize = JumpTables.Size();
 		while (JumpTables.Size()) {
@@ -861,6 +894,8 @@ bool Asm::Disassemble() {
 	LOG(Success, MODULE_REASSEMBLER, "Finished disassembly\n");
 
 	// Insert missing data + padding
+	Data.sTask = "Finalizing";
+	Data.fTotalProgress = 5.f / 6.f;
 	DEBUG_ONLY(uint64_t OldTimeSpentSeaching = Data.TimeSpentSearching);
 	DEBUG_ONLY(TickCount = GetTickCount64());
 	Line line;

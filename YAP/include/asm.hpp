@@ -125,6 +125,8 @@ protected:
 	ZydisDecoder Decoder;
 	Vector<DWORD> Functions;
 	Vector<FunctionRange> FunctionRanges;
+	uint64_t Progress = 0;
+	uint64_t ToDo = 0;
 
 public:
 
