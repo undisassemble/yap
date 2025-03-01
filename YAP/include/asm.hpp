@@ -13,6 +13,43 @@ enum LineType : BYTE {
 	Pointer,
 };
 
+#ifndef ENABLE_DUMPING
+struct DecodedInstruction {
+	ZydisMnemonic mnemonic;
+	BYTE length;
+	union {
+		BYTE operand_count;
+		BYTE operand_count_visible;
+	};
+	ZydisInstructionAttributes attributes;
+
+	void operator=(_In_ ZydisDecodedInstruction instruction);
+	operator ZydisDecodedInstruction() const;
+};
+
+struct DecodedOperand {
+	ZydisOperandType type;
+	BYTE size;
+	union {
+		ZydisDecodedOperandReg reg;
+		ZydisDecodedOperandMem mem;
+		struct {
+			bool is_signed;
+			union {
+				uint64_t u;
+				int64_t s;
+			} value;
+		} imm;
+	};
+
+	void operator=(_In_ ZydisDecodedOperand operand);
+	operator ZydisDecodedOperand() const;
+};
+#else
+typedef ZydisDecodedInstruction DecodedInstruction;
+typedef ZydisDecodedOperand DecodedOperand;
+#endif
+
 struct Line {
 	LineType Type : 4;
 	bool bRelative : 1 = false; ///< Jump table is relative to first entry or request holds instruction index instead of absolute address (i.e. jmp 0 is jumping to the first instruction in the index, if doing this, make the instruction RIP-relative anyway)
@@ -21,8 +58,9 @@ struct Line {
 	DWORD NewRVA = 0;
 	union {
 		struct {
-			ZydisDecodedInstruction Instruction;
-			ZydisDecodedOperand Operands[ZYDIS_MAX_OPERAND_COUNT_VISIBLE];
+			DecodedInstruction Instruction;
+			DecodedOperand Operands[4];
+			uint64_t refs;
 		} Decoded;
 		struct {
 			DWORD Size;

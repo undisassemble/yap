@@ -96,12 +96,14 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 		case ZYDIS_OPERAND_TYPE_REGISTER:
 			ops[i] = ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].reg.value];
 			break;
+#ifdef ENABLE_DUMPING
 		case ZYDIS_OPERAND_TYPE_POINTER:
 			memop = Mem(pLine->Decoded.Operands[i].ptr.offset);
 			memop.setSegment(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].ptr.segment]._baseId); // might need to be changed, relies on segment being a zydis encoded register
 			memop.setSize(pLine->Decoded.Operands[i].size / 8);
 			ops[i] = memop;
 			break;
+#endif
 		case ZYDIS_OPERAND_TYPE_MEMORY:
 			if (pLine->Decoded.Operands[i].mem.scale == 2) scale = 1;
 			else if (pLine->Decoded.Operands[i].mem.scale == 4) scale = 2;

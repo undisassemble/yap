@@ -340,6 +340,12 @@ void DrawGUI() {
 			if (ImGui::Button("Test warning")) Modal("Test warning", "Warning", MB_OK | MB_ICONWARNING);
 			ImGui::SameLine();
 			if (ImGui::Button("Test info")) Modal("Test info", "Information", MB_OK | MB_ICONINFORMATION);
+			
+			// TODO: Avoid looking at this for the foreseeable future
+			ImGui::Text("DecodedInstruction reduction: %d bytes (%.2f%%)", (int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction), 100.f * (int64_t)((int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction)) / (int64_t)sizeof(ZydisDecodedInstruction));
+			ImGui::Text("DecodedOperand reduction: %d bytes (%.2f%%)", (int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand), 100.f * (int64_t)((int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand)) / (int64_t)sizeof(ZydisDecodedOperand));
+			ImGui::Text("Total memory reduction (per line): %d bytes (%.2f%%)", (int64_t)(sizeof(DecodedOperand) + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) + sizeof(ZydisDecodedInstruction)), 100.f * (int64_t)((sizeof(DecodedOperand) + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) + sizeof(ZydisDecodedInstruction))) / (int64_t)(sizeof(Line) - sizeof(DecodedInstruction) - sizeof(DecodedOperand) * 4 + sizeof(ZydisDecodedInstruction) + sizeof(ZydisDecodedOperand) * 4));
+			
 			if (ImGui::TreeNode("Icon Tests")) {
 				ImGui::DebugTextEncoding(ICON_FILE_SHIELD ICON_SHIELD ICON_SHIELD_HALVED ICON_TRIANGLE_EXCLAMATION ICON_CIRCLE_INFO ICON_CIRCLE_QUESTION ICON_FOLDER_OPEN ICON_FILE ICON_FLOPPY_DISK ICON_CODE ICON_MICROCHIP ICON_BOX ICON_BOX_OPEN ICON_BOX_ARCHIVE ICON_BUG);
 				ImGui::TreePop();

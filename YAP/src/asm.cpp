@@ -91,9 +91,78 @@ bool IsInstructionCF(_In_ ZydisMnemonic mnemonic) {
 	}
 }
 
-bool IsInstructionMemory(_In_ ZydisDecodedInstruction* pInstruction, _In_ ZydisDecodedOperand* pOperand) {
+bool IsInstructionMemory(_In_ DecodedInstruction* pInstruction, _In_ DecodedOperand* pOperand) {
 	return IsInstructionCF(pInstruction->mnemonic) || pOperand->type == ZYDIS_OPERAND_TYPE_MEMORY;
 }
+
+#ifndef ENABLE_DUMPING
+void DecodedInstruction::operator=(_In_ ZydisDecodedInstruction instruction) {
+	mnemonic = instruction.mnemonic;
+	length = instruction.length;
+	operand_count = instruction.operand_count_visible;
+	attributes = instruction.attributes;
+}
+
+DecodedInstruction::operator ZydisDecodedInstruction() const {
+	ZydisDecodedInstruction ret;
+	ret.machine_mode = ZYDIS_MACHINE_MODE_LONG_64;
+	ret.mnemonic = mnemonic;
+	ret.length = length;
+	ret.stack_width = 64;
+	ret.operand_width = 64;
+	ret.address_width = 64;
+	ret.operand_count = operand_count;
+	ret.operand_count_visible = operand_count;
+	ret.attributes = attributes;
+	return ret;
+}
+
+void DecodedOperand::operator=(_In_ ZydisDecodedOperand operand) {
+	type = operand.type;
+	size = operand.size;
+	switch (type) {
+	case ZYDIS_OPERAND_TYPE_REGISTER:
+		reg = operand.reg;
+		break;
+	case ZYDIS_OPERAND_TYPE_MEMORY:
+		mem = operand.mem;
+		break;
+	case ZYDIS_OPERAND_TYPE_IMMEDIATE:
+		imm.is_signed = operand.imm.is_signed;
+		imm.value.u = operand.imm.value.u;
+		break;
+	case ZYDIS_OPERAND_TYPE_POINTER:
+		mem.segment = operand.ptr.segment;
+		mem.base = ZYDIS_REGISTER_NONE;
+		mem.index = ZYDIS_REGISTER_NONE;
+		mem.scale = 0;
+		mem.disp.has_displacement = true;
+		mem.disp.value = operand.ptr.offset;
+	}
+}
+
+DecodedOperand::operator ZydisDecodedOperand() const {
+	ZydisDecodedOperand ret;
+	ret.type = type;
+	ret.size = size;
+	switch (type) {
+	case ZYDIS_OPERAND_TYPE_REGISTER:
+		ret.reg = reg;
+		break;
+	case ZYDIS_OPERAND_TYPE_MEMORY:
+		ret.mem = mem;
+		break;
+	case ZYDIS_OPERAND_TYPE_IMMEDIATE:
+		ret.imm.is_signed = imm.is_signed;
+		ret.imm.value.u = imm.value.u;
+		break;
+	case ZYDIS_OPERAND_TYPE_POINTER:
+		ret.ptr.offset = mem.disp.value;
+		ret.ptr.segment = mem.segment;
+	}
+	return ret;
+}
+#endif
 
 Asm::Asm() : PE() {}
 
@@ -290,6 +359,7 @@ DWORD Asm::FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA) {
 bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 	Vector<DWORD> ToDisasm; // To prevent stack overflows on big programs, this function is a lie and is not actually recursive, sue me
 	ToDisasm.Push(dwRVA);
+	ZydisDecodedInstruction Instruction;
 	ZydisDecodedOperand Operands[ZYDIS_MAX_OPERAND_COUNT];
 	Vector<Line>* Lines;
 	Vector<Line> TempLines;
@@ -337,10 +407,28 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 		// Start disassembling
 		Line CraftedLine;
 		CraftedLine.Type = Decoded;
-		while (RawBytes.u64Size && ZYAN_SUCCESS(ZydisDecoderDecodeFull(&Decoder, RawBytes.pBytes, RawBytes.u64Size, &CraftedLine.Decoded.Instruction, Operands))) {
-			CraftedLine.Decoded.Instruction.operand_count = CraftedLine.Decoded.Instruction.operand_count_visible;
-			memcpy(CraftedLine.Decoded.Operands, Operands, sizeof(ZydisDecodedOperand) * CraftedLine.Decoded.Instruction.operand_count_visible);
+		while (RawBytes.u64Size && ZYAN_SUCCESS(ZydisDecoderDecodeFull(&Decoder, RawBytes.pBytes, RawBytes.u64Size, &Instruction, Operands))) {
+			// Convert
+			CraftedLine.Decoded.Instruction = Instruction;
+			for (int i = 0; i < CraftedLine.Decoded.Instruction.operand_count; i++) {
+				CraftedLine.Decoded.Operands[i] = Operands[i];
+			}
 			CraftedLine.OldRVA = dwRVA;
+			if (IsInstructionCF(Instruction.mnemonic)) {
+				if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&Instruction, Operands, CraftedLine.OldRVA, &CraftedLine.Decoded.refs))) {
+					LOG(Warning, MODULE_REASSEMBLER, "Could not calculate referenced address (%#p)\n", NTHeaders.OptionalHeader.ImageBase + dwRVA);
+				}
+			} else {
+				for (int i = 0; i < Instruction.operand_count_visible; i++) {
+					if (Operands[i].type == ZYDIS_OPERAND_TYPE_MEMORY && Operands[i].mem.base == ZYDIS_REGISTER_RIP) {
+						if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&Instruction, &Operands[i], CraftedLine.OldRVA, &CraftedLine.Decoded.refs))) {
+							LOG(Warning, MODULE_REASSEMBLER, "Could not calculate referenced address (%#p)\n", NTHeaders.OptionalHeader.ImageBase + dwRVA);
+						}
+						break;
+					}
+				}
+			}
+
 			TempLines.Push(CraftedLine);
 
 			if (CraftedLine.Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_RET) break;
@@ -350,7 +438,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 				DWORD trva = 0, rva = 0, disp = 0, odisp = 0;
 				{
 					uint64_t r;
-					ZydisCalcAbsoluteAddress(&CraftedLine.Decoded.Instruction, &CraftedLine.Decoded.Operands[1], CraftedLine.OldRVA, &r);
+					ZydisCalcAbsoluteAddress(&Instruction, &Operands[1], CraftedLine.OldRVA, &r);
 					disp = odisp = r;
 				}
 
@@ -410,7 +498,7 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 				// Calculate absolute address
 				else {
 					uint64_t u64Referencing;
-					if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&CraftedLine.Decoded.Instruction, &CraftedLine.Decoded.Operands[0], CraftedLine.OldRVA, &u64Referencing))) {
+					if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&Instruction, &Operands[0], CraftedLine.OldRVA, &u64Referencing))) {
 						LOG(Failed, MODULE_REASSEMBLER, "Failed to disassemble instruction at 0x%p\n", NTHeaders.OptionalHeader.ImageBase + CraftedLine.OldRVA);
 						TempLines.Release();
 						return false;
@@ -905,8 +993,7 @@ bool Asm::Analyze() {
 						if (pLines->At(index).Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_JMP) {
 							bExit = true;
 						}
-						uint64_t r = 0;
-						ZydisCalcAbsoluteAddress(&pLines->At(index).Decoded.Instruction, &pLines->At(index).Decoded.Operands[0], pLines->At(index).OldRVA, &r);
+						uint64_t r = pLines->At(index).Decoded.refs;
 						if (!r) {
 							LOG(Warning, MODULE_REASSEMBLER, "Failed to calculate jump-to address at 0x%p\n", NTHeaders.OptionalHeader.ImageBase + pLines->At(index).OldRVA);
 						} else if (!Done.Includes(r) && !Functions.Includes(r) && !(IAT.VirtualAddress && IAT.Size && r >= IAT.VirtualAddress && r < IAT.VirtualAddress + IAT.Size)) {
@@ -1060,10 +1147,7 @@ bool Asm::Assemble() {
 					}
 				}
 				if (rel >= 0) {
-					if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&line.Decoded.Instruction, &line.Decoded.Operands[rel], line.OldRVA, &refs))) {
-						LOG(Failed, MODULE_REASSEMBLER, "Failed to calculate reference address of instruction at 0x%p\n", NTHeaders.OptionalHeader.ImageBase + line.OldRVA);
-						return false;
-					}
+					refs = line.Decoded.refs;
 					int loc = XREFs.Find(refs);
 					if (loc < 0) {
 						XREFs.Push(refs);
