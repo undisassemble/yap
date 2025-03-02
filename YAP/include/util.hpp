@@ -324,6 +324,7 @@ struct Options_t {
 		bool bDontCompressRsrc : 1 = true;
 		bool bDirectSyscalls : 1 = false;
 		bool bPartialUnpacking : 1 = false;
+		uint64_t reserved : 14 = 0; // Reserved for future features
 		int CompressionLevel = 5;
 		PackerTypes_t Immitate = YAP;
 		char Masquerade[MAX_PATH] = "C:\\Windows\\System32\\cmd.exe";
@@ -345,6 +346,7 @@ struct Options_t {
 		bool bStrip : 1 = false;
 		bool bStripDOSStub : 1 = false;
 		bool bSubstitution : 1 = false;
+		uint64_t reserved : 27 = 0;
 		int MutationLevel = 0;
 		uint64_t Rebase = 0;
 	} Reassembly;
@@ -355,6 +357,7 @@ struct Options_t {
 		bool bSemiRandomSecNames : 1 = true;
 		bool bFakeSymbols : 1 = true;
 		bool bMutateAssembly : 1 = true;
+		uint64_t reserved : 27 = 0;
 		BYTE UPXVersionMajor = 5;
 		BYTE UPXVersionMinor = 0;
 		BYTE UPXVersionPatch = 0;
@@ -362,7 +365,6 @@ struct Options_t {
 		char Sec2Name[9] = { 0 };
 	} Advanced;
 
-#ifdef _DEBUG
 	struct {
 		bool bDumpAsm : 1 = false;
 		bool bDumpSections : 1 = false;
@@ -371,8 +373,8 @@ struct Options_t {
 		bool bGenerateMarks : 1 = false;
 		bool bDisableRelocations : 1 = false;
 		bool bStrictMutation : 1 = false;
+		uint64_t reserved : 25 = 0;
 	} Debug;
-#endif
 };
 
 struct Settings_t {

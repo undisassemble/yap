@@ -1,5 +1,6 @@
 ##### SETUP #####
 cmake_minimum_required(VERSION 3.22)
+enable_testing()
 project("Yet Another Packer" LANGUAGES C CXX VERSION 0.0.0 DESCRIPTION "Protector for x64 native Windows PEs.")
 if (NOT DEFINED CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE "Debug")
@@ -26,6 +27,7 @@ if (NOT DEFINED WIN32)
 	set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY) 
 	set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)
 	set(CMAKE_CXX_COMPILER x86_64-w64-mingw32-g++)
+	set(CROSSCOMPILING_EMULATOR wine)
 	include_directories("/usr/x86_64-w64-mingw32/include")
 	include_directories("/usr/share/mingw-w64/include")
 	link_directories("/usr/x86_64-w64-mingw32/lib")
@@ -189,8 +191,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND ENABLE_DUMPING)
 	target_compile_definitions(YAPClient PUBLIC ENABLE_DUMPING)
 endif()
 
-
-
 ##### INSTALLER #####
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
 	# Create zip
@@ -233,3 +233,48 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 	# set(CPACK_NSIS_MUI_FINISHPAGE_TEXT "Thank you for installing ${CMAKE_PROJECT_NAME}.")
 
 endif()
+
+##### TESTS #####
+
+# Build test executable
+add_executable(test_executable WIN32 tests/test.cpp)
+set_target_properties(test_executable PROPERTIES PREFIX "")
+set_target_properties(test_executable PROPERTIES SUFFIX ".exe")
+
+# Test function
+function(run_test yaproj)
+    add_test(NAME "Protect (easy) - ${yaproj}" COMMAND ${CROSSCOMPILING_EMULATOR} $<TARGET_FILE:YAPClient> ${PROJECT_SOURCE_DIR}/tests/${yaproj}.yaproj protect $<TARGET_FILE:test_executable> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe)
+    if (NOT ${CROSSCOMPILING_EMULATOR} STREQUAL wine)
+        add_test(NAME "Run (easy) - ${yaproj}" COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe)
+    endif()
+	add_test(NAME "Protect (hard) - ${yaproj}" COMMAND ${CROSSCOMPILING_EMULATOR} $<TARGET_FILE:YAPClient> ${PROJECT_SOURCE_DIR}/tests/${yaproj}.yaproj protect $<TARGET_FILE:YAPClient> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe)
+	if (NOT ${CROSSCOMPILING_EMULATOR} STREQUAL wine)
+        add_test(NAME "Run (hard) - ${yaproj}" COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe)
+    endif()
+endfunction()
+
+# Packer tests
+run_test(packer/0)
+run_test(packer/1)
+run_test(packer/2)
+run_test(packer/3)
+run_test(packer/4)
+run_test(packer/5)
+run_test(packer/6)
+run_test(packer/7)
+run_test(packer/all)
+
+# Reassembler tests
+run_test(reasm/0)
+run_test(reasm/1)
+run_test(reasm/2)
+run_test(reasm/3)
+run_test(reasm/all)
+
+# Combo tests
+run_test(combo/packer-reasm/0)
+run_test(combo/packer-reasm/1)
+run_test(combo/packer-reasm/2)
+run_test(combo/packer-reasm/3)
+run_test(combo/packer-reasm/all)
+run_test(combo/packer-reasm/partial_loading)
