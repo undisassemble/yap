@@ -109,6 +109,10 @@ void DrawGUI() {
 				ADD_MENU_THEME("Default Dark", ICON_MOON, 0);
 				ADD_MENU_THEME("Open Dark", ICON_MOON, 1);
 				ADD_MENU_THEME("Open Light", ICON_SUN, 2);
+				ADD_MENU_THEME("Catppuccin Latte", ICON_SUN, 3);
+				ADD_MENU_THEME("Catppuccin Frappé", ICON_MOON, 4);
+				ADD_MENU_THEME("Catppuccin Macchiato", ICON_MOON, 5);
+				ADD_MENU_THEME("Catppuccin Mocha", ICON_MOON, 6);
 #undef ADD_MENU_THEME
 				ImGui::EndMenu();
 			}
