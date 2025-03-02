@@ -6,6 +6,7 @@ CMakeCache.txt
 CMakeFiles
 Makefile
 *.cmake
+Testing
 
 # Other stuff
 version.hpp

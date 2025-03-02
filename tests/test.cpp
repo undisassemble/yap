@@ -1,12 +1,9 @@
-#include <Windows.h>
+#include "processenv.h"
+#include <windows.h>
 
 int main() {
-	HANDLE hEvent = OpenEventA(EVENT_MODIFY_STATE, FALSE, "YAP_Test");
-	if (hEvent) {
-		SetEvent(hEvent);
-	} else {
-		WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), "Failed to set event!\n", 21, NULL, NULL);
-	}
-	Sleep(INFINITE);
+	WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), "Hello World!\n", 13, NULL, NULL);
+	Sleep(500);
+	exit(0);
 	return 0;
 }
