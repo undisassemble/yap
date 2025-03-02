@@ -103,7 +103,6 @@ void DrawGUI() {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Settings")) {
-			if (ImGui::MenuItem(ICON_DOWNLOAD " Auto update", NULL, &Settings.bCheckForUpdates)) SaveSettings();
 			if (ImGui::BeginMenu(ICON_PALETTE " Theme")) {
 #define ADD_MENU_THEME(name, icon, id) if (ImGui::MenuItem(name, icon, Settings.Theme == id)) { Settings.Theme = id; ApplyImGuiTheme(); SaveSettings(); }
 				ADD_MENU_THEME("Default Dark", ICON_MOON, 0);

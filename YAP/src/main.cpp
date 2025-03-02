@@ -278,6 +278,7 @@ th_exit:
 	LOG(Info, MODULE_YAP, "Ending YAP\n");
 	Data.bRunning = false;
 	delete pAssembly;
+	pAssembly = NULL;
 	return 0;
 }
 
@@ -451,8 +452,6 @@ void Console::protect(char* input, char* output) {
 		return;
 	}
 	Begin(TrueOutput);
-	delete pAssembly;
-	pAssembly = NULL;
 }
 
 void Console::SetupConsole() {

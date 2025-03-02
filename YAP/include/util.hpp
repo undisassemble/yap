@@ -376,7 +376,6 @@ struct Options_t {
 };
 
 struct Settings_t {
-	bool bCheckForUpdates = true;
 	int Theme = 0;
 };
 

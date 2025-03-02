@@ -1,4 +1,6 @@
 #include "util.hpp"
+#include "errhandlingapi.h"
+#include "winerror.h"
 
 void SaveSettings() {
 	// Get file
