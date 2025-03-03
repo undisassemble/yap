@@ -65,7 +65,11 @@ Sha256Digest Sha256WStr(_In_ wchar_t* pStr) {
 
 void* Alloc(ISzAllocPtr p, size_t size) { return HeapAlloc(GetProcessHeap(), 0, size); }
 void Free(ISzAllocPtr p, void* mem) { HeapFree(GetProcessHeap(), 0, mem); }
-SRes PackingProgress(ICompressProgressPtr p, UInt64 inSize, UInt64 outSize) { return 0; }
+uint64_t compressing = 0;
+SRes PackingProgress(ICompressProgressPtr p, UInt64 inSize, UInt64 outSize) {
+	Data.fTaskProgress = (float)inSize / (float)compressing;
+	return 0;
+}
 
 Buffer PackSection(_In_ Buffer SectionData) {
 	Buffer data = { 0 };
@@ -1012,11 +1016,14 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	PE Copied(pOriginal);
 
 	DWORD NumPacked = 0;
+	Data.sTask = "Compressing";
 	for (WORD i = 0, n = pOriginal->SectionHeaders.Size(); i < n; i++) {
 		if (!pOriginal->SectionHeaders[i].Misc.VirtualSize || !pOriginal->SectionHeaders[i].SizeOfRawData) continue;
 		
 		// Compress data
+		compressing = pOriginal->SectionData[i].u64Size;
 		Buffer compressed = PackSection(pOriginal->SectionData[i]);
+		compressing = 0;
 		if (!compressed.pBytes || !compressed.u64Size) return buf;
 		LOG(Info_Extended, MODULE_PACKER, "Packed section %.8s (%lld)\n", pOriginal->SectionHeaders[i].Name, (int64_t)compressed.u64Size - pOriginal->SectionHeaders[i].SizeOfRawData);
 		if (compressed.u64Size > _UI32_MAX) {
@@ -1027,7 +1034,11 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 		}
 		Copied.OverwriteSection(i, compressed.pBytes, compressed.u64Size);
 		NumPacked++;
+		Data.fTotalProgress = (float)i / (float)n;
 	}
+	Data.sTask = "Generating loader";
+	Data.fTotalProgress = 0.f;
+	Data.fTaskProgress = 0.f;
 	a.mov(rsi, 0);
 	a.lea(rcx, ptr(CompressedSections));
 	a.mov(rbp, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA);
@@ -3122,6 +3133,8 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		return false;
 	}
 
+	Data.State = Packing;
+	Data.sTask = "Preparing";
 	srand(GetTickCount64());
 
 	if (Options.Packing.bAntiDump) {
@@ -3222,6 +3235,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	ShellcodeData.BaseAddress = ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders;
 	ShellcodeData.bUsingTLSCallbacks = Options.Packing.bDelayedEntry || Options.Packing.bAntiDebug || Options.Packing.bAntiPatch || (pOriginal->GetTLSCallbacks() && *pOriginal->GetTLSCallbacks());
 	ShellcodeData.EntryOff = 0x30 + rand() & 0xCF;
+	Data.sTask = "Generating internal shellcode";
 	Buffer Internal = GenerateInternalShellcode(pOriginal, pPackedBinary);
 	if (!Internal.u64Size || !Internal.pBytes) return false;
 	SecHeader.Misc.VirtualSize = Internal.u64Size + pOriginal->NTHeaders.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders;
@@ -3286,6 +3300,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	pNT->OptionalHeader.AddressOfEntryPoint = SecHeader.VirtualAddress;
 
 	// Get shellcode
+	Data.sTask = "Generating loader";
 	Buffer shell = GenerateLoaderShellcode(pOriginal, pPackedBinary, Internal);
 	if (Options.Packing.bAntiPatch) {
 		CSha256 sha = { 0 };
@@ -3301,6 +3316,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	int nTLSEntries = 0;
 	if (ShellcodeData.bUsingTLSCallbacks) {
 		// Gen num of TLS
+		Data.sTask = "Generating TLS data";
 		int nFalseEntries = 0;
 		nTLSEntries = 1;
 		if (Options.Packing.bAntiDebug) {
@@ -3333,6 +3349,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	}
 
 	// Relocations
+	Data.sTask = "Finalizing";
 #ifdef _DEBUG
 	if (!Options.Debug.bDisableRelocations) {
 #endif
@@ -3468,5 +3485,9 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		delete pOriginal;
 	}
 	pPackedBinary->Status = Normal;
+	Data.State = Idle;
+	Data.sTask = NULL;
+	Data.fTaskProgress = 0.f;
+	Data.fTotalProgress = 0.f;
 	return true;
 }

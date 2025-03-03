@@ -12,8 +12,6 @@ Testing
 version.hpp
 build
 bin
-out.exe
-tester.exe
 yap.log.txt
 yap.config
 yap.h
