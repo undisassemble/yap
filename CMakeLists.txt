@@ -7,6 +7,7 @@ if (NOT DEFINED CMAKE_BUILD_TYPE)
 elseif (NOT (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "Release"))
 	message(FATAL_ERROR "CMAKE_BUILD_TYPE must be either Debug or Release")
 endif()
+find_package(Python3 REQUIRED)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}/garbage")
@@ -166,12 +167,18 @@ if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_custom_command(TARGET yap POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:yap>)
 endif()
 
+# Generate includes
+file(GLOB SOURCES_ASM "YAP/src/modules/*.asm")
+add_custom_command(OUTPUT "YAP/include/modules/anti-dump.inc" COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/generate_asm.py DEPENDS ${SOURCES_ASM})
+add_custom_target(Generated ALL DEPENDS "YAP/include/modules/anti-dump.inc")
+
 # YAPClient.exe
 file(GLOB SOURCES
 	"YAP/src/*.cpp"
 	"YAP/meta/YAPClient.rc"
 )
 add_executable(YAPClient WIN32 ${SOURCES})
+add_dependencies(YAPClient Generated)
 target_link_libraries(YAPClient d3d11)
 target_link_libraries(YAPClient shlwapi)
 target_link_libraries(YAPClient d3dcompiler)

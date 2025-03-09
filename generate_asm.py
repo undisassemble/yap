@@ -13,7 +13,7 @@
 # These comments should have their own lines, any comments following source will be ignored.
 # Also, custom instructions like strict or embed work
 
-import math
+import math, os
 
 # Change as needed
 IN_DIR = "./YAP/src/modules/"
@@ -332,4 +332,6 @@ def main():
         infile.close()
 
 if __name__ == "__main__":
+    if not os.path.isdir(OUT_DIR):
+        os.mkdir(OUT_DIR)
     main()
