@@ -21,3 +21,4 @@ YAPClient.rc
 yap.rc
 *.inc
 __pycache__
+.vscode

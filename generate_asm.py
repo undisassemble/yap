@@ -226,7 +226,7 @@ def parse_line(line: str) -> str:
             if NumIfs < 1:
                 raise Exception("ELIF when not in an if statement")
             return "} else if (" + line.split("%elif ")[1] + ") {\n"
-        elif line.lower().startswith("%else "):
+        elif line.lower().startswith("%else"):
             if NumIfs < 1:
                 raise Exception("ELSE when not in an if statement")
             return "} else {\n"

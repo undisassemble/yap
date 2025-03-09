@@ -169,7 +169,7 @@ endif()
 
 # Generate includes
 file(GLOB SOURCES_ASM "YAP/src/modules/*.asm")
-add_custom_command(OUTPUT "YAP/include/modules/anti-dump.inc" COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/generate_asm.py DEPENDS ${SOURCES_ASM})
+add_custom_command(OUTPUT "YAP/include/modules/anti-dump.inc" MAIN_DEPENDENCY ${CMAKE_CURRENT_BINARY_DIR}/generate_asm.py  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/generate_asm.py DEPENDS ${SOURCES_ASM})
 add_custom_target(Generated ALL DEPENDS "YAP/include/modules/anti-dump.inc")
 
 # YAPClient.exe
