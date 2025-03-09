@@ -707,305 +707,31 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 
 	// Microsoft signing
 	if (Options.Packing.bOnlyLoadMicrosoft) {
-		a.lea(rcx, ptr(NTD));
-		a.call(ShellcodeData.Labels.GetModuleHandleW);
-		a.mov(rcx, rax);
-		a.lea(rdx, ptr(SIP));
-		a.call(ShellcodeData.Labels.GetProcAddress);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		Label skippolicy = a.newLabel();
-		if (Options.Advanced.bMutateAssembly) {
-			a.strict();
-			a.jnz(skippolicy);
-		} else {
-			a.jmp(skippolicy);
-		}
-		
-		// Data
-		Label policy = a.newLabel();
 		PROCESS_MITIGATION_POLICY _policy = ProcessSignaturePolicy;
 		PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY sig_policy = { 0 };
 		sig_policy.MicrosoftSignedOnly = 1;
-		a.align(AlignMode::kCode, alignof(PROCESS_MITIGATION_POLICY));
-		a.bind(policy);
-		a.embed(&_policy, sizeof(PROCESS_MITIGATION_POLICY));
-		a.align(AlignMode::kZero, alignof(PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY));
-		a.embed(&sig_policy, sizeof(PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY));
-
-		a.bind(skippolicy);
-		a.mov(Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFF);
-		a.mov(edx, 52);
-		a.lea(r8, ptr(policy));
-		a.mov(r9d, holder.labelOffset(skippolicy) - holder.labelOffset(policy));
-		if (Options.Packing.bDirectSyscalls) {
-			a.mov(ecx, dword_ptr(rax));
-			a.cmp(ecx, 0xB8D18B4C);
-			a.strict();
-			a.jnz(ret);
-			a.mov(eax, ptr(rax, 4));
-			a.syscall();
-		} else {
-			a.call(rax);
-		}
+		#include "modules/ms-signing.inc"
 	}
 
 	// Debug
 	if (Options.Packing.bAntiDebug) {
-		// Setup context
 		CONTEXT context = { 0 };
 		context.ContextFlags = CONTEXT_ALL;
-		
-		Label skipdata = a.newLabel();
-		a.jmp(skipdata);
-
-		a.align(AlignMode::kCode, alignof(CONTEXT));
-		Label Context = a.newLabel();
-		a.bind(Context);
-		a.embed(&context, sizeof(CONTEXT));
-		Label NTD = a.newLabel();
-		a.bind(NTD);
-		a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest));
-		Label GCT = a.newLabel();
-		a.bind(GCT);
-		a.embed(&Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest));
-
-		a.bind(skipdata);
-		a.lea(rcx, ptr(NTD));
-		a.call(ShellcodeData.Labels.GetModuleHandleW);
-		a.mov(rcx, rax);
-		a.lea(rdx, ptr(GCT));
-		a.call(ShellcodeData.Labels.GetProcAddress);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFE);
-		a.lea(rdx, ptr(Context));
-		a.mov(rsi, rdx);
-		if (Options.Packing.bDirectSyscalls) {
-			a.mov(ecx, ptr(rax));
-			a.cmp(ecx, 0xB8D18B4C);
-			a.strict();
-			a.jnz(ret);
-			a.mov(eax, ptr(rax, 4));
-			a.syscall();
-		} else {
-			a.call(rax);
-		}
-		a.mov(rdx, rsi);
-		a.test(rax, rax);
-		a.strict();
-		a.jnz(ret);
-		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr7)));
-		a.and_(rax, 0x20FF);
-		a.strict();
-		a.jnz(ret);
-		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr6)));
-		a.and_(rax, 0x18F);
-		a.strict();
-		a.jnz(ret);
-		a.mov(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr0)));
-		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr1)));
-		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr2)));
-		a.or_(rax, qword_ptr(rdx, offsetof(CONTEXT, Dr3)));
-		a.strict();
-		a.jnz(ret);
+		#include "modules/anti-debug-main.inc"
 	}
 
 	// VM detection (TODO)
 	if (Options.Packing.bAntiVM) {
-		a.mov(eax, 1);
-		a.cpuid();
-		a.bt(ecx, 31);
-		a.strict();
-		if (!Options.Packing.bAllowHyperV) {
-			a.jc(ret);
-		} else {
-			Label nohv = a.newLabel();
-			a.jnc(nohv);
-			a.mov(eax, 0x40000000);
-			a.cpuid();
-			a.cmp(ebx, 0x7263694D);
-			a.strict();
-			a.jne(ret);
-			a.cmp(ecx, 0x666F736F);
-			a.strict();
-			a.jne(ret);
-			a.cmp(edx, 0x76482074);
-			a.strict();
-			a.jne(ret);
-			a.bind(nohv);
-		}
+		#include "modules/anti-vm.inc"
 	}
 
 	// Wait for cursor activity
 	if (Options.Packing.bAntiSandbox) {
-		Label _skip = a.newLabel();
-		Label USR = a.newLabel();
-		Label GCP = a.newLabel();
-		Label _KRN = a.newLabel();
-		Label SLP = a.newLabel();
-		Label PT = a.newLabel();
-		Label _loop = a.newLabel();
-		Label LLA = a.newLabel();
-		a.jmp(_skip);
-
-		a.align(AlignMode::kCode, alignof(LPCSTR));
-		a.bind(USR);
-		a.embed("USER32.dll", 11);
-		a.bind(GCP);
-		a.embed(&Sha256Str("GetCursorPos"), sizeof(Sha256Digest));
-		a.bind(SLP);
-		a.embed(&Sha256Str("Sleep"), sizeof(Sha256Digest));
-		a.bind(_KRN);
-		a.embed(&Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest));
-		a.bind(LLA);
-		a.embed(&Sha256Str("LoadLibraryA"), sizeof(Sha256Digest));
-		a.align(AlignMode::kCode, 0x10);
-		a.bind(PT);
-		a.dq(rand64());
-		a.dq(rand64());
-
-		a.bind(_skip);
-		a.lea(rcx, ptr(_KRN));
-		a.call(ShellcodeData.Labels.GetModuleHandleW);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(rcx, rax);
-		a.push(rcx);
-		a.lea(rdx, ptr(SLP));
-		a.call(ShellcodeData.Labels.GetProcAddress);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(r13, rax);
-		a.pop(rcx);
-		a.lea(rdx, ptr(LLA));
-		a.call(ShellcodeData.Labels.GetProcAddress);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(rcx, rsp);
-		a.and_(rcx, 0b1111);
-		a.add(rcx, 8);
-		a.sub(rsp, rcx);
-		a.push(rcx);
-		a.lea(rcx, ptr(USR));
-		a.push(rsi);
-		a.push(rbx);
-		a.call(rax);
-		a.add(rsp, 0x10);
-		a.pop(rcx);
-		a.add(rsp, rcx);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(rcx, rax);
-		a.lea(rdx, ptr(GCP));
-		a.call(ShellcodeData.Labels.GetProcAddress);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(r12, rax);
-		a.mov(rcx, rsp);
-		a.and_(rcx, 0b1111);
-		a.add(rcx, 8);
-		a.sub(rsp, rcx);
-		a.push(rcx);
-		a.lea(rcx, ptr(PT));
-		a.sub(rsp, 0x20);
-		a.call(r12);
-		a.add(rsp, 0x20);
-		a.pop(rcx);
-		a.add(rsp, rcx);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(r14, ptr(PT));
-		a.bind(_loop);
-		a.mov(rcx, rsp);
-		a.and_(rcx, 0b1111);
-		a.add(rcx, 8);
-		a.sub(rsp, rcx);
-		a.push(rcx);
-		a.mov(ecx, 5);
-		a.sub(rsp, 0x20);
-		a.call(r13);
-		a.add(rsp, 0x20);
-		a.pop(rcx);
-		a.add(rsp, rcx);
-		a.mov(rcx, rsp);
-		a.and_(rcx, 0b1111);
-		a.add(rcx, 8);
-		a.sub(rsp, rcx);
-		a.push(rcx);
-		a.lea(rcx, ptr(PT));
-		a.sub(rsp, 0x20);
-		a.call(r12);
-		a.add(rsp, 0x20);
-		a.pop(rcx);
-		a.add(rsp, rcx);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(_loop);
-		a.cmp(r14, ptr(PT));
-		a.strict();
-		a.jz(_loop);
+		#include "modules/anti-sandbox.inc"
 	}
 
 	if (Options.Packing.bAntiDump) {
-		Label skip = a.newLabel();
-		a.jmp(skip);
-
-		Label KRN = a.newLabel();
-		a.align(AlignMode::kCode, alignof(DWORD));
-		a.bind(KRN);
-		a.embed(&Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest));
-		Label VRT = a.newLabel();
-		a.bind(VRT);
-		a.embed(&Sha256Str("VirtualProtect"), sizeof(Sha256Digest));
-		
-		a.bind(skip);
-		a.mov(rax, PEB);
-		a.mov(qword_ptr(rax, 0x10), 0);
-		a.lea(rcx, ptr(KRN));
-		a.call(ShellcodeData.Labels.GetModuleHandleW);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(rcx, rax);
-		a.lea(rdx, ptr(VRT));
-		a.call(ShellcodeData.Labels.GetProcAddress);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(rcx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase);
-		a.add(rcx, ptr(Reloc));
-		a.mov(edx, ptr(rcx, offsetof(IMAGE_DOS_HEADER, e_lfanew)));
-		a.add(rdx, rcx);
-		a.mov(edx, ptr(rdx, offsetof(IMAGE_NT_HEADERS64, OptionalHeader.SizeOfHeaders)));
-		a.push(rdx);
-		a.push(rcx);
-		a.lea(r9, ptr(KRN));
-		a.mov(rsi, rax);
-		a.sub(rsp, 0x18);
-		a.mov(r8, rsp);
-		a.and_(r8, 0b1111);
-		a.add(r8, 8);
-		a.sub(rsp, r8);
-		a.push(r8);
-		a.mov(r8, 0x40);
-		a.sub(rsp, 0x20);
-		a.call(rax);
-		a.add(rsp, 0x20);
-		a.pop(r8);
-		a.add(rsp, r8);
-		a.add(rsp, 0x18);
-		a.pop(rcx);
-		a.pop(rdx);
-		a.call(ShellcodeData.Labels.RtlZeroMemory);
+		#include "modules/anti-dump.inc"
 	}
 
 	// Load each section
@@ -1474,136 +1200,16 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 
 	// Critical marking
 	if (Options.Packing.bMarkCritical) {
-		Label data = a.newLabel();
-		Label ret = a.newLabel();
-		Label _skip = a.newLabel();
-		a.jmp(_skip);
-
-		a.bind(NTD);
-		a.embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest));
-		a.bind(SIP);
-		a.embed(&Sha256Str("ZwSetInformationProcess"), sizeof(Sha256Digest));
-		a.align(AlignMode::kCode, alignof(BOOL));
-		a.bind(data);
-		a.dd(1);
-		a.bind(ret);
-		DEBUG_ONLY(if (Options.Debug.bGenerateBreakpoints) a.int3());
-		a.ret();
-
-		a.bind(_skip);
-		a.lea(rcx, ptr(NTD));
-		a.call(ShellcodeData.Labels.GetModuleHandleW);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(rcx, rax);
-		a.lea(rdx, ptr(SIP));
-		a.call(ShellcodeData.Labels.GetProcAddress);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(Options.Packing.bDirectSyscalls ? r10 : rcx, 0xFFFFFFFFFFFFFFFF);
-		a.mov(edx, 0x1D);
-		a.mov(r9d, 4);
-		a.mov(r8, rsp);
-		a.and_(r8, 0b1111);
-		a.add(r8, 8);
-		a.sub(rsp, r8);
-		a.push(r8);
-		a.lea(r8, ptr(data));
-		if (Options.Packing.bDirectSyscalls) {
-			a.mov(ecx, ptr(rax));
-			a.cmp(ecx, 0xB8D18B4C);
-			a.strict();
-			a.jnz(ret);
-			a.mov(eax, ptr(rax, 4));
-			a.syscall();
-		} else {
-			a.call(rax);
-		}
-		a.pop(r8);
-		a.add(rsp, r8);
+		#include "modules/critical.inc"
 	}
 
 	// Masquerading
 	if (Options.Packing.bEnableMasquerade) {
 		Label not_found = a.newLabel();
 		Label new_buf = a.newLabel();
-		Label copy_byte = a.newLabel();
-		Label zero_remainder = a.newLabel();
 		BYTE XORKey = rand() & 255;
 
-		// Check buffer size
-		a.mov(rax, PEB);
-		a.mov(rax, ptr(rax, 0x20));
-		a.mov(si, word_ptr(rax, 0x62));
-		a.cmp(si, 2 * (lstrlenA(Options.Packing.Masquerade) + 1));
-		a.strict();
-		a.jle(not_found);
-
-		// Copy string
-		a.mov(rcx, ptr(rax, 0x68));
-		a.lea(r8, ptr(new_buf));
-		a.mov(dx, 0);
-		a.mov(rdi, 0);
-		a.bind(copy_byte);
-		a.mov(dl, byte_ptr(r8, di));
-		a.test(dl, dl);
-		a.strict();
-		a.jz(zero_remainder);
-		a.xor_(dl, XORKey);
-		a.mov(word_ptr(rcx, di, 1), dx);
-		a.inc(di);
-		a.cmp(dl, '\\');
-		a.strict();
-		a.jne(copy_byte);
-		a.mov(r9w, di);
-		a.shl(r9w, 1);
-		a.jmp(copy_byte);
-
-		// Zero the remainder of the buffer
-		a.bind(zero_remainder);
-		a.lea(rcx, ptr(rcx, di, 1));
-		a.movzx(rdx, si);
-		a.shl(rdi, 1);
-		a.sub(rdx, rdi);
-		a.sub(rdx, 2);
-		a.push(rax);
-		a.push(r9w);
-		a.call(ShellcodeData.Labels.RtlZeroMemory);
-		a.mov(r9d, 0);
-		a.pop(r9w);
-		a.pop(rax);
-
-		// Copy data
-		// bx  = Length
-		// cx  = MaximumLength
-		// rdx = Buffer
-		a.mov(bx, 2 * lstrlenA(Options.Packing.Masquerade)); // Get data
-		a.mov(cx, 2 * (lstrlenA(Options.Packing.Masquerade) + 1));
-		a.mov(rdx, ptr(rax, 0x68));
-		a.mov(word_ptr(rax, 0x70), bx); // CommandLine
-		a.mov(word_ptr(rax, 0x72), cx);
-		a.mov(ptr(rax, 0x78), rdx);
-		a.mov(word_ptr(rax, 0xB0), bx); // WindowTitle
-		a.mov(word_ptr(rax, 0xB2), cx);
-		a.mov(ptr(rax, 0xB8), rdx);
-		a.mov(word_ptr(rax, 0x60), bx); // ImagePathName
-		a.mov(word_ptr(rax, 0x62), cx);
-		a.mov(ptr(rax, 0x68), rdx);
-		a.mov(rax, PEB);
-		a.mov(rax, ptr(rax, offsetof(_PEB, Ldr)));
-		a.mov(rax, ptr(rax, 0x10));
-		a.mov(word_ptr(rax, 0x48), bx); // FullDllName
-		a.mov(word_ptr(rax, 0x4A), cx);
-		a.mov(ptr(rax, 0x50), rdx);
-		a.sub(bx, r9w);
-		a.sub(cx, r9w);
-		a.add(rdx, r9);
-		a.mov(word_ptr(rax, 0x58), bx); // BaseDllName
-		a.mov(word_ptr(rax, 0x5A), cx);
-		a.mov(ptr(rax, 0x60), rdx);
-		a.jmp(not_found);
+		#include "modules/masquerading.inc"
 
 		a.bind(new_buf);
 		for (int i = 0; i < strlen(Options.Packing.Masquerade); i++) a.db(Options.Packing.Masquerade[i] ^ XORKey);
@@ -1614,63 +1220,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 
 	// Sideloading protection
 	if (Options.Packing.bMitigateSideloading) {
-		Label skip = a.newLabel();
-		Label ret = a.newLabel();
-		a.jmp(skip);
-
-		Label DIR = a.newLabel();
-		a.bind(DIR);
-		a.embed(&Sha256Str("SetDllDirectoryA"), sizeof(Sha256Digest));
-		Label SSP = a.newLabel();
-		a.bind(SSP);
-		a.embed(&Sha256Str("SetSearchPathMode"), sizeof(Sha256Digest));
-		Label ZRO = a.newLabel();
-		a.bind(ZRO);
-		a.db(0);
-
-		a.bind(skip);
-		a.lea(rcx, ptr(KERNEL32DLL));
-		a.call(ShellcodeData.Labels.GetModuleHandleW);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(rcx, rax);
-		a.mov(rsi, rax);
-		a.lea(rdx, ptr(DIR));
-		a.call(ShellcodeData.Labels.GetProcAddress);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(rcx, rsp);
-		a.and_(rcx, 0b1111);
-		a.add(rcx, 8);
-		a.sub(rsp, rcx);
-		a.push(rcx);
-		a.lea(rcx, ptr(ZRO));
-		a.sub(rsp, 0x20);
-		a.call(rax);
-		a.add(rsp, 0x20);
-		a.pop(rcx);
-		a.add(rsp, rcx);
-		a.mov(rcx, rsi);
-		a.lea(rdx, ptr(SSP));
-		a.call(ShellcodeData.Labels.GetProcAddress);
-		a.test(rax, rax);
-		a.strict();
-		a.jz(ret);
-		a.mov(rcx, rsp);
-		a.and_(rcx, 0b1111);
-		a.add(rcx, 8);
-		a.sub(rsp, rcx);
-		a.push(rcx);
-		a.mov(ecx, BASE_SEARCH_PATH_ENABLE_SAFE_SEARCHMODE | BASE_SEARCH_PATH_PERMANENT);
-		a.sub(rsp, 0x20);
-		a.call(rax);
-		a.add(rsp, 0x20);
-		a.pop(rcx);
-		a.add(rsp, rcx);
-		
-		a.bind(ret);
+		#include "modules/anti-sideloading.inc"
 	}
 
 	a.garbage();

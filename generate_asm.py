@@ -1,16 +1,17 @@
 # This turns the assembly sources into headers that can be used by the packer, to make it easier to read/modify the packers shellcode
 
 # Some comments in asm sources are treated specially, these are:
-#     ; IMPORT label1, label2, ...          Import labels from outside code (already bound)
-#     ; GLOBAL                              Following label is global, and should not be created (not already bound)
+#     ; GLOBAL                              Following label is global, and should not be created
 #     ; IF condition                        Wraps code in an if statement, condition should be c-style
+#     ; ELSE IF condition                   Else if statement
+#     ; ELSE                                Else statement
 #     ; ENDIF                               Ends if statement
 #     ; DEBUG_ONLY                          Following code only present in debug builds
 #     ; RELEASE_ONLY                        Following code only present in release builds
 #     ; ENDONLY                             Ends DEBUG_ONLY and RELEASE_ONLY segments
 #     ; RAW_C line                          line is C code that should be embedded in the source
 # These comments should have their own lines, any comments following source will be ignored.
-# Also, strict is considered an instruction
+# Also, custom instructions like strict or embed work
 
 import math
 
@@ -18,7 +19,14 @@ import math
 IN_DIR = "./YAP/src/modules/"
 OUT_DIR = "./YAP/include/modules/"
 SOURCES = [
-    
+    "anti-debug-main.asm",
+    "anti-dump.asm",
+    "anti-sandbox.asm",
+    "anti-sideloading.asm",
+    "anti-vm.asm",
+    "critical.asm",
+    "masquerading.asm",
+    "ms-signing.asm"
 ]
 
 # Dont change
@@ -82,6 +90,16 @@ ValidRegs = [
     "zmm29", "ymm29", "xmm29",
     "zmm30", "ymm30", "xmm30",
     "zmm31", "ymm31", "xmm31",
+]
+Prefixes = [
+    "lock",
+	"rep",
+	"repe",
+	"repne",
+	"repz",
+	"repnz",
+	"xrelease",
+	"xacquire"
 ]
 
 def parse_mem(operand: str) -> str:
@@ -163,28 +181,31 @@ def parse_mem(operand: str) -> str:
 
 def parse_line(line: str) -> str:
     global GlobalLabel, NumIfs, NeededLabels, BoundLabels, ValidRegs
-    if line == "\n":
-        return ""
     line = line.strip()
+    if not line or line == '':
+        return ""
 
     # Parse comments
     if line[0] == ';':
         line = line[1:].strip()
-        if line.startswith("IMPORT "):
-            for imp in line[7:].split(','):
-                if imp.strip() in BoundLabels:
-                    raise Exception(f"Import {imp.strip()} already bound or imported")
-                BoundLabels.append(imp.strip())
-            return ""
-        elif line.startswith("GLOBAL"):
+        if line.startswith("GLOBAL"):
             GlobalLabel = True
             return ""
         elif line.startswith("IF "):
             NumIfs += 1
             return "if (" + line.split("IF ")[1] + ") {\n"
+        elif line.startswith("ELSE IF "):
+            if NumIfs < 1:
+                raise Exception("ELSE IF when not in an if statement")
+            return "} else if (" + line.split("ELSE IF ")[1] + ") {\n"
+        elif line.startswith("ELSE "):
+            if NumIfs < 1:
+                raise Exception("ELSE when not in an if statement")
+            return "} else {\n"
         elif line.startswith("ENDIF"):
             if NumIfs < 1:
                 raise Exception("ENDIF when not in an if statement")
+            NumIfs -= 1
             return "}\n"
         elif line.startswith("DEBUG_ONLY"):
             return "#ifdef _DEBUG\n"
@@ -199,6 +220,7 @@ def parse_line(line: str) -> str:
 
     # Parse line
     else:
+        toret = ""
         line = line.split(';')[0].strip()
 
         # Error checking
@@ -219,7 +241,12 @@ def parse_line(line: str) -> str:
         if line.count(' ') == 0:
             return f"a.{line}();\n"
 
-        mnem = ' '.join(line.split(',')[0].split('[')[0].split(' ')[:-1]).lower()
+        # Prefixes
+        while line.split(' ')[0].lower() in Prefixes:
+            toret += "a." + line.split(' ')[0].lower() + "();\n"
+            line = ' '.join(line.split(' ')[1:])
+
+        mnem = line.split(' ')[0].lower()
         ops = line[mnem.__len__() + 1:].split(',')
         
         # Make sure operands are correct
@@ -229,7 +256,7 @@ def parse_line(line: str) -> str:
             if (ops[i].count('[') > ops[i].count(']')) or (ops[i].count('{') > ops[i].count('}')) or (ops[i].count('(') > ops[i].count(')')) or (ops[i].count('"') % 2) or (ops[i].count('\'') % 2):
                 if i == n - 1:
                     raise Exception("Unmatched opening parentheses")
-                ops[i] += ', ' + ops[i + 1]
+                ops[i] += ',' + ops[i + 1]
                 del ops[i + 1]
                 n -= 1
                 continue
@@ -237,31 +264,29 @@ def parse_line(line: str) -> str:
 
         # Write mnemonic + prefixes
         l = mnem.split(' ')
-        line = ""
         for i in range(l.__len__() - 1):
-            line += f"a.{l[i]}();\n"
+            toret += f"a.{l[i]}();\n"
         if l[-1] in MnemonicConversions:
-            line += f"a.{MnemonicConversions[l[-1]]}("
+            toret += f"a.{MnemonicConversions[l[-1]]}("
         else:
-            line += f"a.{l[-1]}("
+            toret += f"a.{l[-1]}("
         del l
 
         first = True
         for operand in ops:
             if not first:
-                line += ", "
+                toret += ", "
             first = False
             operand = operand.strip()
 
             # Only memory operands need to be parsed
             if '[' in operand:
-                line += parse_mem(operand)
+                toret += parse_mem(operand)
             else:
-                line += operand
+                toret += operand
 
-        line += ");\n"
-    
-    return line
+        toret += ");\n"
+        return toret
 
 
 def main():
