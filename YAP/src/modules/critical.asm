@@ -9,9 +9,9 @@ data:
     dd 1
 ret:
     ; DEBUG_ONLY
-    ; IF Options.Debug.bGenerateBreakpoints
+    %if Options.Debug.bGenerateBreakpoints
     int3
-    ; ENDIF
+    %endif
     ; ENDONLY
     ret
 
@@ -35,7 +35,7 @@ _skip:
     sub rsp, r8
     push r8
     lea r8, [data]
-    ; IF Options.Packing.bDirectSyscalls
+    %if Options.Packing.bDirectSyscalls
         mov r10, 0xFFFFFFFFFFFFFFFF
         mov ecx, [rax]
         cmp ecx, 0xB8D18B4C
@@ -43,9 +43,9 @@ _skip:
         jnz ret
         mov eax, [rax + 4]
         syscall
-    ; ELSE
+    %else
         mov rcx, 0xFFFFFFFFFFFFFFFF
         call rax
-    ; ENDIF
+    %endif
     pop r8
     add rsp, r8

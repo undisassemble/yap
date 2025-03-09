@@ -6,12 +6,12 @@
     test rax, rax
     strict
     jz ret
-    ; IF Options.Advanced.bMutateAssembly
+    %if Options.Advanced.bMutateAssembly
         strict
         jnz skippolicy
-    ; ELSE
+    %else
         jmp skippolicy
-    ; ENDIF
+    %endif
 
     align AlignMode::kCode, alignof(PROCESS_MITIGATION_POLICY)
 
@@ -24,7 +24,7 @@ skippolicy:
     mov edx, 52
     lea r8, [policy]
     mov r9d, holder.labelOffset(skippolicy) - holder.labelOffset(policy)
-    ; IF Options.Packing.bDirectSyscalls
+    %if Options.Packing.bDirectSyscalls
         mov r10, 0xFFFFFFFFFFFFFFFF
         mov ecx, [rax]
         cmp ecx, 0xB8D18B4C
@@ -32,7 +32,7 @@ skippolicy:
         jnz ret
         mov eax, [rax + 4]
         syscall
-    ; ELSE
+    %else
         mov rcx, 0xFFFFFFFFFFFFFFFF
         call rax
-    ; ENDIF
+    %endif

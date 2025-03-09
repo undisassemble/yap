@@ -19,7 +19,7 @@ skipdata:
     jz ret
     lea rdx, [Context]
     mov rsi, rdx
-    ; IF Options.Packing.bDirectSyscalls
+    %if Options.Packing.bDirectSyscalls
         mov r10, 0xFFFFFFFFFFFFFFFE
         mov ecx, [rax]
         cmp ecx, 0xB8D18B4C
@@ -27,10 +27,10 @@ skipdata:
         jnz ret
         mov eax, [rax + 4]
         syscall
-    ; ELSE
+    %else
         mov rcx, 0xFFFFFFFFFFFFFFFE
         call rax
-    ; ENDIF
+    %endif
     mov rdx, rsi
     test rax, rax
     strict

@@ -2,9 +2,7 @@
     cpuid
     bt ecx, 31
     strict 
-    ; IF !Options.Packing.bAllowHyperV
-        jc ret
-    ; ELSE
+    %if Options.Packing.bAllowHyperV
         jnc nohv
         mov eax, 0x40000000
         cpuid
@@ -17,5 +15,7 @@
         cmp edx, 0x76482074
         strict
         jne ret
-    ; ENDIF
+    %else
+        jc ret
+    %endif
 nohv:

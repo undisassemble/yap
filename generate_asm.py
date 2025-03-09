@@ -1,11 +1,12 @@
 # This turns the assembly sources into headers that can be used by the packer, to make it easier to read/modify the packers shellcode
 
-# Some comments in asm sources are treated specially, these are:
+# Special commands:
+#     %if condition                         Wraps code in an if statement, condition should be c-style
+#     %elif condition                       Else if statement
+#     %else                                 Else statement
+#     %endif                                Ends if statement
+#     %include                              Include file
 #     ; GLOBAL                              Following label is global, and should not be created
-#     ; IF condition                        Wraps code in an if statement, condition should be c-style
-#     ; ELSE IF condition                   Else if statement
-#     ; ELSE                                Else statement
-#     ; ENDIF                               Ends if statement
 #     ; DEBUG_ONLY                          Following code only present in debug builds
 #     ; RELEASE_ONLY                        Following code only present in release builds
 #     ; ENDONLY                             Ends DEBUG_ONLY and RELEASE_ONLY segments
@@ -19,6 +20,7 @@ import math, os
 IN_DIR = "./YAP/src/modules/"
 OUT_DIR = "./YAP/include/modules/"
 SOURCES = [
+    # Modules
     "anti-debug-main.asm",
     "anti-dump.asm",
     "anti-sandbox.asm",
@@ -26,7 +28,15 @@ SOURCES = [
     "anti-vm.asm",
     "critical.asm",
     "masquerading.asm",
-    "ms-signing.asm"
+    "ms-signing.asm",
+    "segment-unpacker.asm",
+    
+    # Main parts
+    "tls.asm",
+    "loader.asm",
+    "loader-functions.asm",
+    "importer.asm",
+    "sdk.asm"
 ]
 
 # Dont change
@@ -116,17 +126,22 @@ def parse_mem(operand: str) -> str:
     index = None
     scale = 0
     off = 0
+
+    # Make sure elements are correct
+    i = 0
+    n = elements.__len__()
+    while i < n:
+        if (elements[i].count('[') > elements[i].count(']')) or (elements[i].count('{') > elements[i].count('}')) or (elements[i].count('(') > elements[i].count(')')) or (elements[i].count('"') % 2) or (elements[i].count('\'') % 2):
+            if i == n - 1:
+                raise Exception("Unmatched opening parentheses")
+            elements[i] += '+' + elements[i + 1]
+            del elements[i + 1]
+            n -= 1
+            continue
+        i += 1
     
     for element in elements:
         element = element.strip()
-
-        # Error checking
-        if element.count('-') > 1:
-            raise Exception("Too many subtractions in memory operand")
-        if element.count('+') > 2:
-            raise Exception("Too many additions in memory operand")
-        if element.count('*') > 1:
-            raise Exception("Too many multiplications in memory operand")
 
         # Subtracted offset
         if '-' in element:
@@ -191,22 +206,6 @@ def parse_line(line: str) -> str:
         if line.startswith("GLOBAL"):
             GlobalLabel = True
             return ""
-        elif line.startswith("IF "):
-            NumIfs += 1
-            return "if (" + line.split("IF ")[1] + ") {\n"
-        elif line.startswith("ELSE IF "):
-            if NumIfs < 1:
-                raise Exception("ELSE IF when not in an if statement")
-            return "} else if (" + line.split("ELSE IF ")[1] + ") {\n"
-        elif line.startswith("ELSE "):
-            if NumIfs < 1:
-                raise Exception("ELSE when not in an if statement")
-            return "} else {\n"
-        elif line.startswith("ENDIF"):
-            if NumIfs < 1:
-                raise Exception("ENDIF when not in an if statement")
-            NumIfs -= 1
-            return "}\n"
         elif line.startswith("DEBUG_ONLY"):
             return "#ifdef _DEBUG\n"
         elif line.startswith("RELEASE_ONLY"):
@@ -217,6 +216,28 @@ def parse_line(line: str) -> str:
             return line.split("RAW_C ")[1] + "\n"
         else:
             return ""
+
+    # Special stuff
+    elif line[0] == '%':
+        if line.lower().startswith("%if "):
+            NumIfs += 1
+            return "if (" + line.split("%if ")[1] + ") {\n"
+        elif line.lower().startswith("%elif "):
+            if NumIfs < 1:
+                raise Exception("ELIF when not in an if statement")
+            return "} else if (" + line.split("%elif ")[1] + ") {\n"
+        elif line.lower().startswith("%else "):
+            if NumIfs < 1:
+                raise Exception("ELSE when not in an if statement")
+            return "} else {\n"
+        elif line.lower().startswith("%endif"):
+            if NumIfs < 1:
+                raise Exception("ENDIF when not in an if statement")
+            NumIfs -= 1
+            return "}\n"
+        elif line.lower().startswith("%include "):
+            return "#include " + line[9:] + "\n"
+
 
     # Parse line
     else:
@@ -280,7 +301,7 @@ def parse_line(line: str) -> str:
             operand = operand.strip()
 
             # Only memory operands need to be parsed
-            if '[' in operand:
+            if operand[0] == '[' or (operand.count(' ') > 0 and operand.split(' ')[1][0] == '['):
                 toret += parse_mem(operand)
             else:
                 toret += operand
@@ -326,7 +347,8 @@ def main():
 
         # Write stuff
         for line in parsed:
-            outfile.write(line)
+            if line:
+                outfile.write(line)
         outfile.write("}")
         outfile.close()
         infile.close()
