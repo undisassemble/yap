@@ -19,3 +19,5 @@ yap.h
 *.a
 YAPClient.rc
 yap.rc
+*.inc
+__pycache__
