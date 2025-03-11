@@ -20,6 +20,8 @@ cmake . -DCMAKE_BUILD_TYPE=Release
 cmake --build .
 ```
 
+You probably need to change the encoding of file `YAP/dependencies/zydis/resources/VersionInfo.rc` to utf-8.
+
 
 ### Build Options
 

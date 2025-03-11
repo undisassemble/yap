@@ -3,12 +3,18 @@
 #include "pe.hpp"
 #include "packer.hpp"
 #include "gui.hpp"
+#include <TlHelp32.h>
+#include <limits.h>
+#include <minwinbase.h>
+#include <processthreadsapi.h>
 #include <time.h>
 #include <stdarg.h>
 #include <GLFW/glfw3.h>
+#include <winnt.h>
+#include <winternl.h>
 
 // Forward declares
-LONG ExceptionHandler(_In_ EXCEPTION_POINTERS* pException);
+void LaunchAsDebugger();
 DWORD WINAPI Begin(void* args);
 namespace Console {
 	void help(char* name);
@@ -28,14 +34,30 @@ Asm* pAssembly = NULL;
 
 // Main function
 int main(int argc, char** argv) {
+	// Crash handler setup
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "--crash-handler")) {
+			LaunchAsDebugger();
+			return 1;
+		}
+	}
+
 	// General setup
 	srand(time(NULL));
 	hLogFile = CreateFile("yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hLogFile || hLogFile == INVALID_HANDLE_VALUE) {
 		LOG(Failed, MODULE_YAP, "Failed to open logging file (%d)\n", GetLastError());
 	}
-	if (!AddVectoredExceptionHandler(0, ExceptionHandler)) {
-		LOG(Warning, MODULE_YAP, "Could not set crash handler\n");
+	if (!IsDebuggerPresent()) {
+		STARTUPINFOA si = { 0 };
+		si.cb = sizeof(STARTUPINFOA);
+		PROCESS_INFORMATION pi = { 0 };
+		if (!CreateProcessA("YAPClient.exe", "YAPClient.exe --crash-handler", NULL, NULL, FALSE, NULL, NULL, NULL, &si, &pi)) {
+			LOG(Warning, MODULE_YAP, "Failed to start crash handler (%d)\n", GetLastError());
+		} else {
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+		}
 	}
 	LoadSettings();
 	
@@ -53,7 +75,6 @@ int main(int argc, char** argv) {
 	}
 
 	// Search CLI
-	strcpy_s(Data.Project, argv[1]);
 	if (argc > 2) {
 		if (!strcmp(argv[2], "create")) {
 			Console::SetupConsole();
@@ -93,13 +114,11 @@ DWORD WINAPI Begin(void* args) {
 	if (Data.bRunning)
 		return 1;
 	
+	*(int*)(NULL) = 10;
 	Data.bRunning = true;
 	LOG(Info, MODULE_YAP, "Starting YAP\n");
 
 	Options_t OptionsBackup = Options;
-
-	// Select optimization mode
-	bool bResetOptimizations = false;
 
 	// Reassembler
 	if (Options.Reassembly.bEnabled) {
@@ -170,7 +189,7 @@ DWORD WINAPI Begin(void* args) {
 			for (int i = 0; i < pAssembly->GetDisassembledFunctionRanges().Size(); i++) {
 				WriteFile(hDumped, "------------\n", 13, NULL, NULL);
 				for (int j = 0; j < pAssembly->GetDisassembledFunctionRanges()[i].Entries.Size(); j++) {
-					int n = snprintf(buf, 512, "%08x: %08x -> %08x\n", pAssembly->GetDisassembledFunctionRanges()[i].Entries[j], pAssembly->GetDisassembledFunctionRanges()[i].dwStart, pAssembly->GetDisassembledFunctionRanges()[i].dwStart + pAssembly->GetDisassembledFunctionRanges()[i].dwSize);
+					int n = snprintf(buf, 512, "%08lx: %08lx -> %08lx\n", pAssembly->GetDisassembledFunctionRanges()[i].Entries[j], pAssembly->GetDisassembledFunctionRanges()[i].dwStart, pAssembly->GetDisassembledFunctionRanges()[i].dwStart + pAssembly->GetDisassembledFunctionRanges()[i].dwSize);
 					WriteFile(hDumped, buf, n, NULL, NULL);
 				}
 			}
@@ -208,7 +227,7 @@ DWORD WINAPI Begin(void* args) {
 			for (int i = 0; i < pAssembly->GetDisassembledFunctionRanges().Size(); i++) {
 				WriteFile(hDumped, "------------\n", 13, NULL, NULL);
 				for (int j = 0; j < pAssembly->GetDisassembledFunctionRanges()[i].Entries.Size(); j++) {
-					int n = snprintf(buf, 512, "%08x: %08x -> %08x\n", pAssembly->GetDisassembledFunctionRanges()[i].Entries[j], pAssembly->GetDisassembledFunctionRanges()[i].dwStart, pAssembly->GetDisassembledFunctionRanges()[i].dwStart + pAssembly->GetDisassembledFunctionRanges()[i].dwSize);
+					int n = snprintf(buf, 512, "%08lx: %08lx -> %08lx\n", pAssembly->GetDisassembledFunctionRanges()[i].Entries[j], pAssembly->GetDisassembledFunctionRanges()[i].dwStart, pAssembly->GetDisassembledFunctionRanges()[i].dwStart + pAssembly->GetDisassembledFunctionRanges()[i].dwSize);
 					WriteFile(hDumped, buf, n, NULL, NULL);
 				}
 			}
@@ -283,13 +302,13 @@ th_exit:
 }
 
 // Crash handler
-LONG ExceptionHandler(_In_ EXCEPTION_POINTERS* pException) {
-	if (hLogFile && pException && pException->ExceptionRecord && pException->ExceptionRecord->ExceptionFlags & EXCEPTION_NONCONTINUABLE) {
-		LOG(Failed, MODULE_YAP, "Program has crashed!\n");
-		LOG(Info_Extended, MODULE_YAP, "Build: " __YAP_VERSION__ " " __YAP_BUILD__ "\n");
-		switch (pException->ExceptionRecord->ExceptionCode) {
+Vector<MODULEENTRY32> Modules;
+void LogExceptionRecord(_In_ EXCEPTION_RECORD* pExceptionRecord) {
+	if (pExceptionRecord) {
+		switch (pExceptionRecord->ExceptionCode) {
 		case EXCEPTION_ACCESS_VIOLATION:
 			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_ACCESS_VIOLATION\n");
+			if (pExceptionRecord->NumberParameters >= 2) LOG(Info_Extended, MODULE_YAP, "Attempted %c operation on address 0x%p\n", pExceptionRecord->ExceptionInformation[0] == 0 ? 'R' : (pExceptionRecord->ExceptionInformation[0] == 1 ? 'W' : (pExceptionRecord->ExceptionInformation[0] == 8 ? 'X' : '-')), pExceptionRecord->ExceptionInformation[1]);
 			break;
 		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
 			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n");
@@ -315,56 +334,120 @@ LONG ExceptionHandler(_In_ EXCEPTION_POINTERS* pException) {
 		case EXCEPTION_STACK_OVERFLOW:
 			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_STACK_OVERFLOW\n");
 			break;
+		case STATUS_HEAP_CORRUPTION:
+			LOG(Info_Extended, MODULE_YAP, "Code: STATUS_HEAP_CORRUPTION\n");
+			break;
+		case EXCEPTION_BREAKPOINT:
+			LOG(Info_Extended, MODULE_YAP, "Code: EXCEPTION_BREAKPOINT\n");
+			break;
 		default:
-			LOG(Info_Extended, MODULE_YAP, "Code: %lu\n", pException->ExceptionRecord->ExceptionCode);
+			LOG(Info_Extended, MODULE_YAP, "Code: %#010lx\n", pExceptionRecord->ExceptionCode);
 		}
-		LOG(Info_Extended, MODULE_YAP, "Address: 0x%p\n", pException->ExceptionRecord->ExceptionAddress);
-		char* modules[] = {
-			"YAPClient.exe",
-			"asmjit.dll",
-			"glfw3.dll",
-			"imgui.dll",
-			"lzma.dll",
-			"zydis.dll"
-		};
-		for (int i = 0, n = countof(modules); i < n; i++) {
-			HMODULE mod = GetModuleHandleA(modules[i]);
-			if (!mod) {
-				LOG(Warning, MODULE_YAP, "Could not get base address of %s\n", modules[i]);
-				continue;
-			}
-			MODULEINFO info;
-			if (GetModuleInformation(GetCurrentProcess(), mod, &info, sizeof(MODULEINFO))) {
-				LOG(Info_Extended, MODULE_YAP, "Memory range of %s: %p -> %p\n", modules[i], (uint64_t)info.lpBaseOfDll, (uint64_t)info.lpBaseOfDll + info.SizeOfImage);
-				if (pException->ExceptionRecord->ExceptionAddress >= info.lpBaseOfDll && pException->ExceptionRecord->ExceptionAddress < info.lpBaseOfDll + info.SizeOfImage) {
-					LOG(Info_Extended, MODULE_YAP, "Crash occurred at %s+0x%08x\n", modules[i], (uint64_t)pException->ExceptionRecord->ExceptionAddress - (uint64_t)info.lpBaseOfDll);
-				}
-			} else {
-				LOG(Info_Extended, MODULE_YAP, "Base address of %s: 0x%p\n", modules[i], mod);
+		LOG(Info_Extended, MODULE_YAP, "Address: 0x%p\n", pExceptionRecord->ExceptionAddress);
+		for (int i = 0; i < Modules.Size(); i++) {
+			if (pExceptionRecord->ExceptionAddress >= Modules[i].modBaseAddr && pExceptionRecord->ExceptionAddress < Modules[i].modBaseAddr + Modules[i].modBaseSize) {
+				LOG(Info_Extended, MODULE_YAP, "In module %s\n", Modules[i].szModule);
+				break;
 			}
 		}
-		if (!pException->ContextRecord) {
-			LOG(Warning, MODULE_YAP, "Exception did not provide a context record\n");
-			return EXCEPTION_CONTINUE_SEARCH;
-		}
-		LOG(Info_Extended, MODULE_YAP, "RAX: %p\n", pException->ContextRecord->Rax);
-		LOG(Info_Extended, MODULE_YAP, "RCX: %p\n", pException->ContextRecord->Rcx);
-		LOG(Info_Extended, MODULE_YAP, "RDX: %p\n", pException->ContextRecord->Rdx);
-		LOG(Info_Extended, MODULE_YAP, "RBX: %p\n", pException->ContextRecord->Rbx);
-		LOG(Info_Extended, MODULE_YAP, "RSP: %p\n", pException->ContextRecord->Rsp);
-		LOG(Info_Extended, MODULE_YAP, "RBP: %p\n", pException->ContextRecord->Rbp);
-		LOG(Info_Extended, MODULE_YAP, "RSI: %p\n", pException->ContextRecord->Rsi);
-		LOG(Info_Extended, MODULE_YAP, "RDI: %p\n", pException->ContextRecord->Rdi);
-		LOG(Info_Extended, MODULE_YAP, "R8: %p\n", pException->ContextRecord->R8);
-		LOG(Info_Extended, MODULE_YAP, "R9: %p\n", pException->ContextRecord->R9);
-		LOG(Info_Extended, MODULE_YAP, "R10: %p\n", pException->ContextRecord->R10);
-		LOG(Info_Extended, MODULE_YAP, "R11: %p\n", pException->ContextRecord->R11);
-		LOG(Info_Extended, MODULE_YAP, "R12: %p\n", pException->ContextRecord->R12);
-		LOG(Info_Extended, MODULE_YAP, "R13: %p\n", pException->ContextRecord->R13);
-		LOG(Info_Extended, MODULE_YAP, "R14: %p\n", pException->ContextRecord->R14);
-		LOG(Info_Extended, MODULE_YAP, "R15: %p\n", pException->ContextRecord->R15);
+		if (pExceptionRecord->ExceptionRecord) LogExceptionRecord(pExceptionRecord->ExceptionRecord);
 	}
-	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void LaunchAsDebugger() {
+	// Open log file
+	hLogFile = CreateFileA("except.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (!hLogFile || hLogFile == INVALID_HANDLE_VALUE) {
+		exit(1);
+	}
+
+	// Find parent
+	DWORD dwParentId = 0;
+	PROCESS_BASIC_INFORMATION info = { 0 };
+	if (NtQueryInformationProcess(GetCurrentProcess(), ProcessBasicInformation, &info, sizeof(PROCESS_BASIC_INFORMATION), NULL)) {
+		LOG(Failed, MODULE_YAP, "Failed to get parent PID\n");
+		exit(1);
+	}
+	dwParentId = (DWORD)info.InheritedFromUniqueProcessId;
+	LOG(Info, MODULE_YAP, "Parent PID: %d\n", dwParentId);
+	if (!DebugActiveProcess(dwParentId)) {
+		LOG(Failed, MODULE_YAP, "Failed to attach to parent (%d)\n", GetLastError());
+		exit(1);
+	}
+
+	DEBUG_EVENT event = { 0 };
+	MODULEENTRY32 entry = { 0 };
+	entry.dwSize = sizeof(MODULEENTRY32);
+	CONTEXT context;
+	context.ContextFlags = CONTEXT_AMD64;
+	while (1) {
+		if (WaitForDebugEvent(&event, INFINITE)) {
+			if (event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT && event.dwProcessId == dwParentId) {
+				LOG(Info_Extended, MODULE_YAP, "Process exited: %lx\n", event.u.ExitProcess.dwExitCode);
+				break;
+			}
+
+			else if (event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT && event.u.Exception.ExceptionRecord.ExceptionCode != 0x6ba) {
+				LOG(Failed, MODULE_YAP, "----- Exception recorded -----\n");
+				LOG(Info_Extended, MODULE_YAP, "Build: " __YAP_VERSION__ " " __YAP_BUILD__ "\n");
+				
+				// Log registers
+				HANDLE hHand = OpenThread(THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME, FALSE, event.dwThreadId);
+				if (!hHand) {
+					LOG(Warning, MODULE_YAP, "Failed to open crashed thread (%d)\n", GetLastError());
+				} else if (SuspendThread(hHand) == _UI32_MAX) {
+					LOG(Warning, MODULE_YAP, "Failed to suspend thread (%d)\n", GetLastError());
+				} else if (!GetThreadContext(hHand, &context)) {
+					LOG(Warning, MODULE_YAP, "Failed to get thread context (%d)\n", GetLastError());
+				} else {
+					// This isnt working, I dont know why
+					LOG(Info_Extended, MODULE_YAP, "--- CONTEXT ---\n");
+					LOG(Info_Extended, MODULE_YAP, "RAX: %p\n", context.Rax);
+					LOG(Info_Extended, MODULE_YAP, "RCX: %p\n", context.Rcx);
+					LOG(Info_Extended, MODULE_YAP, "RDX: %p\n", context.Rdx);
+					LOG(Info_Extended, MODULE_YAP, "RBX: %p\n", context.Rbx);
+					LOG(Info_Extended, MODULE_YAP, "RSP: %p\n", context.Rsp);
+					LOG(Info_Extended, MODULE_YAP, "RBP: %p\n", context.Rbp);
+					LOG(Info_Extended, MODULE_YAP, "RSI: %p\n", context.Rsi);
+					LOG(Info_Extended, MODULE_YAP, "RDI: %p\n", context.Rdi);
+					LOG(Info_Extended, MODULE_YAP, "R8:  %p\n", context.R8);
+					LOG(Info_Extended, MODULE_YAP, "R9:  %p\n", context.R9);
+					LOG(Info_Extended, MODULE_YAP, "R10: %p\n", context.R10);
+					LOG(Info_Extended, MODULE_YAP, "R11: %p\n", context.R11);
+					LOG(Info_Extended, MODULE_YAP, "R12: %p\n", context.R12);
+					LOG(Info_Extended, MODULE_YAP, "R13: %p\n", context.R13);
+					LOG(Info_Extended, MODULE_YAP, "R14: %p\n", context.R14);
+					LOG(Info_Extended, MODULE_YAP, "R15: %p\n", context.R15);
+					ResumeThread(hHand);
+				}
+				CloseHandle(hHand);
+
+				// Log list of loaded modules
+				Modules.Release();
+				do {
+					hHand = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
+				} while (hHand == INVALID_HANDLE_VALUE && GetLastError() == ERROR_BAD_LENGTH);
+				if (hHand == INVALID_HANDLE_VALUE) {
+					LOG(Warning, MODULE_YAP, "Could not get list of modules (%d)\n", GetLastError());
+				} else {
+					LOG(Info_Extended, MODULE_YAP, "--- MODULES ---\n");
+					Module32First(hHand, &entry);
+					do {
+						Modules.Push(entry);
+						LOG(Info_Extended, MODULE_YAP, "%s: \t0x%p -> 0x%p\n", entry.szModule, entry.modBaseAddr, entry.modBaseAddr + entry.modBaseSize);
+					} while (Module32Next(hHand, &entry));
+				}
+
+				// Log exceptions
+				LOG(Info_Extended, MODULE_YAP, "--- RECORD(S) ---\n");
+				LogExceptionRecord(&event.u.Exception.ExceptionRecord);
+				LOG(Info_Extended, MODULE_YAP, "----- End of exception -----\n\n\n\n");
+			}
+			ContinueDebugEvent(event.dwProcessId, event.dwThreadId, DBG_EXCEPTION_NOT_HANDLED);
+		}
+	}
+	DebugActiveProcessStop(dwParentId);
+	exit(0);
 }
 
 void Console::help(char* name) {

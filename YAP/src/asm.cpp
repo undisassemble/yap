@@ -1,6 +1,7 @@
 #include "asm.hpp"
 #include "Zydis/SharedTypes.h"
 #include "assembler.hpp"
+#include "util.hpp"
 
 typedef struct {
 	BYTE Version : 3;
@@ -132,6 +133,7 @@ void DecodedOperand::operator=(_In_ ZydisDecodedOperand operand) {
 		imm.value.u = operand.imm.value.u;
 		break;
 	case ZYDIS_OPERAND_TYPE_POINTER:
+		LOG(Warning, MODULE_REASSEMBLER, "I don\'t know if this works, operand.ptr.segment = %d\n", operand.ptr.segment);
 		mem.segment = operand.ptr.segment;
 		mem.base = ZYDIS_REGISTER_NONE;
 		mem.index = ZYDIS_REGISTER_NONE;
@@ -702,8 +704,8 @@ bool Asm::Disassemble() {
 			// Insert entries
 			IAT_ENTRY entry = { 0 };
 			insert.OldRVA = NTHeaders.OptionalHeader.DataDirectory[1].VirtualAddress;
-			WORD wSecIndex = FindSectionIndex(insert.OldRVA);
-			WORD wIndex = FindPosition(wSecIndex, insert.OldRVA);
+			DWORD wSecIndex = FindSectionIndex(insert.OldRVA);
+			DWORD wIndex = FindPosition(wSecIndex, insert.OldRVA);
 			if (wIndex == _UI32_MAX || wSecIndex == _UI32_MAX) {
 				LOG(Failed, MODULE_REASSEMBLER, "Failed to insert IAT!\n");
 				return false;
@@ -730,8 +732,8 @@ bool Asm::Disassemble() {
 			for (int i = 0; pEntries && pEntries[i].LookupRVA; i++) {
 				// Begin
 				insert.OldRVA = pEntries[i].LookupRVA;
-				WORD wSecIndex = FindSectionIndex(insert.OldRVA);
-				WORD wIndex = FindPosition(wSecIndex, insert.OldRVA);
+				DWORD wSecIndex = FindSectionIndex(insert.OldRVA);
+				DWORD wIndex = FindPosition(wSecIndex, insert.OldRVA);
 				if (wIndex == _UI32_MAX || wSecIndex == _UI32_MAX) {
 					LOG(Failed, MODULE_REASSEMBLER, "Failed to insert IAT!\n");
 					return false;
@@ -755,8 +757,8 @@ bool Asm::Disassemble() {
 		if (NTHeaders.OptionalHeader.DataDirectory[0].VirtualAddress && NTHeaders.OptionalHeader.DataDirectory[0].Size) {
 			IMAGE_EXPORT_DIRECTORY ExportTable = ReadRVA<IMAGE_EXPORT_DIRECTORY>(NTHeaders.OptionalHeader.DataDirectory[0].VirtualAddress);
 			insert.OldRVA = NTHeaders.OptionalHeader.DataDirectory[0].VirtualAddress + sizeof(DWORD) * 7;
-			WORD wSecIndex = FindSectionIndex(insert.OldRVA);
-			WORD wIndex = FindPosition(wSecIndex, insert.OldRVA);
+			DWORD wSecIndex = FindSectionIndex(insert.OldRVA);
+			DWORD wIndex = FindPosition(wSecIndex, insert.OldRVA);
 			if (wIndex == _UI32_MAX || wSecIndex == _UI32_MAX) {
 				LOG(Failed, MODULE_REASSEMBLER, "Failed to insert exports!\n");
 				return false;
