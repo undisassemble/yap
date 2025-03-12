@@ -113,8 +113,6 @@ DWORD WINAPI Begin(void* args) {
 	// Prevent it from running twice
 	if (Data.bRunning)
 		return 1;
-	
-	*(int*)(NULL) = 10;
 	Data.bRunning = true;
 	LOG(Info, MODULE_YAP, "Starting YAP\n");
 
@@ -346,6 +344,7 @@ void LogExceptionRecord(_In_ EXCEPTION_RECORD* pExceptionRecord) {
 		LOG(Info_Extended, MODULE_YAP, "Address: 0x%p\n", pExceptionRecord->ExceptionAddress);
 		for (int i = 0; i < Modules.Size(); i++) {
 			if (pExceptionRecord->ExceptionAddress >= Modules[i].modBaseAddr && pExceptionRecord->ExceptionAddress < Modules[i].modBaseAddr + Modules[i].modBaseSize) {
+				LOG(Info_Extended, MODULE_YAP, "RVA: 0x%08x\n", reinterpret_cast<uint64_t>(pExceptionRecord->ExceptionAddress) - reinterpret_cast<uint64_t>(Modules[i].modBaseAddr));
 				LOG(Info_Extended, MODULE_YAP, "In module %s\n", Modules[i].szModule);
 				break;
 			}
