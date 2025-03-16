@@ -873,7 +873,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			a.jnz(loop);
 		}
 
-		Buffer zero;
+		Buffer zero = { 0 };
 		zero.Allocate(pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].Size);
 		ZeroMemory(zero.pBytes, zero.u64Size);
 		pOriginal->WriteRVA(pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].VirtualAddress, zero.pBytes, zero.u64Size);
@@ -917,7 +917,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			pCallbacks[i] = 0;
 		}
 
-		Buffer zero;
+		Buffer zero = { 0 };
 		zero.Allocate(pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].Size);
 		ZeroMemory(zero.pBytes, zero.u64Size);
 		pOriginal->WriteRVA(pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].VirtualAddress, zero.pBytes, zero.u64Size);
@@ -977,7 +977,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			DWORD ID = 0;
 			int count = 0;
 			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
-				Buffer buf;
+				Buffer buf = { 0 };
 				buf.Allocate(FunctionRanges[i].dwSize);
 				pOriginal->ReadRVA(FunctionRanges[i].dwStart, buf.pBytes, buf.u64Size);
 				FunctionBodies.Push(PackSection(buf));
