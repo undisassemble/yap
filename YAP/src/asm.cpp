@@ -1127,6 +1127,7 @@ bool Asm::Analyze() {
 
 bool Asm::Assemble() {
 	Data.State = Assembling;
+	Data.sTask = "Assembling";
 	// Setup
 	LOG(Info, MODULE_REASSEMBLER, "Assembling\n");
 	if (!Sections.Size()) return false;
@@ -1153,6 +1154,7 @@ bool Asm::Assemble() {
 	// Assemble sections
 	for (DWORD SecIndex = 0; SecIndex < Sections.Size(); SecIndex++) {
 		// Prepare next section
+		Data.fTotalProgress = (float)SecIndex / (float)Sections.Size();
 		AsmSection section = Sections[SecIndex];
 		pLines = section.Lines;
 		section.NewRVA = a.offset() + SectionHeaders[0].VirtualAddress;
@@ -1162,6 +1164,7 @@ bool Asm::Assemble() {
 
 		// Assemble lines
 		for (int i = 0; i < pLines->Size(); i++) {
+			Data.fTaskProgress = (float)i / (float)pLines->Size();
 			line = pLines->At(i);
 			line.NewRVA = rva;
 			pLines->Replace(i, line);
@@ -1244,6 +1247,9 @@ bool Asm::Assemble() {
 	}
 
 	// Link
+	Data.fTotalProgress = 0.f;
+	Data.fTaskProgress = 0.f;
+	Data.sTask = "Linking";
 	LOG(Info, MODULE_REASSEMBLER, "Linking\n");
 	if (XREFs.Size() != XREFLabels.Size()) {
 		LOG(Failed, MODULE_REASSEMBLER, "This should never happen (XREFs.Size() != XREFLabels.Size())\n");
@@ -1310,6 +1316,7 @@ bool Asm::Assemble() {
 	NTHeaders.OptionalHeader.DataDirectory[5].Size = relocs.u64Size;
 
 	// Copy data
+	Data.sTask = "Finalizing";
 	LOG(Info, MODULE_REASSEMBLER, "Finalizing\n");
 	holder.flatten();
 	holder.relocateToBase(NTHeaders.OptionalHeader.ImageBase + SectionHeaders[0].VirtualAddress);
