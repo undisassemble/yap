@@ -1,6 +1,6 @@
 #include "util.hpp"
 #include "debugger.hpp"
-#include <TlHelp32.h>
+#include <tlhelp32.h>
 #include <basetsd.h>
 #include <errhandlingapi.h>
 #include <minwinbase.h>
@@ -8,7 +8,7 @@
 #include <processthreadsapi.h>
 #include <winnt.h>
 #include <winternl.h>
-#include <DbgHelp.h>
+#include <dbghelp.h>
 
 #ifndef MAX_STACK_DEPTH
 #define MAX_STACK_DEPTH 100
