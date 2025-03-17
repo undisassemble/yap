@@ -7,6 +7,8 @@
 #include <errhandlingapi.h>
 #include <minwinbase.h>
 #include <processthreadsapi.h>
+#include <shlwapi.h>
+#include <string.h>
 #include <time.h>
 #include <stdarg.h>
 #include <GLFW/glfw3.h>
@@ -72,6 +74,7 @@ int main(int argc, char** argv) {
 	}
 
 	// Search CLI
+	strcpy_s(Data.Project, argv[1]);
 	if (argc > 2) {
 		if (!strcmp(argv[2], "create")) {
 			Console::SetupConsole();
