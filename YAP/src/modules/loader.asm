@@ -81,7 +81,7 @@ SkipReloc:
 	; Load each section
 	mov rsi, 0
 	lea rcx, [CompressedSections]
-	mov rbp, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA
+	mov rbp, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset
 decompressloop:
 	mov rax, DecompressKey
 	lea rdx, [CompressedSizes]
@@ -93,7 +93,7 @@ decompressloop:
 	add r8, rbp
 	add r8, [Reloc]
 	lea r9, [DecompressedSizes]
-	mov r9, [r9 + rsi * 3]
+	mov r9, [r9 + rsi * 8]
 	xor r9, rax
 	mov rax, 0
 	call unpack
@@ -103,7 +103,7 @@ decompressloop:
 	jne decompressloop
 	lea rcx, [InternalShell]
 	mov rdx, CompressedInternal.u64Size
-	mov r8, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders
+	mov r8, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset + pOriginal->NTHeaders.OptionalHeader.SizeOfImage
 	add r8, [Reloc]
 	mov r9, InternalShellcode.u64Size
 	call unpack
@@ -121,7 +121,7 @@ decompressloop:
 	mov rcx, rax
 
 	desync
-	mov rax, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.OldPENewBaseRVA + pOriginal->NTHeaders.OptionalHeader.SizeOfImage - pOriginal->NTHeaders.OptionalHeader.SizeOfHeaders
+	mov rax, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset + pOriginal->NTHeaders.OptionalHeader.SizeOfImage
 	add rax, rcx
 	%if Options.Packing.bAntiDump
 		lea rcx, [rip]
