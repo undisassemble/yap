@@ -1,14 +1,14 @@
-/// PLEASE READ ME!
-/// 
-/// Functions provided in this header and in yap.dll DO NOT DO ANYTHING UNLESS YOUR APPLICATION HAS BEEN PACKED!
-/// Every function is handled internally by the packer, meaning you do not need to distribute yap.dll with your application, because it doesn't do anything.
-/// Please make sure that you link with yap.dll specifically, and do not rename it, otherwise the packer will not be able to resolve the imports!
-/// All functions are provided if they were imported, regardless of configuration options when packing.
-/// You also cannot use GetProcAddress to get access to these functions.
-/// 
-/// You don't have to link with yap.dll if you only use reasm macros.
-/// 
-/// Have a good day :)
+// PLEASE READ ME!
+// 
+// Functions provided in this header and in yap.dll DO NOT DO ANYTHING UNLESS YOUR APPLICATION HAS BEEN PACKED!
+// Every function is handled internally by the packer, meaning you do not need to distribute yap.dll with your application, because it doesn't do anything.
+// Please make sure that you link with yap.dll specifically, and do not rename it, otherwise the packer will not be able to resolve the imports!
+// All functions are provided if they were imported, regardless of configuration options when packing.
+// You also cannot use GetProcAddress to get access to these functions.
+// 
+// You don't have to link with yap.dll if you only use reasm macros.
+// 
+// Have a good day :)
 
 #pragma once
 
@@ -28,17 +28,17 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
-/// 
-/// Check for attached debuggers.
-/// It is highly recommended that you use this in your main thread, as no protective threads are spawned by the packer.
-/// Only the main thread of the application can check for hardware breakpoints.
-/// 
+// 
+// Check for attached debuggers.
+// It is highly recommended that you use this in your main thread, as no protective threads are spawned by the packer.
+// Only the main thread of the application can check for hardware breakpoints.
+// 
 YAP_IMPORT(bool) CheckForDebuggers();
 
-/// 
-/// Retrieves the base address of the running executable.
-/// If using anti-dump, GetModuleHandle(NULL) will return NULL, use this instead.
-/// 
+// 
+// Retrieves the base address of the running executable.
+// If using anti-dump, GetModuleHandle(NULL) will return NULL, use this instead.
+// 
 YAP_IMPORT(HMODULE) GetSelf();
 
 #ifdef __cplusplus
@@ -51,19 +51,19 @@ YAP_IMPORT(HMODULE) GetSelf();
 #define YAP_OP_REASM_MUTATION 0b10000000
 #define YAP_OP_REASM_SUB      0b00000010
 #ifdef __MINGW64__
-#define YAP_OP(x) __asm__ volatile (".byte 0x67, 0x48, 0x0F, 0x1F, 0x04, 0x25, %c0, 0x80, 0x65, 0x89" : : "i" (x & 0xFF))
+#define YAP_OP(x) __asm__ volatile (".byte 0x67, 0x48, 0x0F, 0x1F, 0x04, 0x25, %c0, 0x80, 0x65, 0x89" : : "i" ((x) & 0xFF))
 #else
-#define YAP_OP(x) __asm nop qword [0x89658000 | (x)]
+#define YAP_OP(x) __asm nop qword [0x89658000 | ((x) & 0xFF)]
 #endif
 
-/// 
-/// Changes the reassemblers mutation setting.
-/// NOTE: This is all linear, any control flow changes/optimizations might change how you expect this to behave!
-/// 
+// 
+// Changes the reassemblers mutation setting.
+// NOTE: This is all linear, any control flow changes/optimizations might change how you expect this to behave!
+// 
 #define YAP_MUTATIONLEVEL(level) YAP_OP(YAP_OP_REASM_MUTATION | (level & 0b1111111))
 
-/// 
-/// Changes the substitution mutation setting.
-/// NOTE: This is all linear, any control flow changes/optimizations might change how you expect this to behave!
-/// 
+// 
+// Changes the reassemblers substitution setting.
+// NOTE: This is all linear, any control flow changes/optimizations might change how you expect this to behave!
+// 
 #define YAP_SUBSTITUTION(enabled) YAP_OP(YAP_OP_REASM_SUB | (enabled & 1))
