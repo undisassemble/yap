@@ -1,7 +1,14 @@
 #pragma once
 
 // Headers
-#include "platform.hpp"
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winternl.h>
+#include <psapi.h>
+#include <shlwapi.h>
+#include <commdlg.h>
+#include <shellapi.h>
+#include <stdint.h>
 #include "version.hpp"
 #include <limits.h>
 typedef uint64_t QWORD;

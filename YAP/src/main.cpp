@@ -4,11 +4,6 @@
 #include "packer.hpp"
 #include "gui.hpp"
 #include "debugger.hpp"
-#include <errhandlingapi.h>
-#include <minwinbase.h>
-#include <processthreadsapi.h>
-#include <shlwapi.h>
-#include <string.h>
 #include <time.h>
 #include <stdarg.h>
 #include <GLFW/glfw3.h>

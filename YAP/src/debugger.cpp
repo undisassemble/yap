@@ -1,12 +1,6 @@
 #include "util.hpp"
 #include "debugger.hpp"
 #include <tlhelp32.h>
-#include <basetsd.h>
-#include <errhandlingapi.h>
-#include <minwinbase.h>
-#include <minwindef.h>
-#include <processthreadsapi.h>
-#include <winnt.h>
 #include <winternl.h>
 #include <dbghelp.h>
 
