@@ -5,6 +5,7 @@
 #define __YAP_VERSION_MASK_MAJOR__ 0x000000FF
 #define __YAP_VERSION_MASK_MINOR__ 0x0000FF00
 #define __YAP_VERSION_MASK_PATCH__ 0x00FF0000
+#define __YAP_CONFIG_VERSION__ 0 // Only changes when .yaproj file format changes
 #ifdef _DEBUG
 #define __YAP_BUILD__ "DEBUG"
 #define DEBUG_ONLY(x) x

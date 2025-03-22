@@ -40,7 +40,7 @@ GetModuleHandleW_item:
     mov r10d, 0
 GetModuleHandleW_strcmp_loop:
     inc r10
-    mov r11w, word [r9 + r10 * 2]
+    mov r11w, [r9 + r10 * 2]
     test r11w, r11w
     strict
     jnz GetModuleHandleW_strcmp_loop

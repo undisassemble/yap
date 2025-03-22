@@ -50,7 +50,6 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GN
 	add_link_options(-static)
 	add_link_options(-Wl,-allow-multiple-definition)
 	add_compile_options(-fpermissive)
-	add_link_options(-mwindows)
 else()
 	message(FATAL_ERROR "CMake build files only support clang/gcc")
 endif()
@@ -93,6 +92,7 @@ file(GLOB SOURCES_GLFW
 	"YAP/meta/glfw3.rc"
 )
 add_library(glfw3 SHARED ${SOURCES_GLFW})
+target_link_options(glfw3 PUBLIC -mwindows)
 set_target_properties(glfw3 PROPERTIES PREFIX "")
 set_target_properties(glfw3 PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -107,6 +107,7 @@ file(GLOB SOURCES_IMGUI
 	"YAP/meta/imgui.rc"
 )
 add_library(imgui SHARED ${SOURCES_IMGUI})
+target_link_options(imgui PUBLIC -mwindows)
 target_link_libraries(imgui glfw3)
 set_target_properties(imgui PROPERTIES PREFIX "")
 set_target_properties(imgui PROPERTIES SUFFIX ".dll")
@@ -121,6 +122,7 @@ file(GLOB SOURCES_ASMJIT
 	"YAP/meta/asmjit.rc"
 )
 add_library(asmjit SHARED ${SOURCES_ASMJIT})
+target_link_options(asmjit PUBLIC -mwindows)
 set_target_properties(asmjit PROPERTIES PREFIX "")
 set_target_properties(asmjit PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -135,6 +137,7 @@ file(GLOB SOURCES_ZYDIS
 	"YAP/dependencies/zydis/resources/VersionInfo.rc"
 )
 add_library(zydis SHARED ${SOURCES_ZYDIS})
+target_link_options(zydis PUBLIC -mwindows)
 set_target_properties(zydis PROPERTIES PREFIX "")
 set_target_properties(zydis PROPERTIES SUFFIX ".dll")
 target_compile_definitions(zydis PUBLIC ZYCORE_SHOULD_EXPORT)
@@ -149,6 +152,7 @@ file(GLOB SOURCES_LZMA
 	"YAP/meta/lzma.rc"
 )
 add_library(lzma SHARED ${SOURCES_LZMA})
+target_link_options(lzma PUBLIC -mwindows)
 set_target_properties(lzma PROPERTIES PREFIX "")
 set_target_properties(lzma PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -161,6 +165,7 @@ endif()
 
 # yap.dll
 add_library(yap SHARED "SDK/yap_sdk.cpp" "SDK/yap.rc")
+target_link_options(yap PUBLIC -mwindows)
 set_target_properties(yap PROPERTIES PREFIX "")
 set_target_properties(yap PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -179,6 +184,7 @@ file(GLOB SOURCES
 )
 add_executable(YAPClient WIN32 ${SOURCES})
 add_dependencies(YAPClient Generated)
+target_link_options(YAPClient PUBLIC -mwindows)
 target_link_libraries(YAPClient d3d11)
 target_link_libraries(YAPClient ntdll)
 target_link_libraries(YAPClient shlwapi)
@@ -229,6 +235,7 @@ endif()
 
 # Build test executable
 add_executable(test_executable WIN32 tests/test.cpp)
+target_link_options(test_executable PUBLIC -mconsole)
 set_target_properties(test_executable PROPERTIES PREFIX "")
 set_target_properties(test_executable PROPERTIES SUFFIX ".exe")
 
@@ -236,11 +243,11 @@ set_target_properties(test_executable PROPERTIES SUFFIX ".exe")
 function(run_test yaproj)
     add_test(NAME "Protect (easy) - ${yaproj}" COMMAND ${CROSSCOMPILING_EMULATOR} $<TARGET_FILE:YAPClient> ${PROJECT_SOURCE_DIR}/tests/${yaproj}.yaproj protect $<TARGET_FILE:test_executable> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe)
     if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-        add_test(NAME "Run (easy) - ${yaproj}" COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe)
+        add_test(NAME "Run (easy) - ${yaproj}" COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe & del ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe)
     endif()
 	add_test(NAME "Protect (hard) - ${yaproj}" COMMAND ${CROSSCOMPILING_EMULATOR} $<TARGET_FILE:YAPClient> ${PROJECT_SOURCE_DIR}/tests/${yaproj}.yaproj protect $<TARGET_FILE:YAPClient> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe)
 	if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-        add_test(NAME "Run (hard) - ${yaproj}" COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe)
+        add_test(NAME "Run (hard) - ${yaproj}" COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe --version & del ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testing.exe)
     endif()
 endfunction()
 

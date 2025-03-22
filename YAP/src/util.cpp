@@ -1,6 +1,5 @@
 #include "util.hpp"
 #include "errhandlingapi.h"
-#include "winerror.h"
 
 void SaveSettings() {
 	// Get file
@@ -79,7 +78,7 @@ bool SaveProject() {
 
 	// Write sig + version
 	WriteFile(hFile, "YAP", 3, NULL, NULL);
-	DWORD ver = __YAP_VERSION_NUM__;
+	DWORD ver = __YAP_CONFIG_VERSION__;
 	WriteFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
 
 	// Write data
@@ -123,11 +122,11 @@ bool LoadProject() {
 
 	// Read version
 	ReadFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
-	if ((ver & ~__YAP_VERSION_MASK_PATCH__) != (__YAP_VERSION_NUM__ & ~__YAP_VERSION_MASK_PATCH__)) {
+	if (ver != __YAP_CONFIG_VERSION__) {
 		Modal("Version mismatch", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Version mismatch\n");
-		LOG(Info_Extended, MODULE_YAP, "Current version: " __YAP_VERSION__ " " __YAP_BUILD__ "\n");
-		LOG(Info_Extended, MODULE_YAP, "Project version: %d.%d.%d %s\n", ver & __YAP_VERSION_MASK_MAJOR__, ver & __YAP_VERSION_MASK_MINOR__, ver & __YAP_VERSION_MASK_PATCH__, (ver & __YAP_VERSION_MASK_DEBUG__) ? "DEBUG" : "RELEASE");
+		LOG(Info_Extended, MODULE_YAP, "Current version: %d\n", __YAP_CONFIG_VERSION__);
+		LOG(Info_Extended, MODULE_YAP, "Project version: %d\n", ver);
 		CloseHandle(hFile);
 		Data.Project[0] = 0;
 		return false;

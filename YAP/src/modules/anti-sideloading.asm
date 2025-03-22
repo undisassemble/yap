@@ -1,5 +1,7 @@
    jmp skip
 
+KRN:
+   embed &Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest)
 DIR:
    embed &Sha256Str("SetDllDirectoryA"), sizeof(Sha256Digest)
 SSP:
@@ -8,7 +10,7 @@ ZRO:
    db 0
 
 skip:
-   lea rcx, [KERNEL32DLL]
+   lea rcx, [KRN]
    call ShellcodeData.Labels.GetModuleHandleW
    test rax, rax
    strict

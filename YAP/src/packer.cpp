@@ -604,11 +604,6 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 		a.bind(not_found);
 	}
 
-	// Sideloading protection
-	if (Options.Packing.bMitigateSideloading) {
-		#include "modules/anti-sideloading.inc"
-	}
-
 	a.garbage();
 
 	// Handle original PE's imports

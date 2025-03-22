@@ -54,9 +54,11 @@ SkipReloc:
 	desync_jnz
 
     ; Modules
-    ; TODO: Move ms-signing to internal
     ; TODO: Improve anti-vm
     ; TODO: Improve anti-sandbox
+	%if Options.Packing.bMitigateSideloading
+		%include "modules/anti-sideloading.inc"
+	%endif
 	%if Options.Packing.bOnlyLoadMicrosoft
 		; RAW_C PROCESS_MITIGATION_POLICY _policy = ProcessSignaturePolicy;
 		; RAW_C PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY sig_policy = { 0 };

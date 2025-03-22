@@ -10,7 +10,6 @@
 #include <shellapi.h>
 #include <stdint.h>
 #include "version.hpp"
-#include <limits.h>
 typedef uint64_t QWORD;
 #ifndef UTIL_STRUCT_ONLY
 #include <asmjit/asmjit.h>

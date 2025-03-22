@@ -163,7 +163,10 @@ def parse_mem(operand: str) -> str:
 
         # Other stuff
         try:
-            noff = int(element, 0)
+            if element.startswith("offsetof") or element.startswith("sizeof"):
+                noff = element
+            else:
+                noff = int(element, 0)
             if off:
                 raise Exception("Too many offsets")
             off = noff
