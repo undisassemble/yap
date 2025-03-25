@@ -120,8 +120,8 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 		}
 	}
 	if (pLine->Decoded.Instruction.operand_count_visible > 4) {
-		char formatted[MAX_PATH];
 #ifdef ENABLE_DUMPING
+		char formatted[MAX_PATH];
 		ZydisFormatter fmt;
 		ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
 		ZydisFormatterFormatInstruction(&fmt, &pLine->Decoded.Instruction, pLine->Decoded.Operands, pLine->Decoded.Instruction.operand_count_visible, formatted, sizeof(formatted), pLine->OldRVA, NULL);
@@ -132,6 +132,7 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 	}
 	
 	// Substitution
+	// TODO: Change this for a better solution
 	if (bSubstitute) {
 		switch (mnem) {
 		case Inst::kIdRet:
@@ -139,37 +140,17 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 			break;
 		case Inst::kIdMov:
 			if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) {
-				Gp o0;
-				memcpy(&o0, &ops[0], sizeof(Gp));
-				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) {
-					Gp o1;
-					memcpy(&o1, &ops[1], sizeof(Gp));
-					return mov(o0, o1);
-				} else if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) {
-					Imm o1;
-					memcpy(&o1, &ops[1], sizeof(Imm));
-					return mov(o0, o1);
-				} else {
-					Mem o1;
-					memcpy(&o1, &ops[1], sizeof(Mem));
-					return mov(o0, o1);
-				}
+				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Gp*>(&ops[1]));
+				else if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Imm*>(&ops[1]));
+				else return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Mem*>(&ops[1]));
 			} else {
-				Mem o0;
-				memcpy(&o0, &ops[0], sizeof(Mem));
-				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) {
-					Gp o1;
-					memcpy(&o1, &ops[1], sizeof(Gp));
-					return mov(o0, o1);
-				} else {
-					Imm o1;
-					memcpy(&o1, &ops[1], sizeof(Imm));
-					return mov(o0, o1);
-				}
+				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) return mov(*reinterpret_cast<Mem*>(&ops[0]), *reinterpret_cast<Gp*>(&ops[1]));
+				else return mov(*reinterpret_cast<Mem*>(&ops[0]), *reinterpret_cast<Imm*>(&ops[1]));
 			}
 			break;
 		case Inst::kIdCall:
 			if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && pLabel) return call(*pLabel);
+			else if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) return call(*reinterpret_cast<Gp*>(&ops[0]));
 			break;
 		}
 	}

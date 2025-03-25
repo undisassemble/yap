@@ -97,7 +97,7 @@ public:
 	Error dw(uint16_t o0, size_t o1 = 1) { block(); return Assembler::dw(o0, o1); }
 	Error dd(uint32_t o0, size_t o1 = 1) { block(); return Assembler::dd(o0, o1); }
 	Error dq(uint64_t o0, size_t o1 = 1) { block(); return Assembler::dq(o0, o1); }
-	Error embed(void* data, size_t dataSize) { block(); return::Assembler::embed(data, dataSize); }
+	Error embed(const void* data, size_t dataSize) override { block(); return::Assembler::embed(data, dataSize); }
 	Error jz(Label o0) { strict(); return Assembler::jz(o0); }
 	Error jz(Imm o0) { strict(); return Assembler::jz(o0); }
 	Error jnz(Label o0) { strict(); return Assembler::jnz(o0); }
@@ -122,7 +122,7 @@ public:
 	Error jle(Imm o0) { strict(); return Assembler::jle(o0); }
 	Error ret();
 	Error ret(Imm o0);
-	Error align(AlignMode o0, uint32_t o1) { HeldLocks++; Error ret = Assembler::align(o0, o1); HeldLocks--; return ret; }
+	Error align(AlignMode o0, uint32_t o1) override { HeldLocks++; Error ret = Assembler::align(o0, o1); HeldLocks--; return ret; }
 	Error _emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) override;
 	ProtectedAssembler(CodeHolder* pHolder = NULL) : Assembler(pHolder) {}
 	~ProtectedAssembler() {}
