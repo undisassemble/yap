@@ -82,6 +82,7 @@ public:
 	void desync_mov(Gpq o0);
 	void block() { bWaitingOnEmit = true; } // Prevents garbage stub from being generated
 	void strict() { bStrict = true; } // Tells the garbage stub to leave EFLAGS untouched
+	bool resolve(Mem memory); // Manually resolve memory opperand, and push to stack
 	Error call(Gp o0);
 	Error call(Imm o0);
 	Error call(Label o0);
@@ -93,6 +94,7 @@ public:
 	Error mov(Mem o0, Gp o1);
 	Error movzx(Gp o0, Mem o1);
 	Error movzx(Gp o0, Gp o1);
+	Error lea(Gp o0, Mem o1);
 	Error db(uint8_t o0, size_t o1 = 1) { block(); return Assembler::db(o0, o1); }
 	Error dw(uint16_t o0, size_t o1 = 1) { block(); return Assembler::dw(o0, o1); }
 	Error dd(uint32_t o0, size_t o1 = 1) { block(); return Assembler::dd(o0, o1); }

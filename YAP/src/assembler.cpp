@@ -158,6 +158,69 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 	return !Assembler::_emit(mnem, ops[0], ops[1], ops[2], &ops[3]);
 }
 
+// TODO: Make this work with labels and with rip
+bool ProtectedAssembler::resolve(Mem memory) {
+	// Check compatibility
+	if (memory.hasBaseLabel() ||
+		(memory.hasIndexReg() && (memory.indexReg().isRip() || (!memory.indexReg().isGpq() && !memory.indexReg().isGpd()))) ||
+		(memory.hasBaseReg() && (memory.baseReg().isRip() || (!memory.baseReg().isGpq() && !memory.baseReg().isGpd()) || (memory.baseReg().isGpd() && *reinterpret_cast<Gpd*>(&memory.baseReg()) == esp))) ||
+		(memory.hasBaseReg() && !memory.hasIndexReg() && !memory.hasOffset())) {
+		return false;
+	}
+
+	bool fq = bStrict;
+	Gp reg;
+	do {
+		reg = truerandreg();
+	} while ((memory.hasBaseReg() && reg == memory.baseReg()) || (memory.hasIndexReg() && reg == memory.indexReg()));
+	if (fq) {
+		pushfq();
+	}
+	push(reg);
+	mov(reg, 0);
+	if (memory.hasIndexReg()) {
+		if (memory.indexReg().isGpd()) {
+			mov(reg.r32(), *reinterpret_cast<Gpd*>(&memory.indexReg()));
+			if (*reinterpret_cast<Gpd*>(&memory.indexReg()) == esp) {
+				add(reg, fq ? 16 : 8);
+			}
+		} else if (memory.indexReg().isGpq()) {
+			mov(reg, *reinterpret_cast<Gpq*>(&memory.indexReg()));
+			if (*reinterpret_cast<Gpq*>(&memory.indexReg()) == rsp) {
+				add(reg, fq ? 16 : 8);
+			}
+		}
+	}
+	if (memory.hasShift() && memory.shift() > 0) {
+		shl(reg, memory.shift());
+	}
+	if (memory.hasBaseReg()) {
+		if (memory.baseReg().isGpd()) {
+			push(*reinterpret_cast<Gpq*>(&memory.baseReg()));
+			xchg(*reinterpret_cast<Gpd*>(&memory.baseReg()), *reinterpret_cast<Gpd*>(&memory.baseReg()));
+			add(reg, *reinterpret_cast<Gpq*>(&memory.baseReg()));
+			pop(*reinterpret_cast<Gpq*>(&memory.baseReg()));
+		} else if (memory.baseReg().isGpq()) {
+			add(reg, *reinterpret_cast<Gpq*>(&memory.baseReg()));
+			if (*reinterpret_cast<Gpq*>(&memory.baseReg()) == rsp) {
+				add(reg, fq ? 16 : 8);
+			}
+		}
+	}
+	if (memory.hasOffset()) {
+		add(reg, memory.offset());
+	}
+
+	if (fq) {
+		xchg(reg, ptr(rsp, 8));
+		xchg(reg, ptr(rsp));
+		popfq();
+	} else {
+		xchg(reg, ptr(rsp));
+	}
+	return true;
+}
+
 int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {
 	if (nMin > nMax) return 0;
 	HeldLocks++;
@@ -614,6 +677,15 @@ void ProtectedAssembler::desync_mov(Gpq o0) {
 	for (int i = 0; i < dist + 6; i++) db(rand() & 0xFF);
 }
 
+Error ProtectedAssembler::lea(Gp o0, Mem o1) {
+	if (bWaitingOnEmit || !bMutate || o0.size() != 8) return Assembler::lea(o0, o1);
+	bool j = bStrict;
+	if (!resolve(o1)) return Assembler::lea(o0, o1);
+	bStrict = j;
+	return pop(o0);
+}
+
+// TODO: This probably doesnt work with strict
 Error ProtectedAssembler::call(Gp o0) {
 	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
 	BYTE dist = 64 + (rand() % 192);
@@ -642,6 +714,7 @@ Error ProtectedAssembler::call(Imm o0) {
 	return Assembler::call(o0);
 }
 
+// TODO: This probably doesnt work with strict
 Error ProtectedAssembler::call(Label o0) {
 	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
 	Gp reg = truerandreg();
@@ -669,14 +742,22 @@ Error ProtectedAssembler::call(Label o0) {
 	return 0;
 }
 
+// TODO: This probably doesnt work with strict
 Error ProtectedAssembler::call(Mem o0) {
 	if (bWaitingOnEmit || !bMutate || o0.baseReg() == rsp) return Assembler::call(o0);
 	Gp reg = truerandreg();
 	o0.setSize(8);
 	BYTE dist = 64 + (rand() % 192);
 	if (bStrict) dist = 0;
-	push(o0);
-	push(o0);
+	if (resolve(o0)) {
+		xchg(reg, ptr(rsp));
+		mov(reg, ptr(reg));
+		xchg(reg, ptr(rsp));
+		push(qword_ptr(rsp));
+	} else {
+		push(o0);
+		push(o0);
+	}
 	push(reg);
 	Label after = newLabel();
 	lea(reg, ptr(after));
@@ -724,18 +805,46 @@ Error ProtectedAssembler::mov(Gp o0, Mem o1) {
 Error ProtectedAssembler::mov(Mem o0, Imm o1) {
 	if (bWaitingOnEmit || !bMutate || o0.size() != 8 || o0.baseReg() == rsp) return Assembler::mov(o0, o1);
 	bool j = bStrict;
-	push(o1);
-	bStrict = j;
-	return pop(o0);
+	if (resolve(o0)) {
+		bStrict = j;
+		push(o1);
+		Gp reg = truerandreg();
+		bStrict = j;
+		xchg(reg, ptr(rsp, 8));
+		bStrict = j;
+		pop(qword_ptr(reg));
+		bStrict = j;
+		return pop(reg);
+	} else {
+		push(o1);
+		bStrict = j;
+		return pop(o0);
+	}
 }
 
 Error ProtectedAssembler::mov(Mem o0, Gp o1) {
 	o0.setSize(o1.size());
 	if (bWaitingOnEmit || !bMutate || o1.size() == 1 || o1.size() == 4 || o0.baseReg() == rsp) return Assembler::mov(o0, o1);
 	bool j = bStrict;
-	push(o1);
-	bStrict = j;
-	return pop(o0);
+	if (resolve(o0)) {
+		Gp reg;
+		do {
+			reg = truerandreg();
+		} while (reg == o1.r64());
+		bStrict = j;
+		push(o1);
+		bStrict = j;
+		xchg(reg, ptr(rsp, o1.size()));
+		bStrict = j;
+		if (o1.size() == 8) pop(qword_ptr(reg));
+		else pop(word_ptr(reg));
+		bStrict = j;
+		return pop(reg);
+	} else {
+		push(o1);
+		bStrict = j;
+		return pop(o0);
+	}
 }
 
 Error ProtectedAssembler::movzx(Gp o0, Mem o1) {
