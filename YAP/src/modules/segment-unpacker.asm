@@ -4,13 +4,13 @@ LoadSegment:
     
     ; Check if already loaded
     mov eax, [CurrentlyLoadedSegment]
-    ; DEBUG_ONLY
-    cmp rax, [rsp]
-    strict
-    jne dontkill
-    int3
+    %ifdef _DEBUG
+        cmp rax, [rsp]
+        strict
+        jne dontkill
+        int3
 dontkill:
-    ; ENDONLY
+    %endif
     cmp eax, count
     strict
     jl _UnloadSegment

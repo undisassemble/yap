@@ -130,11 +130,11 @@ decompressloop:
 		sub rcx, a.offset()
 		mov rdx, [szshell]
 	%endif
-	; DEBUG_ONLY
-    %if Options.Debug.bGenerateBreakpoints
-    int3
-    block
+	%ifdef _DEBUG
+		%if Options.Debug.bGenerateBreakpoints
+			int3
+			block
+		%endif
     %endif
-    ; ENDONLY
 	call rax
 	garbage

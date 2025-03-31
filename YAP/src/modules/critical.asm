@@ -8,11 +8,11 @@ SIP:
 data:
     dd 1
 ret:
-    ; DEBUG_ONLY
-    %if Options.Debug.bGenerateBreakpoints
-    int3
+    %ifdef _DEBUG
+        %if Options.Debug.bGenerateBreakpoints
+            int3
+        %endif
     %endif
-    ; ENDONLY
     ret
 
 _skip:

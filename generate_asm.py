@@ -1,15 +1,14 @@
 # This turns the assembly sources into headers that can be used by the packer, to make it easier to read/modify the packers shellcode
 
 # Special commands:
+#     %ifdef condition                      Same as C #ifdef, end with %endif
+#     %ifndef condition                     Same as C #ifndef, end with %endif
 #     %if condition                         Wraps code in an if statement, condition should be c-style
 #     %elif condition                       Else if statement
 #     %else                                 Else statement
 #     %endif                                Ends if statement
 #     %include                              Include file
 #     ; GLOBAL                              Following label is global, and should not be created
-#     ; DEBUG_ONLY                          Following code only present in debug builds
-#     ; RELEASE_ONLY                        Following code only present in release builds
-#     ; ENDONLY                             Ends DEBUG_ONLY and RELEASE_ONLY segments
 #     ; RAW_C line                          line is C code that should be embedded in the source
 # These comments should have their own lines, any comments following source will be ignored.
 # Also, custom instructions like strict or embed work
@@ -40,9 +39,9 @@ SOURCES = [
 ]
 
 # Dont change
+IfStack = []
 NeededLabels = []
 BoundLabels = []
-NumIfs = 0
 GlobalLabel = False
 MnemonicConversions = {
     'xor': 'xor_',
@@ -198,7 +197,7 @@ def parse_mem(operand: str) -> str:
     return line
 
 def parse_line(line: str) -> str:
-    global GlobalLabel, NumIfs, NeededLabels, BoundLabels, ValidRegs
+    global GlobalLabel, IfStack, NeededLabels, BoundLabels, ValidRegs
     line = line.strip()
     if not line or line == '':
         return ""
@@ -209,12 +208,6 @@ def parse_line(line: str) -> str:
         if line.startswith("GLOBAL"):
             GlobalLabel = True
             return ""
-        elif line.startswith("DEBUG_ONLY"):
-            return "#ifdef _DEBUG\n"
-        elif line.startswith("RELEASE_ONLY"):
-            return "#ifndef _DEBUG\n"
-        elif line.startswith("ENDONLY"):
-            return "#endif\n"
         elif line.startswith("RAW_C "):
             return line.split("RAW_C ")[1] + "\n"
         else:
@@ -223,21 +216,35 @@ def parse_line(line: str) -> str:
     # Special stuff
     elif line[0] == '%':
         if line.lower().startswith("%if "):
-            NumIfs += 1
+            IfStack.append(1)
             return "if (" + line.split("%if ")[1] + ") {\n"
         elif line.lower().startswith("%elif "):
-            if NumIfs < 1:
+            if IfStack.__len__() < 1:
                 raise Exception("ELIF when not in an if statement")
-            return "} else if (" + line.split("%elif ")[1] + ") {\n"
+            if IfStack[-1]:
+                return "} else if (" + line.split("%elif ")[1] + ") {\n"
+            else:
+                return "#elif " + line.split("%elif ")[1] + "\n"
         elif line.lower().startswith("%else"):
-            if NumIfs < 1:
+            if IfStack.__len__() < 1:
                 raise Exception("ELSE when not in an if statement")
-            return "} else {\n"
+            if IfStack[-1]:
+                return "} else {\n"
+            else:
+                return "#else\n"
+        elif line.lower().startswith("%ifdef"):
+            IfStack.append(0)
+            return "#if defined(" + line.split("%ifdef ")[1] + ")\n"
+        elif line.lower().startswith("%ifndef"):
+            IfStack.append(0)
+            return "#if !defined(" + line.split("%ifndef ")[1] + ")\n"
         elif line.lower().startswith("%endif"):
-            if NumIfs < 1:
+            if IfStack.__len__() < 1:
                 raise Exception("ENDIF when not in an if statement")
-            NumIfs -= 1
-            return "}\n"
+            if IfStack.pop():
+                return "}\n"
+            else:
+                return "#endif\n"
         elif line.lower().startswith("%include "):
             return "#include " + line[9:] + "\n"
 
@@ -314,12 +321,12 @@ def parse_line(line: str) -> str:
 
 
 def main():
-    global GlobalLabel, NumIfs, NeededLabels, BoundLabels, ValidRegs
+    global GlobalLabel, IfStack, NeededLabels, BoundLabels, ValidRegs
     for fname in SOURCES:
         # Clear vars
         NeededLabels = []
         BoundLabels = []
-        NumIfs = 0
+        IfStack = []
         GlobalLabel = False
         infile = None
         outfile = None

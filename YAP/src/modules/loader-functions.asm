@@ -96,11 +96,11 @@ GetModuleHandleW_skip:
     mov rax, [rax + 0x30]
     ret
 GetModuleHandleW_bad:
-    ; DEBUG_ONLY
-    %if Options.Debug.bGenerateBreakpoints
-        int3
+    %ifdef _DEBUG
+        %if Options.Debug.bGenerateBreakpoints
+            int3
+        %endif
     %endif
-    ; ENDONLY
     mov eax, 0
     ret
 GetModuleHandleW_ret_self:
@@ -216,11 +216,11 @@ GetProcAddress_skip:
     add rax, rcx
     jmp GetProcAddress_ret
 GetProcAddress_bad:
-    ; DEBUG_ONLY
-    %if Options.Debug.bGenerateBreakpoints
-        int3
+    %ifdef _DEBUG
+        %if Options.Debug.bGenerateBreakpoints
+            int3
+        %endif
     %endif
-    ; ENDONLY
     mov eax, 0
 GetProcAddress_ret:
     pop rbx

@@ -82,12 +82,12 @@ _do:
 		; RAW_C }
 		push rcx
 		mov rcx, 0
-		; DEBUG_ONLY
-        %if Options.Debug.bGenerateBreakpoints
-            int3
-            block
+		%ifdef _DEBUG
+			%if Options.Debug.bGenerateBreakpoints
+				int3
+				block
+			%endif
         %endif
-        ; ENDONLY
 		popfq
 		block
 		jz pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseAddress - (rand() & 0xFFFF)

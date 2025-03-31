@@ -124,11 +124,11 @@ GetModuleHandleW_skip:
     mov rax, [rax + 0x30]
     ret
 GetModuleHandleW_bad:
-    ; DEBUG_ONLY
-    %if Options.Debug.bGenerateBreakpoints
-        int3
+    %ifdef _DEBUG
+        %if Options.Debug.bGenerateBreakpoints
+            int3
+        %endif
     %endif
-    ; ENDONLY
     mov eax, 0
     ret
 GetModuleHandleW_ret_self:
@@ -331,11 +331,11 @@ GetProcAddress_skip:
     jge GetProcAddress_check_in_e
     jmp GetProcAddress_ret
 GetProcAddress_bad:
-    ; DEBUG_ONLY
-    %if Options.Debug.bGenerateBreakpoints
-        int3
+    %ifdef _DEBUG
+        %if Options.Debug.bGenerateBreakpoints
+            int3
+        %endif
     %endif
-    ; ENDONLY
     mov eax, 0
 GetProcAddress_ret:
     %if Options.Packing.bHideIAT
@@ -417,11 +417,11 @@ GetProcAddress_check_in_e:
     jge GetProcAddress_ret
    
     ; Handle import thingy dothingy magigys
-    ; DEBUG_ONLY
-    %if Options.Debug.bGenerateBreakpoints
-        int3
+    %ifdef _DEBUG
+        %if Options.Debug.bGenerateBreakpoints
+            int3
+        %endif
     %endif
-    ; ENDONLY
     push r12
     push r13
     push r14
