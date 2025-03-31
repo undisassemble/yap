@@ -2,6 +2,12 @@
 #include "util.hpp"
 #include "asm.hpp"
 
+struct NeededLink {
+	uint64_t offsetToLink = 0;
+	uint64_t offsetOfRIP = 0;
+	uint32_t id = 0;
+};
+
 class AsmJitErrorHandler : public ErrorHandler {
 public:
 	void handleError(_In_ Error error, _In_ const char* message, _In_ BaseEmitter* emitter) override;
@@ -55,6 +61,7 @@ private:
 	}
 	Gp randreg() { return stack.Size() ? stack[rand() % stack.Size()] : (Gp)rsp; }
 	Vector<Gp> stack;
+	Vector<NeededLink> NeededLinks;
 	int randstack(_In_ int nMin = 0, _In_ int nMax = 15);
 	void restorestack(_In_ int n = -1);
 	void randinst(Gp o0);
@@ -65,6 +72,7 @@ public:
 	bool bSubstitute = true;
 	bool bFailed = false;
 	BYTE MutationLevel = 3;
+	void resolvelinks();
 
 	/// <summary>
 	/// Converts and assembles a decoded instruction.

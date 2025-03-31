@@ -1318,6 +1318,7 @@ bool Asm::Assemble() {
 	// Copy data
 	Data.sTask = "Finalizing";
 	LOG(Info, MODULE_REASSEMBLER, "Finalizing\n");
+	a.resolvelinks();
 	holder.flatten();
 	holder.relocateToBase(NTHeaders.OptionalHeader.ImageBase + SectionHeaders[0].VirtualAddress);
 	LOG(Info_Extended, MODULE_REASSEMBLER, "Assembled code has %d sections, and has %d relocations\n", holder.sectionCount(), holder.hasRelocEntries() ? holder.relocEntries().size() : 0);

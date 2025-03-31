@@ -1,5 +1,6 @@
 #include "assembler.hpp"
 #include "asmtranslations.hpp"
+#include "util.hpp"
 
 // SDK defs
 #define YAP_OP_REASM_MUTATION 0b10000000
@@ -161,7 +162,8 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 // TODO: Make this work with labels and with rip
 bool ProtectedAssembler::resolve(Mem memory) {
 	// Check compatibility
-	if (memory.hasBaseLabel() ||
+	if ((memory.hasBaseLabel() && !code()->isLabelBound(memory.baseId())) || // I have no idea why the fuck this isnt working, but im just going to ignore it for now
+		(memory.hasBaseReg() && memory.baseReg().isGpd() && *reinterpret_cast<Gpd*>(&memory.baseReg()) == esp) ||
 		(memory.hasIndexReg() && (memory.indexReg().isRip() || (!memory.indexReg().isGpq() && !memory.indexReg().isGpd()))) ||
 		(memory.hasBaseReg() && (memory.baseReg().isRip() || (!memory.baseReg().isGpq() && !memory.baseReg().isGpd()) || (memory.baseReg().isGpd() && *reinterpret_cast<Gpd*>(&memory.baseReg()) == esp))) ||
 		(memory.hasBaseReg() && !memory.hasIndexReg() && !memory.hasOffset())) {
@@ -178,6 +180,7 @@ bool ProtectedAssembler::resolve(Mem memory) {
 	}
 	push(reg);
 	mov(reg, 0);
+	uint64_t off = 0;
 	if (memory.hasIndexReg()) {
 		if (memory.indexReg().isGpd()) {
 			mov(reg.r32(), *reinterpret_cast<Gpd*>(&memory.indexReg()));
@@ -194,13 +197,40 @@ bool ProtectedAssembler::resolve(Mem memory) {
 	if (memory.hasShift() && memory.shift() > 0) {
 		shl(reg, memory.shift());
 	}
-	if (memory.hasBaseReg()) {
+	if (memory.hasBaseLabel()) {
+		if (rand() & 1) {
+			push(reg);
+			lea(reg, ptr(rip));
+			off = offset();
+			add(ptr(rsp), reg);
+			pop(reg);
+		} else {
+			db(0xE8);
+			dd(0x00);
+			off = offset();
+			add(ptr(rsp), reg);
+			pop(reg);
+		}
+		if (code()->isLabelBound(memory.baseId())) {
+			add(reg, code()->labelOffset(memory.baseId()) - off);
+		} else {
+			NeededLink link = { 0 };
+			push(reg);
+			mov(reg, 0xFF00FF00FF00FF00);
+			link.offsetToLink = offset() - 8;
+			link.offsetOfRIP = off;
+			link.id = memory.baseId();
+			NeededLinks.Push(link);
+			add(ptr(rsp), reg);
+			pop(reg);
+		}
+	} else if (memory.hasBaseReg()) {
 		if (memory.baseReg().isGpd()) {
 			push(*reinterpret_cast<Gpq*>(&memory.baseReg()));
 			xchg(*reinterpret_cast<Gpd*>(&memory.baseReg()), *reinterpret_cast<Gpd*>(&memory.baseReg()));
 			add(reg, *reinterpret_cast<Gpq*>(&memory.baseReg()));
 			pop(*reinterpret_cast<Gpq*>(&memory.baseReg()));
-		} else if (memory.baseReg().isGpq()) {
+		} else {
 			add(reg, *reinterpret_cast<Gpq*>(&memory.baseReg()));
 			if (*reinterpret_cast<Gpq*>(&memory.baseReg()) == rsp) {
 				add(reg, fq ? 16 : 8);
@@ -219,6 +249,20 @@ bool ProtectedAssembler::resolve(Mem memory) {
 		xchg(reg, ptr(rsp));
 	}
 	return true;
+}
+
+void ProtectedAssembler::resolvelinks() {
+	LOG(Info, MODULE_PACKER, "Resolving %d links\n", NeededLinks.Size());
+	NeededLink link = { 0 };
+	while (NeededLinks.Size()) {
+		link = NeededLinks.Pop();
+		if (!code()->isLabelBound(link.id)) {
+			LOG(Failed, MODULE_PACKER, "Link ID invalid\n");
+			bFailed = true;
+			return;
+		}
+		*reinterpret_cast<QWORD*>(code()->textSection()->data() + link.offsetToLink) = code()->labelOffset(link.id) - link.offsetOfRIP;
+	}
 }
 
 int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {

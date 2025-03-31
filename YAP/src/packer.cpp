@@ -380,6 +380,7 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
 	#include "modules/tls.inc"
 
 	// Return data
+	a.resolvelinks();
 	holder.flatten();
 	holder.relocateToBase(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseAddress);
 	if (a.bFailed) {
@@ -509,6 +510,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	#include "modules/loader-functions.inc"
 
 	// Return data
+	a.resolvelinks();
 	holder.flatten();
 	holder.relocateToBase(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseAddress);
 	if (a.bFailed) {
@@ -1003,6 +1005,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	}
 
 	// Return data
+	a.resolvelinks();
 	holder.flatten();
 	holder.relocateToBase(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseAddress);
 	if (a.bFailed) {
