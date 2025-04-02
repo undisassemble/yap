@@ -1,15 +1,59 @@
-; Setup
+; Defines
 !define VERSION "0.0.0"
 Name "Yet Another Packer"
-OutFile "Installer.exe"
+OutFile "YAP-${VERSION}-Installer.exe"
 InstallDir "$PROGRAMFILES64\Yet Another Packer"
 RequestExecutionLevel admin
+SetCompressor lzma
+
+;----- MUI2 -----;
+!include MUI2.nsh
+
+; Icons
+; !define MUI_ICON "" ; FOR WHEN ICON IS ADDED
+; !define MUI_UNICON "" ; FOR WHEN ICON IS ADDED
+; !define MUI_HEADERIMAGE_BITMAP "" ; FOR WHEN ICON IS ADDED
+
+; Colors
+; !define MUI_BGCOLOR "191919"
+; !define MUI_TEXTCOLOR "FFFFFF"
+; !define MUI_LICENSEPAGE_BGCOLOR "282828"
+; !define MUI_DIRECTORYPAGE_BGCOLOR "282828"
+; !define MUI_STARTMENUPAGE_BGCOLOR "282828"
+; !define MUI_INSTFILESPAGE_COLORS "282828 191919"
+; ; !define MUI_INSTFILESPAGE_PROGRESSBAR "colored"
+; ; !define MUI_INSTALLCOLORS ""
+
+; Settings
+!define MUI_ABORTWARNING
+!define MUI_UNABORTWARNING
+
+; Pages
+var SMF
+!insertmacro MUI_PAGE_WELCOME
+!define MUI_LICENSEPAGE_CHECKBOX
+!insertmacro MUI_PAGE_LICENSE "LICENSE"
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_STARTMENU 0 $SMF
+!insertmacro MUI_PAGE_INSTFILES
+!define MUI_FINISHPAGE_RUN "$INSTDIR\bin\YAPClient.exe"
+!define MUI_FINISHPAGE_RUN_NOTCHECKED
+!define MUI_FINISHPAGE_NOREBOOTSUPPORT
+!insertmacro MUI_PAGE_FINISH
+!insertmacro MUI_UNPAGE_WELCOME
+!insertmacro MUI_UNPAGE_DIRECTORY
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_UNPAGE_FINISH
+
+!insertmacro MUI_LANGUAGE "English"
+;----------------;
+
+; File version
 VIProductVersion "${VERSION}.0"
 VIFileVersion "${VERSION}.0"
 VIAddVersionKey "ProductVersion" "${VERSION}"
 VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "FileDescription" "Protector for x64 native Windows PEs."
-SetCompressor lzma
 
 ; Installer
 Section
@@ -37,11 +81,14 @@ Section
 	WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "NoModify" 1
 	WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "NoRepair" 1
 	!ifdef INSTALLSIZE
-		WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "EstimatedSize" ${INSTALLSIZE}
+		WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "EstimatedSize" $INSTALLSIZE
 	!endif
 
     ; Other files
-    CreateShortCut "$SMPROGRAMS\Yet Another Packer.lnk" "$INSTDIR\bin\YAPClient.exe"
+    !insertmacro MUI_STARTMENU_WRITE_BEGIN 0
+        CreateDirectory "$SMPROGRAMS\$SMF"
+        CreateShortCut "$SMPROGRAMS\$SMF\Yet Another Packer.lnk" "$INSTDIR\bin\YAPClient.exe"
+    !insertmacro MUI_STARTMENU_WRITE_END
     SetOutPath $INSTDIR
     File LICENSE
     WriteUninstaller "$INSTDIR\Uninstall.exe"
