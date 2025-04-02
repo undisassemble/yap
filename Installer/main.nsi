@@ -14,16 +14,6 @@ SetCompressor lzma
 ; !define MUI_UNICON "" ; FOR WHEN ICON IS ADDED
 ; !define MUI_HEADERIMAGE_BITMAP "" ; FOR WHEN ICON IS ADDED
 
-; Colors
-; !define MUI_BGCOLOR "191919"
-; !define MUI_TEXTCOLOR "FFFFFF"
-; !define MUI_LICENSEPAGE_BGCOLOR "282828"
-; !define MUI_DIRECTORYPAGE_BGCOLOR "282828"
-; !define MUI_STARTMENUPAGE_BGCOLOR "282828"
-; !define MUI_INSTFILESPAGE_COLORS "282828 191919"
-; ; !define MUI_INSTFILESPAGE_PROGRESSBAR "colored"
-; ; !define MUI_INSTALLCOLORS ""
-
 ; Settings
 !define MUI_ABORTWARNING
 !define MUI_UNABORTWARNING
@@ -53,7 +43,7 @@ VIProductVersion "${VERSION}.0"
 VIFileVersion "${VERSION}.0"
 VIAddVersionKey "ProductVersion" "${VERSION}"
 VIAddVersionKey "FileVersion" "${VERSION}"
-VIAddVersionKey "FileDescription" "Protector for x64 native Windows PEs."
+VIAddVersionKey "FileDescription" "Protector for AMD64 native Windows PEs."
 
 ; Installer
 Section
@@ -96,7 +86,7 @@ SectionEnd
 
 ; Uninstaller
 Section "Uninstall"
-    Delete "$SMPROGRAMS\Yet Another Packer.lnk"
+    RMDir /r "$SMPROGRAMS\$SMF"
     DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP"
     RMDir /r $INSTDIR
 SectionEnd
