@@ -1,5 +1,7 @@
 ; Defines
-!define VERSION "0.0.0"
+!ifndef VERSION
+    !error "Must define VERSION"
+!endif
 Name "Yet Another Packer"
 OutFile "YAP-${VERSION}-Installer.exe"
 InstallDir "$PROGRAMFILES64\Yet Another Packer"
@@ -45,7 +47,7 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "FileDescription" "Protector for AMD64 native Windows PEs."
 
-; Installer
+;-- INSTALLER --;
 Section
     ; bin
     CreateDirectory "$INSTDIR\bin"
@@ -72,6 +74,8 @@ Section
 	WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "NoRepair" 1
 	!ifdef INSTALLSIZE
 		WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP" "EstimatedSize" $INSTALLSIZE
+    !else
+        !warning "INSTALLSIZE not defined"
 	!endif
 
     ; Other files
@@ -83,10 +87,12 @@ Section
     File LICENSE
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd
+;---------------;
 
-; Uninstaller
+;-- UNINSTALL --;
 Section "Uninstall"
     RMDir /r "$SMPROGRAMS\$SMF"
     DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\YAP"
     RMDir /r $INSTDIR
 SectionEnd
+;---------------;
