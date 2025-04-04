@@ -492,18 +492,8 @@ bool Asm::DisasmRecursive(_In_ DWORD dwRVA) {
 			}
  
 			if (IsInstructionCF(CraftedLine.Decoded.Instruction.mnemonic)) {
-				// Make sure the operand is an address, dont jump to registers yet
-				if ((CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_MEMORY && CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE) || (CraftedLine.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && (CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_RIP && CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_NONE))) {
-#ifdef ENABLE_DUMPING
-					ZydisFormatterFormatInstruction(&Formatter, &CraftedLine.Decoded.Instruction, CraftedLine.Decoded.Operands, CraftedLine.Decoded.Instruction.operand_count_visible, FormattedBuf, 128, NTHeaders.OptionalHeader.ImageBase + dwRVA, NULL);
-					LOG(Warning, MODULE_REASSEMBLER, "Can\'t resolve jump-to address at 0x%p (%s)\n", NTHeaders.OptionalHeader.ImageBase + dwRVA, FormattedBuf);
-#else
-					LOG(Warning, MODULE_REASSEMBLER, "Can\'t resolve jump-to address at 0x%p\n", NTHeaders.OptionalHeader.ImageBase + dwRVA);
-#endif
-				}
-
 				// Calculate absolute address
-				else {
+				if (!((CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_MEMORY && CraftedLine.Decoded.Operands[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE) || (CraftedLine.Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && (CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_RIP && CraftedLine.Decoded.Operands[0].mem.base != ZYDIS_REGISTER_NONE)))) {
 					uint64_t u64Referencing;
 					if (ZYAN_FAILED(ZydisCalcAbsoluteAddress(&Instruction, &Operands[0], CraftedLine.OldRVA, &u64Referencing))) {
 						LOG(Failed, MODULE_REASSEMBLER, "Failed to disassemble instruction at 0x%p\n", NTHeaders.OptionalHeader.ImageBase + CraftedLine.OldRVA);
@@ -1670,7 +1660,6 @@ Vector<AsmSection> Asm::GetSections() {
 
 Buffer GenerateRelocSection(Vector<DWORD> Relocations) {
 	Buffer ret = { 0 };
-	WORD current = 0;
 	ret.Allocate(sizeof(IMAGE_BASE_RELOCATION));
 	IMAGE_BASE_RELOCATION* pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes);
 	pReloc->SizeOfBlock = sizeof(IMAGE_BASE_RELOCATION);
@@ -1680,26 +1669,40 @@ Buffer GenerateRelocSection(Vector<DWORD> Relocations) {
 	if (!Relocations.Size())
 		return ret;
 
-	pReloc->VirtualAddress = (Relocations[0] / 0x1000) * 0x1000;
-	BYTE RelocOff = 0;
+	pReloc->VirtualAddress = Relocations[0] & ~0xFFF;
+	QWORD RelocOff = 0;
 	for (int i = 0; i < Relocations.Size(); i++) {
-		current = 0b1010000000000000; // DIR64
-
 		// Generate new rva
 		if (pReloc->VirtualAddress + 0x1000 <= Relocations[i]) {
+			// Add pad
+			if (ret.u64Size % sizeof(DWORD)) {
+				ret.Allocate(ret.u64Size + sizeof(WORD));
+				pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
+				pReloc->SizeOfBlock += sizeof(WORD);
+				*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = 0;
+			}
+
+			// Create new thingymadoodle
+			RelocOff = ret.u64Size;
 			ret.Allocate(ret.u64Size + sizeof(IMAGE_BASE_RELOCATION));
-			RelocOff = ret.u64Size - sizeof(IMAGE_BASE_RELOCATION);
 			pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
 			pReloc->SizeOfBlock = sizeof(IMAGE_BASE_RELOCATION);
-			pReloc->VirtualAddress = (Relocations[i] / 0x1000) * 0x1000;
+			pReloc->VirtualAddress = Relocations[i] & ~0xFFF;
 		}
 
 		// Add entry
-		current |= (Relocations[i] - pReloc->VirtualAddress) & 0b0000111111111111;
 		ret.Allocate(ret.u64Size + sizeof(WORD));
 		pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
 		pReloc->SizeOfBlock += sizeof(WORD);
-		*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = current;
+		*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = 0b1010000000000000 | ((Relocations[i] - pReloc->VirtualAddress) & 0xFFF);
+	}
+
+	// Add pad
+	if (ret.u64Size % sizeof(DWORD)) {
+		ret.Allocate(ret.u64Size + sizeof(WORD));
+		pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
+		pReloc->SizeOfBlock += sizeof(WORD);
+		*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = 0;
 	}
 	return ret;
 }

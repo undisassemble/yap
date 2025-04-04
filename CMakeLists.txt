@@ -243,7 +243,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 ##### TESTS #####
-if (wine_exec)
+if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" OR wine_exec)
 	# Build test executable
 	add_executable(test_executable WIN32 tests/test.cpp)
 	target_compile_options(test_executable PUBLIC -fpermissive)
