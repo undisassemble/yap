@@ -24,6 +24,7 @@ typedef struct {
 class PE {
 protected:
 	DWORD OverlayOffset = 0;
+	IMAGE_SYMBOL* pSyms = NULL;
 public:
 	PEStatus_t Status = NotSet;
 	Buffer DosStub = { 0 };
@@ -195,4 +196,14 @@ public:
 	/// Gets list of addresses that get relocated.
 	/// 
 	Vector<DWORD> GetRelocations();
+
+	/// 
+	/// Find symbol from the symbol table by name.
+	/// 
+	IMAGE_SYMBOL FindSymbol(_In_ char* sName);
+
+	/// 
+	/// Get all symbols
+	/// 
+	Vector<char*> GetSymbolNames();
 };

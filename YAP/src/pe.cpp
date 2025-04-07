@@ -124,6 +124,20 @@ bool PE::ParseFile(_In_ HANDLE hFile) {
 		OverlayOffset = 0;
 	}
 
+	// Get symbol table buffer
+	if (NTHeaders.FileHeader.PointerToSymbolTable && NTHeaders.FileHeader.NumberOfSymbols) {
+		if (NTHeaders.FileHeader.PointerToSymbolTable >= OverlayOffset) {
+			pSyms = reinterpret_cast<IMAGE_SYMBOL*>(Overlay.pBytes + NTHeaders.FileHeader.PointerToSymbolTable - OverlayOffset);
+			if (NTHeaders.FileHeader.PointerToSymbolTable - OverlayOffset + sizeof(IMAGE_SYMBOL) * NTHeaders.FileHeader.NumberOfSymbols > Overlay.u64Size) pSyms = NULL;
+		} else {
+			for (int i = 0; i < SectionHeaders.Size(); i++) {
+				if (SectionHeaders[i].SizeOfRawData && SectionHeaders[i].PointerToRawData && NTHeaders.FileHeader.PointerToSymbolTable >= SectionHeaders[i].PointerToRawData && NTHeaders.FileHeader.PointerToSymbolTable - SectionHeaders[i].PointerToRawData + sizeof(IMAGE_SYMBOL) * NTHeaders.FileHeader.NumberOfSymbols > SectionHeaders[i].PointerToRawData + SectionHeaders[i].SizeOfRawData) {
+					pSyms = reinterpret_cast<IMAGE_SYMBOL*>(SectionData[i].pBytes + NTHeaders.FileHeader.PointerToSymbolTable - SectionHeaders[i].PointerToRawData);
+				}
+			}
+		}
+	}
+
 	Status = Normal;
 	free(pBytes);
 	szBytes = 0;
@@ -490,4 +504,34 @@ void PE::DiscardOverlay() {
 
 DWORD PE::GetOverlayOffset() {
 	return OverlayOffset;
+}
+
+IMAGE_SYMBOL PE::FindSymbol(_In_ char* sName) {
+	IMAGE_SYMBOL ret = { 0 };
+	if (!pSyms || Status || !NTHeaders.FileHeader.PointerToSymbolTable || !NTHeaders.FileHeader.NumberOfSymbols) return ret;
+
+	for (int i = 0; i < NTHeaders.FileHeader.NumberOfSymbols; i++) {
+		if (!pSyms[i].N.Name.Short && pSyms[i].N.Name.Long) {
+			char* str = reinterpret_cast<char*>(pSyms) + sizeof(IMAGE_SYMBOL) * NTHeaders.FileHeader.NumberOfSymbols + pSyms[i].N.Name.Long;
+			if (!lstrcmpA(sName, str)) {
+				return pSyms[i];
+			}
+		}
+	}
+
+	return ret;
+}
+
+Vector<char*> PE::GetSymbolNames() {
+	Vector<char*> ret;
+	if (!pSyms || Status || !NTHeaders.FileHeader.PointerToSymbolTable || !NTHeaders.FileHeader.NumberOfSymbols) return ret;
+
+	ret.Reserve(NTHeaders.FileHeader.NumberOfSymbols);
+	for (int i = 0; i < NTHeaders.FileHeader.NumberOfSymbols; i++) {
+		if (!pSyms[i].N.Name.Short && pSyms[i].N.Name.Long) {
+			ret.Push(reinterpret_cast<char*>(pSyms) + sizeof(IMAGE_SYMBOL) * NTHeaders.FileHeader.NumberOfSymbols + pSyms[i].N.Name.Long);
+		}
+	}
+
+	return ret;
 }

@@ -110,6 +110,13 @@ struct Vector {
 	bool bExponentialGrowth : 1 = false; // Faster on larger vectors
 	bool bCannotBeReleased : 1 = false; // If the buffer is within another memory block
 
+	/// 
+	/// Reserves an additional nItems worth of memory
+	/// 
+	void Reserve(_In_ int nItems) {
+		raw.Allocate(raw.u64Size + nItems * sizeof(T));
+	}
+
 	void Merge(_In_ Vector<T> Other, _In_ bool bDontFree = false) {
 		raw.u64Size = nItems * sizeof(T);
 		raw.Merge(Other.raw, true);
