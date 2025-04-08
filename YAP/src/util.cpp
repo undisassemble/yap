@@ -1,3 +1,12 @@
+/*!
+ * @file util.cpp
+ * @author undisassemble
+ * @brief Utility functions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #include "util.hpp"
 #include "errhandlingapi.h"
 

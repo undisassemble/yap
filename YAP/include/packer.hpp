@@ -1,25 +1,45 @@
+/*!
+ * @file debugger.hpp
+ * @author undisassemble
+ * @brief Debugger definitions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #pragma once
 
 #include "asm.hpp"
 #include "LzmaEnc.h"
 
+/*!
+ * @brief Result of a SHA256 operation.
+ * @bug This is wrong because of endianness.
+ */
 struct Sha256Digest {
 	struct {
-		uint64_t high = 0;
-		uint64_t low = 0;
+		uint64_t high = 0; //!< Bytes 0-7
+		uint64_t low = 0;  //!< Bytes 8-15
 	} high;
 	struct {
-		uint64_t high = 0;
-		uint64_t low = 0;
+		uint64_t high = 0; //!< Bytes 16-23
+		uint64_t low = 0;  //!< Bytes 24-31
 	} low;
 };
 
+/*!
+ * @brief SDK function request.
+ */
 struct RequestedFunction {
-	bool bRequested = false;
-	DWORD dwRVA = 0;
-	Label Func;
+	bool bRequested = false; //!< If the function is required.
+	DWORD dwRVA = 0;         //!< RVA where the function address needs to be written.
+	Label Func;              //!< Function entry label.
 };
 
+/*!
+ * @brief Various data needed by the packer.
+ * @todo Clean this up.
+ */
 struct _ShellcodeData {
 	uint64_t BaseAddress = 0;
 	int64_t BaseOffset = 0;
@@ -82,6 +102,14 @@ struct _ShellcodeData {
 	} AntiPatchData;
 };
 
+/*!
+ * @brief Pack the PE.
+ * 
+ * @param pOriginal PE to be packed.
+ * @param pPackedBinary Where to store the packed PE.
+ * @return true Success.
+ * @return false Failure.
+ */
 bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary);
 
 #include "vm.hpp"

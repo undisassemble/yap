@@ -1,3 +1,12 @@
+/*!
+ * @file util.hpp
+ * @author undisassemble
+ * @brief Utility definitions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #pragma once
 
 // Headers
@@ -27,14 +36,28 @@ using namespace x86;
 #define MODULE_VM "VM"
 #define MODULE_PACKER "Packer"
 #define MODULE_REASSEMBLER "ReAsm"
+
+/*!
+ * @brief Logging prefixes
+ */
 enum LoggingLevel_t : int {
-	Nothing,
-	Failed,
-	Success,
-	Warning,
-	Info,
-	Info_Extended
+	Nothing,      //!< No prefix
+	Failed,       //!< [-] prefix
+	Success,      //!< [+] prefix
+	Warning,      //!< [*] prefix
+	Info,         //!< [?] prefix
+	Info_Extended //!< [>] prefix
 };
+
+/*!
+ * @brief Log information to console and log file.
+ * 
+ * @param level Prefix.
+ * @param mod Module producing the log.
+ * @param str Formatted string to log.
+ * @param ... Additional information from `str`.
+ * @see LoggingLevel_t
+ */
 void LOG(LoggingLevel_t level, char* mod, char* str, ...);
 
 // Macros
@@ -64,12 +87,33 @@ enum State_t : BYTE {
 };
 #endif // UTIL_STRUCT_ONLY
 
+/*!
+ * @brief Buffer for raw data.
+ */
 struct Buffer {
-	BYTE* pBytes;
-	uint64_t u64Size;
+	BYTE* pBytes;     //!< Pointer to raw data.
+	uint64_t u64Size; //!< Size of `pBytes`.
 
+	/*!
+	 * @brief Merge with another buffer.
+	 * @todo Get rid of the double-negative.
+	 * 
+	 * @param Other Other buffer to merge with.
+	 * @param bDontFree Don't release other buffers memory.
+	 */
 	void Merge(_In_ Buffer Other, _In_ bool bDontFree = false);
+
+	/*!
+	 * @brief Allocate `Size` bytes.
+	 * @remark This is not cumulative, if you have 5 bytes reserved and allocate 3 you get 3, not 8.
+	 * 
+	 * @param Size Number of bytes to allocate.
+	 */
 	void Allocate(_In_ uint64_t Size);
+
+	/*!
+	 * @brief Release memory used by buffer.
+	 */
 	void Release();
 };
 
@@ -87,7 +131,7 @@ struct Data_t {
 	bool bUserCancelled : 1 = false;
 	bool bUsingConsole : 1 = false;
 	bool bRunning : 1 = false;
-#ifdef _DEBUG // Using DEBUG_ONLY macro doesnt work
+#ifdef _DEBUG // Using DEBUG_ONLY macro doesn't work
 	uint64_t TimeSpentSearching = 0;
 	uint64_t TimeSpentFilling = 0;
 	uint64_t TimeSpentInserting = 0;
@@ -103,20 +147,35 @@ extern Data_t Data;
 extern HANDLE hLogFile;
 extern HANDLE hStdOut;
 
+/*!
+ * @brief List it items.
+ * 
+ * @tparam T Type of data stored.
+ */
 template <typename T>
 struct Vector {
 	Buffer raw = { 0 };
 	DWORD nItems = 0;
-	bool bExponentialGrowth : 1 = false; // Faster on larger vectors
-	bool bCannotBeReleased : 1 = false; // If the buffer is within another memory block
+	bool bExponentialGrowth : 1 = false; //!< Whether extra memory should be reserved when limit reached, faster on larger vectors.
+	bool bCannotBeReleased : 1 = false;  //!< When enabled `Release()` does nothing. Use if the buffer is within another memory block.
 
-	/// 
-	/// Reserves an additional nItems worth of memory
-	/// 
+	/*!
+	 * @brief Reserves additional memory.
+	 * @remark Unlike `Buffer::Allocate(_In_ uint64_t Size)`, this is cumulative and adds additional memory.
+	 * 
+	 * @param nItems Number of items to 
+	 */
 	void Reserve(_In_ int nItems) {
 		raw.Allocate(raw.u64Size + nItems * sizeof(T));
 	}
 
+	/*!
+	 * @brief Merge with another vector.
+	 * @todo Get rid of the double-negative.
+	 * 
+	 * @param Other Other vector to merge with.
+	 * @param bDontFree Don't free the other vector.
+	 */
 	void Merge(_In_ Vector<T> Other, _In_ bool bDontFree = false) {
 		raw.u64Size = nItems * sizeof(T);
 		raw.Merge(Other.raw, true);
@@ -125,14 +184,27 @@ struct Vector {
 		Data.InUse += Other.nItems * sizeof(T);
 	}
 
+	/*!
+	 * @brief Number of items in the vector.
+	 * 
+	 * @return size_t Number of items.
+	 */
 	size_t Size() {
 		return nItems;
 	}
 
+	/*!
+	 * @brief Total number of items that can fit before more memory will be reserved.
+	 * 
+	 * @return size_t Number of items.
+	 */
 	size_t Capacity() {
 		return raw.u64Size / sizeof(T);
 	}
 
+	/*!
+	 * @brief Reserve memory based on number of items.
+	 */
 	void Grow() {
 		if (bCannotBeReleased) return;
 
@@ -166,6 +238,12 @@ struct Vector {
 		}
 	}
 
+	/*!
+	 * @brief Get item at index i.
+	 * 
+	 * @param i Index.
+	 * @return T Item.
+	 */
 	T At(_In_ DWORD i) {
 		if (!raw.pBytes || !raw.u64Size || Size() <= i) {
 			T ret;
@@ -175,10 +253,22 @@ struct Vector {
 		return ((T*)raw.pBytes)[i];
 	}
 
+	/*!
+	 * @brief Get item at index i.
+	 * @todo Return reference, deprecate `Replace`.
+	 * 
+	 * @param i Index.
+	 * @return T Item.
+	 */
 	T operator[](_In_ int i) {
 		return At(i);
 	}
 
+	/*!
+	 * @brief Push item to end of vector.
+	 * 
+	 * @param Item Item to push.
+	 */
 	void Push(_In_ T Item) {
 		if (bCannotBeReleased) return;
 		nItems++;
@@ -187,12 +277,22 @@ struct Vector {
 		Data.InUse += sizeof(T);
 	}
 
+	/*!
+	 * @brief Push vector of items to end of vector.
+	 * 
+	 * @param Items Items to push.
+	 */
 	void Push(Vector<T> Items) {
 		for (int i = 0; i < Items.Size(); i++) {
 			Push(Items[i]);
 		}
 	}
 
+	/*!
+	 * @brief Pop item from end vector.
+	 * 
+	 * @return T Popped item.
+	 */
 	T Pop() {
 		if (!raw.u64Size || !raw.pBytes || bCannotBeReleased) {
 			T ret;
@@ -209,32 +309,52 @@ struct Vector {
 		return ret;
 	}
 
+	/*!
+	 * @brief Replace item at index i.
+	 * @todo Deprecate.
+	 * 
+	 * @param i Index of item to replace.
+	 * @param Item Item to replace it with.
+	 */
 	void Replace(_In_ DWORD i, _In_ T Item) {
 		if (i < Size()) {
 			((T*)raw.pBytes)[i] = Item;
 		}
 	}
 
-	// Replaces first instruction, inserts the remainder
-	void Replace(_In_ DWORD i, _In_ Vector<T> Item) {
-		if (!Item.Size() || i >= Size()) return;
-		Replace(i, Item[0]);
-		Item.nItems--;
-		Item.raw.pBytes += sizeof(T);
-		Item.raw.u64Size -= sizeof(T);
-		Insert(i + 1, Item);
-		Item.raw.u64Size += sizeof(T);
-		Item.raw.pBytes -= sizeof(T);
-		Item.nItems++;
+	/*!
+	 * @brief Replace single element with vector.
+	 * 
+	 * @param i Index to replace.
+	 * @param Items Items to replace it with.
+	 */
+	void Replace(_In_ DWORD i, _In_ Vector<T> Items) {
+		if (!Items.Size() || i >= Size()) return;
+		Replace(i, Items[0]);
+		Items.nItems--;
+		Items.raw.pBytes += sizeof(T);
+		Items.raw.u64Size -= sizeof(T);
+		Insert(i + 1, Items);
+		Items.raw.u64Size += sizeof(T);
+		Items.raw.pBytes -= sizeof(T);
+		Items.nItems++;
 	}
 
-	// Replaces instructions in order, size does not change
-	void Overwrite(_In_ DWORD i, _In_ Vector<T> Item) {
-		for (int j = 0; j < Item.Size() && i < Size(); j++ && i++) {
-			((T*)raw.pBytes)[i] = Item[j];
+	/*!
+	 * @brief Replaces multiple elements with vector.
+	 * 
+	 * @param i Index to begin replacement.
+	 * @param Items Items to replace with.
+	 */
+	void Overwrite(_In_ DWORD i, _In_ Vector<T> Items) {
+		for (int j = 0; j < Items.Size() && i < Size(); j++ && i++) {
+			((T*)raw.pBytes)[i] = Items[j];
 		}
 	}
 
+	/*!
+	 * @brief Release memory being used.
+	 */
 	void Release() {
 		if (!bCannotBeReleased) {
 			raw.Release();
@@ -243,6 +363,12 @@ struct Vector {
 		}
 	}
 
+	/*!
+	 * @brief Insert item at index.
+	 * 
+	 * @param i Index to insert item.
+	 * @param Item Item to be inserted.
+	 */
 	void Insert(_In_ DWORD i, _In_ T Item) {
 		if (i > Size() || bCannotBeReleased) return;
 		if (i == Size()) {
@@ -261,6 +387,12 @@ struct Vector {
 		DEBUG_ONLY(Data.TimeSpentInserting += GetTickCount64() - TickCount);
 	}
 
+	/*!
+	 * @brief Insert multiple items at index.
+	 * 
+	 * @param i Index to insert items.
+	 * @param Items Items to be inserted.
+	 */
 	void Insert(_In_ DWORD i, _In_ Vector<T> Items) {
 		if (i > Size() || bCannotBeReleased) return;
 		DEBUG_ONLY(uint64_t TickCount = GetTickCount64());
@@ -283,6 +415,11 @@ struct Vector {
 		DEBUG_ONLY(Data.TimeSpentInserting += GetTickCount64() - TickCount);
 	}
 
+	/*!
+	 * @brief Remove item at idex.
+	 * 
+	 * @param i Index to remove item from.
+	 */
 	void Remove(_In_ DWORD i) {
 		if (!raw.u64Size || !raw.pBytes || i >= Size() || bCannotBeReleased) return;
 		memcpy(raw.pBytes + sizeof(T) * i, raw.pBytes + sizeof(T) * (i + 1), (nItems * sizeof(T)) - sizeof(T) * (i + 1));
@@ -290,11 +427,12 @@ struct Vector {
 		Data.InUse -= sizeof(T);
 	}
 
-	/// <summary>
-	/// Finds item in array
-	/// </summary>
-	/// <param name="Item">Item to find</param>
-	/// <returns>Index of item, or -1 if not found</returns>
+	/*!
+	 * @brief Finds an item.
+	 * 
+	 * @param Item Item to search for.
+	 * @return int Index of item or -1 if not found.
+	 */
 	int Find(_In_ T Item) {
 		for (int i = 0, n = Size(); i < n; i++) {
 			if (!memcmp(&Item, &((T*)raw.pBytes)[i], sizeof(T))) return i;
@@ -302,6 +440,13 @@ struct Vector {
 		return -1;
 	}
 
+	/*!
+	 * @brief Checks to see if a matching item exists.
+	 * 
+	 * @param Item Item to search for.
+	 * @return true Present.
+	 * @return false Not present.
+	 */
 	bool Includes(_In_ T Item) {
 		return Find(Item) >= 0;
 	}
@@ -400,9 +545,14 @@ extern Options_t Options;
 
 uint64_t rand64();
 
-/// 
-/// Similar to MessageBox, opens a modal and waits for user input.
-/// 
+/*!
+ * @brief Similar to MessageBox, opens a modal and waits for user input.
+ * 
+ * @param pText Modal text.
+ * @param pTitle Modal title.
+ * @param uType Modal icon and buttons.
+ * @return int Which button was selected.
+ */
 int Modal(_In_ char* pText, _In_ char* pTitle = "Error", _In_ UINT uType = MB_OK);
 
 bool LoadProject();

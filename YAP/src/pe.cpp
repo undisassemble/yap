@@ -1,3 +1,12 @@
+/*!
+ * @file pe.cpp
+ * @author undisassemble
+ * @brief Portable executable parsing functions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #include "pe.hpp"
 
 PE::PE(_In_ char* sFileName) {
@@ -508,7 +517,7 @@ DWORD PE::GetOverlayOffset() {
 
 IMAGE_SYMBOL PE::FindSymbol(_In_ char* sName) {
 	IMAGE_SYMBOL ret = { 0 };
-	if (!pSyms || Status || !NTHeaders.FileHeader.PointerToSymbolTable || !NTHeaders.FileHeader.NumberOfSymbols) return ret;
+	if (!pSyms || Status) return ret;
 
 	for (int i = 0; i < NTHeaders.FileHeader.NumberOfSymbols; i++) {
 		if (!pSyms[i].N.Name.Short && pSyms[i].N.Name.Long) {
@@ -524,7 +533,7 @@ IMAGE_SYMBOL PE::FindSymbol(_In_ char* sName) {
 
 Vector<char*> PE::GetSymbolNames() {
 	Vector<char*> ret;
-	if (!pSyms || Status || !NTHeaders.FileHeader.PointerToSymbolTable || !NTHeaders.FileHeader.NumberOfSymbols) return ret;
+	if (!pSyms || Status) return ret;
 
 	ret.Reserve(NTHeaders.FileHeader.NumberOfSymbols);
 	for (int i = 0; i < NTHeaders.FileHeader.NumberOfSymbols; i++) {
@@ -534,4 +543,11 @@ Vector<char*> PE::GetSymbolNames() {
 	}
 
 	return ret;
+}
+
+IMAGE_SYMBOL PE::GetSymbol(_In_ int i) {
+	IMAGE_SYMBOL ret = { 0 };
+	if (!pSyms || Status || NTHeaders.FileHeader.NumberOfSymbols <= i) return ret;
+
+	return pSyms[i];
 }

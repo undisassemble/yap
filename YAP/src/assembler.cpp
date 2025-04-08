@@ -1,3 +1,12 @@
+/*!
+ * @file assembler.cpp
+ * @author undisassemble
+ * @brief Obfuscating assembler functions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #include "assembler.hpp"
 #include "asmtranslations.hpp"
 #include "util.hpp"
@@ -159,14 +168,13 @@ bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
 	return !Assembler::_emit(mnem, ops[0], ops[1], ops[2], &ops[3]);
 }
 
-// TODO: Make this work with labels and with rip
-bool ProtectedAssembler::resolve(Mem memory) {
+bool ProtectedAssembler::resolve(Mem o0) {
 	// Check compatibility
-	if ((memory.hasBaseLabel() && !code()->isLabelBound(memory.baseId())) || // I have no idea why the fuck this isnt working, but im just going to ignore it for now
-		(memory.hasBaseReg() && memory.baseReg().isGpd() && *reinterpret_cast<Gpd*>(&memory.baseReg()) == esp) ||
-		(memory.hasIndexReg() && (memory.indexReg().isRip() || (!memory.indexReg().isGpq() && !memory.indexReg().isGpd()))) ||
-		(memory.hasBaseReg() && (memory.baseReg().isRip() || (!memory.baseReg().isGpq() && !memory.baseReg().isGpd()) || (memory.baseReg().isGpd() && *reinterpret_cast<Gpd*>(&memory.baseReg()) == esp))) ||
-		(memory.hasBaseReg() && !memory.hasIndexReg() && !memory.hasOffset())) {
+	if ((o0.hasBaseLabel() && !code()->isLabelBound(o0.baseId())) || // I have no idea why the fuck this isnt working, but im just going to ignore it for now
+		(o0.hasBaseReg() && o0.baseReg().isGpd() && *reinterpret_cast<Gpd*>(&o0.baseReg()) == esp) ||
+		(o0.hasIndexReg() && (o0.indexReg().isRip() || (!o0.indexReg().isGpq() && !o0.indexReg().isGpd()))) ||
+		(o0.hasBaseReg() && (o0.baseReg().isRip() || (!o0.baseReg().isGpq() && !o0.baseReg().isGpd()) || (o0.baseReg().isGpd() && *reinterpret_cast<Gpd*>(&o0.baseReg()) == esp))) ||
+		(o0.hasBaseReg() && !o0.hasIndexReg() && !o0.hasOffset())) {
 		return false;
 	}
 
@@ -174,30 +182,30 @@ bool ProtectedAssembler::resolve(Mem memory) {
 	Gp reg;
 	do {
 		reg = truerandreg();
-	} while ((memory.hasBaseReg() && reg == memory.baseReg()) || (memory.hasIndexReg() && reg == memory.indexReg()));
+	} while ((o0.hasBaseReg() && reg == o0.baseReg()) || (o0.hasIndexReg() && reg == o0.indexReg()));
 	if (fq) {
 		pushfq();
 	}
 	push(reg);
 	mov(reg, 0);
 	uint64_t off = 0;
-	if (memory.hasIndexReg()) {
-		if (memory.indexReg().isGpd()) {
-			mov(reg.r32(), *reinterpret_cast<Gpd*>(&memory.indexReg()));
-			if (*reinterpret_cast<Gpd*>(&memory.indexReg()) == esp) {
+	if (o0.hasIndexReg()) {
+		if (o0.indexReg().isGpd()) {
+			mov(reg.r32(), *reinterpret_cast<Gpd*>(&o0.indexReg()));
+			if (*reinterpret_cast<Gpd*>(&o0.indexReg()) == esp) {
 				add(reg, fq ? 16 : 8);
 			}
-		} else if (memory.indexReg().isGpq()) {
-			mov(reg, *reinterpret_cast<Gpq*>(&memory.indexReg()));
-			if (*reinterpret_cast<Gpq*>(&memory.indexReg()) == rsp) {
+		} else if (o0.indexReg().isGpq()) {
+			mov(reg, *reinterpret_cast<Gpq*>(&o0.indexReg()));
+			if (*reinterpret_cast<Gpq*>(&o0.indexReg()) == rsp) {
 				add(reg, fq ? 16 : 8);
 			}
 		}
 	}
-	if (memory.hasShift() && memory.shift() > 0) {
-		shl(reg, memory.shift());
+	if (o0.hasShift() && o0.shift() > 0) {
+		shl(reg, o0.shift());
 	}
-	if (memory.hasBaseLabel()) {
+	if (o0.hasBaseLabel()) {
 		if (rand() & 1) {
 			push(reg);
 			lea(reg, ptr(rip));
@@ -211,34 +219,34 @@ bool ProtectedAssembler::resolve(Mem memory) {
 			add(ptr(rsp), reg);
 			pop(reg);
 		}
-		if (code()->isLabelBound(memory.baseId())) {
-			add(reg, code()->labelOffset(memory.baseId()) - off);
+		if (code()->isLabelBound(o0.baseId())) {
+			add(reg, code()->labelOffset(o0.baseId()) - off);
 		} else {
 			NeededLink link = { 0 };
 			push(reg);
 			mov(reg, 0xFF00FF00FF00FF00);
 			link.offsetToLink = offset() - 8;
 			link.offsetOfRIP = off;
-			link.id = memory.baseId();
+			link.id = o0.baseId();
 			NeededLinks.Push(link);
 			add(ptr(rsp), reg);
 			pop(reg);
 		}
-	} else if (memory.hasBaseReg()) {
-		if (memory.baseReg().isGpd()) {
-			push(*reinterpret_cast<Gpq*>(&memory.baseReg()));
-			xchg(*reinterpret_cast<Gpd*>(&memory.baseReg()), *reinterpret_cast<Gpd*>(&memory.baseReg()));
-			add(reg, *reinterpret_cast<Gpq*>(&memory.baseReg()));
-			pop(*reinterpret_cast<Gpq*>(&memory.baseReg()));
+	} else if (o0.hasBaseReg()) {
+		if (o0.baseReg().isGpd()) {
+			push(*reinterpret_cast<Gpq*>(&o0.baseReg()));
+			xchg(*reinterpret_cast<Gpd*>(&o0.baseReg()), *reinterpret_cast<Gpd*>(&o0.baseReg()));
+			add(reg, *reinterpret_cast<Gpq*>(&o0.baseReg()));
+			pop(*reinterpret_cast<Gpq*>(&o0.baseReg()));
 		} else {
-			add(reg, *reinterpret_cast<Gpq*>(&memory.baseReg()));
-			if (*reinterpret_cast<Gpq*>(&memory.baseReg()) == rsp) {
+			add(reg, *reinterpret_cast<Gpq*>(&o0.baseReg()));
+			if (*reinterpret_cast<Gpq*>(&o0.baseReg()) == rsp) {
 				add(reg, fq ? 16 : 8);
 			}
 		}
 	}
-	if (memory.hasOffset()) {
-		add(reg, memory.offset());
+	if (o0.hasOffset()) {
+		add(reg, o0.offset());
 	}
 
 	if (fq) {

@@ -1,3 +1,14 @@
+/*!
+ * @file yap.h
+ * @author undisassemble
+ * @brief SDK header
+ * @details Two files are required to use the SDK: `yap.h` and `yap.dll`, make sure that `__YAP_VERSION__` matches the packer. You must link to `yap.dll` directly, so that it appears in the applications import directory. After protection, `yap.dll` is unlinked, meaning you don't need to (and shouldn't) distribute `yap.dll` along with your application. Because `yap.dll` is never actually loaded, you cannot find `yap.dll` with `GetModuleHandle` and cannot find SDK functions with `GetProcAddress`.
+ * @warning Do not rename `yap.dll`, renaming it prevents the SDK from being recognized.
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 // PLEASE READ ME!
 // 
 // Functions provided in this header and in yap.dll DO NOT DO ANYTHING UNLESS YOUR APPLICATION HAS BEEN PACKED!
@@ -20,7 +31,7 @@
 #include <windows.h>
 
 #define __YAP_VERSION__ "@PROJECT_VERSION@"
-#define YAP_IMPORT(type) __declspec(dllimport) type __stdcall
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,23 +39,27 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
-// 
-// Check for attached debuggers.
-// It is highly recommended that you use this in your main thread, as no protective threads are spawned by the packer.
-// Only the main thread of the application can check for hardware breakpoints.
-// 
-YAP_IMPORT(bool) CheckForDebuggers();
+/*!
+ * @brief Check for attached debuggers.
+ * @details It is highly recommended that you use this in your main thread, as no protective threads are spawned by the packer.
+ * @note Only the main thread of the application can check for hardware breakpoints.
+ *
+ * @return true Debugger present.
+ * @return false No debugger present.
+ */
+__declspec(dllimport) bool __stdcall CheckForDebuggers();
 
-// 
-// Retrieves the base address of the running executable.
-// If using anti-dump, GetModuleHandle(NULL) will return NULL, use this instead.
-// 
-YAP_IMPORT(HMODULE) GetSelf();
+/*!
+ * @brief Retrieves the base address of the running executable.
+ * @note If using anti-dump, GetModuleHandle(NULL) will return NULL, use this instead.
+ * 
+ * @return HMODULE Handle to self.
+ */
+__declspec(dllimport) HMODULE __stdcall GetSelf();
 
 #ifdef __cplusplus
 }
 #endif
-#undef YAP_IMPORT
 
 
 // Asm macros
@@ -56,14 +71,14 @@ YAP_IMPORT(HMODULE) GetSelf();
 #define YAP_OP(x) __asm nop qword [0x89658000 | ((x) & 0xFF)]
 #endif
 
-// 
-// Changes the reassemblers mutation setting.
-// NOTE: This is all linear, any control flow changes/optimizations might change how you expect this to behave!
-// 
+/*!
+ * @brief Changes the reassemblers mutation setting.
+ * @warning This is all linear, any control flow changes/optimizations might change how you expect this to behave!
+ */
 #define YAP_MUTATIONLEVEL(level) YAP_OP(YAP_OP_REASM_MUTATION | (level & 0b1111111))
 
-// 
-// Changes the reassemblers substitution setting.
-// NOTE: This is all linear, any control flow changes/optimizations might change how you expect this to behave!
-// 
+/*!
+ * @brief Changes the reassemblers substitution setting.
+ * @warning This is all linear, any control flow changes/optimizations might change how you expect this to behave!
+ */
 #define YAP_SUBSTITUTION(enabled) YAP_OP(YAP_OP_REASM_SUB | (enabled & 1))

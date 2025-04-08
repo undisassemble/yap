@@ -1,3 +1,12 @@
+/*!
+ * @file yap_sdk.cpp
+ * @author undisassemble
+ * @brief SDK dll
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #ifndef _WIN64
 #error YAP can only be used on 64-bit Windows binaries!
 #endif

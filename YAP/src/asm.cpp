@@ -1,3 +1,12 @@
+/*!
+ * @file asm.cpp
+ * @author undisassemble
+ * @brief Disassembly related functions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #include "asm.hpp"
 #include "Zydis/SharedTypes.h"
 #include "assembler.hpp"
@@ -1553,9 +1562,9 @@ DWORD Asm::GetAssembledSize(_In_ DWORD SectionIndex) {
 	return dwSize;
 }
 
-void Asm::InsertLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ Line Line) {
+void Asm::InsertLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ Line line) {
 	if (SectionIndex >= Sections.Size() || LineIndex > Sections[SectionIndex].Lines->Size()) return;
-	Sections[SectionIndex].Lines->Insert(LineIndex, Line);
+	Sections[SectionIndex].Lines->Insert(LineIndex, line);
 }
 
 DWORD Asm::TranslateOldAddress(_In_ DWORD dwRVA) {

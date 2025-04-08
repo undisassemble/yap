@@ -1,9 +1,40 @@
+/*!
+ * @file gui.hpp
+ * @author undisassemble
+ * @brief GUI definitions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #pragma once
 
 #include "util.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
 
+/*!
+ * @brief Starts the UI.
+ * 
+ * @return true Success.
+ * @return false Failure.
+ */
 bool BeginGUI();
+
+/*!
+ * @brief Applies the ImGui theme set in `Settings.Theme`.
+ */
 void ApplyImGuiTheme();
+
+/*!
+ * @brief Opens the file selection menu.
+ * 
+ * @param pOut Buffer to store file path to.
+ * @param szOut Size of the `pOut` buffer.
+ * @param pFilter File type filter. Check `lpstrFilter` in https://learn.microsoft.com/en-us/windows/win32/api/commdlg/ns-commdlg-openfilenamea.
+ * @param pFileNameOffset Pointer to receive offset of the beginning of the file name.
+ * @param bSaveTo Opened dialogue is a 'save file' dialogue instead of 'load file'.
+ * @return true Success.
+ * @return false Failure.
+ */
 bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo);

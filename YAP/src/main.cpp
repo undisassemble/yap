@@ -1,3 +1,12 @@
+/*!
+ * @file main.cpp
+ * @author undisassemble
+ * @brief Initialization functions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #include "util.hpp"
 #include "asm.hpp"
 #include "pe.hpp"

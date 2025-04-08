@@ -1,3 +1,12 @@
+/*!
+ * @file debugger.cpp
+ * @author undisassemble
+ * @brief Debugger functions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #include "util.hpp"
 #include "debugger.hpp"
 #include <tlhelp32.h>

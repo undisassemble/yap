@@ -1,3 +1,12 @@
+/*!
+ * @file packer.cpp
+ * @author undisassemble
+ * @brief Packer functions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #include "packer.hpp"
 #include "assembler.hpp"
 #include "lzma/Aes.h"

@@ -1,18 +1,36 @@
+/*!
+ * @file assembler.hpp
+ * @author undisassemble
+ * @brief Obfuscating assembler definitions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #pragma once
 #include "util.hpp"
 #include "asm.hpp"
 
+/*!
+ * @brief Data about a link to be resolved after assembly.
+ */
 struct NeededLink {
-	uint64_t offsetToLink = 0;
-	uint64_t offsetOfRIP = 0;
-	uint32_t id = 0;
+	uint64_t offsetToLink = 0; //!< Offset from shellcode base to write to.
+	uint64_t offsetOfRIP = 0;  //!< Address of RIP during resolution.
+	uint32_t id = 0;           //!< Label ID.
 };
 
+/*!
+ * @brief Error logged for AsmJit.
+ */
 class AsmJitErrorHandler : public ErrorHandler {
 public:
 	void handleError(_In_ Error error, _In_ const char* message, _In_ BaseEmitter* emitter) override;
 };
 
+/*!
+ * @brief Obfuscating assembler.
+ */
 class ProtectedAssembler : public Assembler {
 private:
 	bool bWaitingOnEmit = false;
@@ -68,29 +86,95 @@ private:
 	uint64_t GetStackSize();
 
 public:
+	/*!
+	 * @brief Allow mutation.
+	 */
 	bool bMutate = true;
+
+	/*!
+	 * @brief Allow substitution of instructions.
+	 */
 	bool bSubstitute = true;
+
+	/*!
+	 * @brief Set to true if any instruction failed.
+	 */
 	bool bFailed = false;
+
+	/*!
+	 * @brief How much the generated code should be mutated.
+	 */
 	BYTE MutationLevel = 3;
+
+	/*!
+	 * @brief Resolves unsolved links created by `resolve(Mem o0)`.
+	 */
 	void resolvelinks();
 
-	/// <summary>
-	/// Converts and assembles a decoded instruction.
-	/// </summary>
-	/// <param name="pLine">Pointer to decoded line</param>
-	/// <param name="pLabel">Pointer to label referenced, if used</param>
-	/// <returns>Success/failure</returns>
+	/*!
+	 * @brief Converts and assembles a decoded instruction.
+	 * 
+	 * @param pLine Pointer to decoded line.
+	 * @param pLabel Pointer to label referenced, if used.
+	 * @return true Success.
+	 * @return false Failure.
+	 */
 	bool FromDis(_In_ Line* pLine, _In_ Label* pLabel = NULL);
 
+	/*!
+	 * @brief Generate stub in between instructions.
+	 */
 	void stub();
+
+	/*!
+	 * @brief Generate garbage assembly stub, clobbers most registers.
+	 * 
+	 * @return size_t Size of stub, in bytes.
+	 */
 	size_t garbage();
+
+	/*!
+	 * @brief Causes disassembly desynchronization by combining `jmp -1` and `inc eax`.
+	 */
 	void desync();
+
+	/*!
+	 * @brief Causes disassembly desynchronization by combining `jz -1` and `inc eax`.
+	 */
 	void desync_jz();
+
+	/*!
+	 * @brief Causes disassembly desynchronization by combining `jnz -1` and `inc eax`.
+	 */
 	void desync_jnz();
+
+	/*!
+	 * @brief Causes disassembly desynchronization by popping to rip.
+	 * 
+	 * @param o0 Register to clobber.
+	 */
 	void desync_mov(Gpq o0);
-	void block() { bWaitingOnEmit = true; } // Prevents garbage stub from being generated
-	void strict() { bStrict = true; } // Tells the garbage stub to leave EFLAGS untouched
-	bool resolve(Mem memory); // Manually resolve memory opperand, and push to stack
+
+	/*!
+	 * @brief Prevents `stub()` from running.
+	 */
+	void block() { bWaitingOnEmit = true; }
+
+	/*!
+	 * @brief Prevents `stub()` from modifying `RFLAGS`.
+	 */
+	void strict() { bStrict = true; }
+
+	/*!
+	 * @brief Resolve memory and push to top of stack.
+	 * @todo Make this work with labels and with RIP.
+	 * 
+	 * @param o0 Memory operand to resolve.
+	 * @return true Success.
+	 * @return false Failure, treat as if resolve wasn't used.
+	 */
+	bool resolve(Mem o0);
+
 	Error call(Gp o0);
 	Error call(Imm o0);
 	Error call(Label o0);

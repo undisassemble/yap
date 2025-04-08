@@ -1,0 +1,12 @@
+PROJECT_NAME           = "Yet Another Packer"
+PROJECT_NUMBER         = 0.0.0
+PROJECT_BRIEF          = "Protector for AMD64 native Windows PEs."
+TIMESTAMP              = DATETIME
+INPUT                  = YAP/src YAP/include SDK
+GENERATE_LATEX         = NO
+EXTRACT_PRIVATE        = YES
+EXTRACT_ALL            = YES
+EXCLUDE                = YAP/include/asmtranslations.hpp
+EXCLUDE               += YAP/include/font.hpp
+EXCLUDE               += YAP/include/icons.hpp
+EXCLUDE               += YAP/include/theme.hpp

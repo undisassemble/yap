@@ -1,7 +1,14 @@
-#include "asmjit/core/cpuinfo.h"
+/*!
+ * @file gui.cpp
+ * @author undisassemble
+ * @brief GUI functions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #include "imgui.h"
 #include "util.hpp"
-#include "wingdi.h"
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include "gui.hpp"
 #include "font.hpp"

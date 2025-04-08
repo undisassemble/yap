@@ -1,13 +1,26 @@
+/*!
+ * @file pe.hpp
+ * @author undisassemble
+ * @brief Portable executable parser definitions
+ * @version 0.0.0
+ * @date 2025-04-08
+ * @copyright MIT License
+ */
+
 #pragma once
 
 #include "util.hpp"
+#include <winnt.h>
 
+/*!
+ * @brief Status of PE class.
+ */
 enum PEStatus_t : BYTE {
-	Normal = 0,								// No noticed errors
-	NotSet = 1,								// Parser has not been given a file
-	NoFile = 2,								// File provided does not exist
-	NotPE = 3,								// File provided is not a PE or is corrupt
-	Unsupported = 4							// PE is an unsupported architecture or format
+	Normal = 0,     //!< No noticed errors
+	NotSet = 1,     //!< Parser has not been given a file
+	NoFile = 2,     //!< File provided does not exist
+	NotPE = 3,      //!< File provided is not a PE or is corrupt
+	Unsupported = 4 //!< PE is an unsupported architecture or format
 };
 
 typedef struct {
@@ -18,81 +31,111 @@ typedef struct {
 	DWORD ThunkRVA;
 } IAT_ENTRY;
 
-/// 
-/// Parses portable executable formats
-/// 
+/*!
+ * @brief Parses portable executable formats.
+ */
 class PE {
 protected:
-	DWORD OverlayOffset = 0;
-	IMAGE_SYMBOL* pSyms = NULL;
+	DWORD OverlayOffset = 0;    //!< Raw offset of the overlay.
+	IMAGE_SYMBOL* pSyms = NULL; //!< Image symbol table.
+
 public:
-	PEStatus_t Status = NotSet;
-	Buffer DosStub = { 0 };
-	Buffer Overlay = { 0 };
-	Vector<Buffer> SectionData;
-	Vector<IMAGE_SECTION_HEADER> SectionHeaders;
-	IMAGE_DOS_HEADER DosHeader = { 0 };
-	IMAGE_NT_HEADERS64 NTHeaders = { 0 };
-
-	/// 
-	/// Parses PE from file.
-	/// 
-	PE(_In_ char* sFileName);
-	
-	/// 
-	/// Parses PE from file.
-	/// 
-	PE(_In_ HANDLE hFile);
-
-	/// 
-	/// Creates empty PE object.
-	/// 
 	PE();
-
-	/// 
-	/// Duplicates an existing PE object.
-	/// 
-	PE(_In_ PE* pOther);
-
 	virtual ~PE();
 
-	/// 
-	/// Retrieves the TLS callback array (can be written to/modified).
-	/// `NULL` or points to `NULL` if no TLS callbacks are present.
-	/// 
+	PEStatus_t Status = NotSet; //!< Status of PE.
+	Buffer DosStub = { 0 }; //!< Image DOS stub.
+	Buffer Overlay = { 0 }; //!< Image overlay.
+	Vector<Buffer> SectionData; //!< Raw data of image sections.
+	Vector<IMAGE_SECTION_HEADER> SectionHeaders; //!< Image section headers.
+	IMAGE_DOS_HEADER DosHeader = { 0 }; //!< Image DOS header.
+	IMAGE_NT_HEADERS64 NTHeaders = { 0 }; //!< Image NT headers.
+
+	/*!
+	 * @brief Parses PE from file.
+	 * 
+	 * @param sFileName File name.
+	 */
+	PE(_In_ char* sFileName);
+	
+	/*!
+	 * @brief Parses PE from file.
+	 * 
+	 * @param hFile File handle.
+	 */
+	PE(_In_ HANDLE hFile);
+	
+	/*!
+	 * @brief Duplicates an existing PE.
+	 * 
+	 * @param pOther PE to duplicate. 
+	 */
+	PE(_In_ PE* pOther);
+
+	/*!
+	 * @brief Retrieves the TLS callback array (can be written to/modified).
+	 * 
+	 * @return uint64_t* Pointer to TLS callback array, `NULL` if no TLS callbacks are present.
+	 */
 	uint64_t* GetTLSCallbacks();
 
-	/// 
-	/// Parses a file.
-	/// 
+	/*!
+	 * @brief Parses a file.
+	 * 
+	 * @param hFile File handle.
+	 * @return true Success.
+	 * @return false Failure.
+	 */
 	bool ParseFile(_In_ HANDLE hFile);
 
-	/// 
-	/// Changes a PEs base address (and handles relocations).
-	/// 
+	/*!
+	 * @brief Changes a PEs base address and handles relocations.
+	 * 
+	 * @param u64NewBase New base address.
+	 */
 	void RebaseImage(_In_ uint64_t u64NewBase);
 
-	/// 
-	/// Writes data at the RVA.
-	/// 
+	/*!
+	 * @brief Writes data at the RVA.
+	 * @todo Change `pData` and `szData` to `Buffer`.
+	 * @todo Return status.
+	 * 
+	 * @param dwRVA RVA to write to.
+	 * @param pData Data to be written.
+	 * @param szData Size of data in `pData`.
+	 */
 	void WriteRVA(_In_ DWORD dwRVA, _In_ void* pData, _In_ size_t szData);
-	
-	/// 
-	/// Reads data at the RVA.
-	/// 
+
+	/*!
+	 * @brief Reads data at the RVA.
+	 * @todo Change `pData` and `szData` to `Buffer` or have it return a `Buffer`.
+	 * 
+	 * @param dwRVA RVA to read from.
+	 * @param pData Buffer to contain data.
+	 * @param szData Size of `pData`.
+	 */
 	void ReadRVA(_In_ DWORD dwRVA, _Out_ void* pData, _In_ size_t szData);
 
-	/// 
-	/// Writes data at the RVA.
-	/// 
+	/*!
+	 * @brief Writes data at the RVA.
+	 * @todo Return status.
+	 * 
+	 * @tparam T Type to be written.
+	 * @param dwRVA RVA to write to.
+	 * @param Data Data to be written.
+	 */
 	template <typename T>
 	void WriteRVA(_In_ DWORD dwRVA, _In_ T Data) {
 		WriteRVA(dwRVA, &Data, sizeof(T));
 	}
 
-	/// 
-	/// Reads data at the RVA.
-	/// 
+	/*!
+	 * @brief Reads data at the RVA.
+	 * 
+	 * @tparam T Type to be read.
+	 * @param dwRVA RVA to read.
+	 * @return T Data read, zero-filled if RVA is invalid.
+	 */
 	template <typename T>
 	T ReadRVA(_In_ DWORD dwRVA) {
 		T ret;
@@ -100,110 +143,171 @@ public:
 		return ret;
 	}
 
-	/// 
-	/// Fixes headers and moves sections.
-	/// 
+	/*!
+	 * @brief Fixes headers and moves sections.
+	 */
 	void FixHeaders();
 
-	/// 
-	/// Deletes a section.
-	/// 
+	/*!
+	 * @brief Deletes a section.
+	 * 
+	 * @param wIndex Index of section to delete.
+	 */
 	virtual void DeleteSection(_In_ WORD wIndex);
 
-	/// 
-	/// Overwrites a section with new data.
-	/// 
+	/*!
+	 * @brief Overwrite a section with new data.
+	 * @todo Replace `pBytes` and `szBytes` with `Buffer`.
+	 * 
+	 * @param wIndex Index of section to overwrite.
+	 * @param pBytes Bytes to be replaced with.
+	 * @param szBytes Size of `pBytes`.
+	 */
 	void OverwriteSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_opt_ size_t szBytes);
-	
-	/// 
-	/// Inserts a new section.
-	/// 
+
+	/*!
+	 * @brief Inserts a new section.
+	 * 
+	 * @param wIndex Index of section.
+	 * @param pBytes Bytes of section data.
+	 * @param Header Section header.
+	 */
 	void InsertSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_ IMAGE_SECTION_HEADER Header);
-	
-	/// 
-	/// Finds the section containing the raw address.
-	/// Returns `_UI16_MAX` if not found.
-	/// 
+
+	/*!
+	 * @brief Finds the section containing the raw address.
+	 * 
+	 * @param dwRaw Raw address to search for.
+	 * @return WORD Index of section or `_UI16_MAX` if not found.
+	 */
 	WORD FindSectionByRaw(_In_ DWORD dwRaw);
 
-	/// 
-	/// Removes the DOS stub.
-	/// 
+	/*!
+	 * @brief Remove the DOS stub.
+	 */
 	void StripDosStub();
-	
-	/// 
-	/// Gets import tables.
-	/// 
+
+	/*!
+	 * @brief Gets import tables.
+	 * 
+	 * @return IAT_ENTRY* Import table entries.
+	 */
 	IAT_ENTRY* GetIAT();
-	
-	/// 
-	/// Removes PE overlay.
-	/// 
+
+	/*!
+	 * @brief Removes the PE overlay.
+	 */
 	void DiscardOverlay();
-	
-	/// 
-	/// Gets the offset for the overlay, or 0 if no overlay.
-	/// 
+
+	/*!
+	 * @brief Gets the file offset for the overlay.
+	 * 
+	 * @return DWORD Offset of the overlay or `NULL` if there is no overlay.
+	 */
 	DWORD GetOverlayOffset();
-	
-	/// 
-	/// Finds the section containing the RVA.
-	/// Returns `_UI16_MAX` if not found.
-	/// 
+
+	/*!
+	 * @brief Finds the section containing the RVA.
+	 * 
+	 * @param dwRVA RVA to search for.
+	 * @return WORD Section index or `_UI16_MAX` if not found.
+	 */
 	WORD FindSectionByRVA(_In_ DWORD dwRVA);
 
-	/// 
-	/// Translates a runtime offset to a file offset.
-	/// 
+	/*!
+	 * @brief Translates a runtime offset to a file offset.
+	 * @todo Ensure this works when getting virtual address that doesn't exist raw.
+	 * 
+	 * @param dwRVA RVA to translate.
+	 * @return DWORD File offset.
+	 */
 	DWORD RVAToRaw(_In_ DWORD dwRVA);
 
-	/// 
-	/// Translates a file offset to a runtime offset.
-	/// 
+	/*!
+	 * @brief Translates a file offset to a runtime offset.
+	 * @todo Ensure this works when getting raw address that never gets loaded.
+	 * 
+	 * @param dwRaw File offset.
+	 * @return DWORD RVA.
+	 */
 	DWORD RawToRVA(_In_ DWORD dwRaw);
 
-	/// 
-	/// Formats and writes PE to disk.
-	/// 
+	/*!
+	 * @brief Formats and writes PE to disk.
+	 * 
+	 * @param hFile Handle of file to write to.
+	 * @return true Success.
+	 * @return false Failure.
+	 */
 	bool ProduceBinary(_In_ HANDLE hFile);
 
-	/// 
-	/// Formats and writes PE to disk.
-	/// 
+	/*!
+	 * @brief Formats and writes PE to disk.
+	 * 
+	 * @param sName Name of file to write to.
+	 * @return true Success.
+	 * @return false Failure.
+	 */
 	bool ProduceBinary(_In_ char* sName);
 
-	/// 
-	/// Gets RVAs of exported functions.
-	/// 
+	/*!
+	 * @brief Gets RVAs of exported functions.
+	 * @todo Rename to GetExportedSymbolRVAs
+	 * 
+	 * @return Vector<DWORD> Exported RVAs.
+	 */
 	Vector<DWORD> GetExportedFunctionRVAs();
-	
-	/// 
-	/// Gets names of exported functions.
-	/// 
+
+	/*!
+	 * @brief Gets names of exported functions.
+	 * @todo Rename to GetExportedSymbolNames
+	 * 
+	 * @return Vector<char*> Exported names.
+	 */
 	Vector<char*> GetExportedFunctionNames();
-	
-	/// 
-	/// Gets list of imported DLLs.
-	/// 
+
+	/*!
+	 * @brief Gets list of imported DLLs.
+	 * 
+	 * @return Vector<IMAGE_IMPORT_DESCRIPTOR> Imported DLL descriptors.
+	 */
 	Vector<IMAGE_IMPORT_DESCRIPTOR> GetImportedDLLs();
-	
-	/// 
-	/// Reads string at RVA (because `ReadRVA<char*>` does not work).
-	/// 
+
+	/*!
+	 * @brief Reads string at RVA.
+	 * 
+	 * @param dwRVA RVA to read.
+	 * @return char* String read or `NULL` if invalid.
+	 */
 	char* ReadRVAString(_In_ DWORD dwRVA);
 
-	/// 
-	/// Gets list of addresses that get relocated.
-	/// 
+	/*!
+	 * @brief Gets list of addresses that get relocated.
+	 * 
+	 * @return Vector<DWORD> Relocation RVAs.
+	 */
 	Vector<DWORD> GetRelocations();
 
-	/// 
-	/// Find symbol from the symbol table by name.
-	/// 
+	/*!
+	 * @brief Find symbol from the symbol table by name.
+	 * 
+	 * @param sName Name of symbol to find.
+	 * @return IMAGE_SYMBOL Symbol info, zero-filled if not found.
+	 */
 	IMAGE_SYMBOL FindSymbol(_In_ char* sName);
 
-	/// 
-	/// Get all symbols
-	/// 
+	/*!
+	 * @brief Get all symbol names.
+	 * 
+	 * @return Vector<char*> Symbol names.
+	 */
 	Vector<char*> GetSymbolNames();
+
+	/*!
+	 * @brief Get symbol by index in table.
+	 * 
+	 * @param i Index of symbol.
+	 * @return IMAGE_SYMBOL Symbol info, zero-filled if invalid.
+	 */
+	IMAGE_SYMBOL GetSymbol(_In_ int i);
 };
