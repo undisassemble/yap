@@ -105,10 +105,10 @@ struct _ShellcodeData {
 /*!
  * @brief Pack the PE.
  * 
- * @param pOriginal PE to be packed.
- * @param pPackedBinary Where to store the packed PE.
- * @return true Success.
- * @return false Failure.
+ * @param [in] pOriginal PE to be packed.
+ * @param [out] pPackedBinary Where to store the packed PE.
+ * @retval true Success.
+ * @retval false Failure.
  */
 bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary);
 

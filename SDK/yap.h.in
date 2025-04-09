@@ -44,8 +44,8 @@ extern "C" {
  * @details It is highly recommended that you use this in your main thread, as no protective threads are spawned by the packer.
  * @note Only the main thread of the application can check for hardware breakpoints.
  *
- * @return true Debugger present.
- * @return false No debugger present.
+ * @retval true Debugger present.
+ * @retval false No debugger present.
  */
 __declspec(dllimport) bool __stdcall CheckForDebuggers();
 
@@ -53,7 +53,7 @@ __declspec(dllimport) bool __stdcall CheckForDebuggers();
  * @brief Retrieves the base address of the running executable.
  * @note If using anti-dump, GetModuleHandle(NULL) will return NULL, use this instead.
  * 
- * @return HMODULE Handle to self.
+ * @return Handle to self.
  */
 __declspec(dllimport) HMODULE __stdcall GetSelf();
 

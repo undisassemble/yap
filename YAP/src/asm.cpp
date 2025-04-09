@@ -625,8 +625,7 @@ bool Asm::CheckRuntimeFunction(_In_ RUNTIME_FUNCTION* pFunc, _In_ bool bFixAddr)
 		Tables.Grow();
 		LOG(Info, MODULE_REASSEMBLER, "Processing exception exception handler with %lu table(s) (at 0x%p)\n", Tables.nItems, NTHeaders.OptionalHeader.ImageBase + pFunc->UnwindData);
 		for (int i = 0; i < Tables.nItems; i++) {
-			C_SCOPE_TABLE temp = ReadRVA<C_SCOPE_TABLE>(pFunc->UnwindData + sizeof(UNWIND_INFO) + UnwindInfo.NumUnwindCodes * sizeof(UNWIND_CODE) + sizeof(DWORD) * 2 + sizeof(C_SCOPE_TABLE) * i);
-			Tables.Replace(i, temp);
+			Tables[i] = ReadRVA<C_SCOPE_TABLE>(pFunc->UnwindData + sizeof(UNWIND_INFO) + UnwindInfo.NumUnwindCodes * sizeof(UNWIND_CODE) + sizeof(DWORD) * 2 + sizeof(C_SCOPE_TABLE) * i);
 		}
 
 		if (bFixAddr) {
@@ -891,7 +890,6 @@ bool Asm::Disassemble() {
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent disassembling: %llu\n", Data.TimeSpentDisassembling));
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent searching: %llu\n", Data.TimeSpentSearching));
 	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Time spent inserting: %llu\n", Data.TimeSpentInserting));
-	DEBUG_ONLY(LOG(Info_Extended, MODULE_REASSEMBLER, "Number of instructions: %llu\n", GetNumLines()));
 	LOG(Success, MODULE_REASSEMBLER, "Finished disassembly\n");
 
 	// Insert missing data + padding
@@ -1242,7 +1240,7 @@ bool Asm::Assemble() {
 		if (a.offset() % NTHeaders.OptionalHeader.SectionAlignment) {
 			a.db(0, NTHeaders.OptionalHeader.SectionAlignment - a.offset() % NTHeaders.OptionalHeader.SectionAlignment);
 		}
-		Sections.Replace(SecIndex, section);
+		Sections[SecIndex] = section;
 	}
 
 	// Link
@@ -1302,7 +1300,7 @@ bool Asm::Assemble() {
 	NTHeaders.OptionalHeader.AddressOfEntryPoint = TranslateOldAddress(NTHeaders.OptionalHeader.AddressOfEntryPoint);
 	Vector<DWORD> Relocations = GetRelocations();
 	for (int i = 0; i < Relocations.Size(); i++) {
-		Relocations.Replace(i, TranslateOldAddress(Relocations[i]));
+		Relocations[i] = TranslateOldAddress(Relocations[i]);
 		/*for (int j = 0; j < holder.relocEntries().size(); j++) {
 			if (holder.relocEntries().at(j)->relocType() == RelocType::kAbsToAbs) {
 				
@@ -1330,7 +1328,7 @@ bool Asm::Assemble() {
 	for (int i = 0; i < NTHeaders.FileHeader.NumberOfSections; i++) {
 		SectionData[i].Release();
 		Buffer buf = { 0 };
-		SectionData.Replace(i, buf);
+		SectionData[i] = buf;
 		if (!Sections[i].NewVirtualSize && !Sections[i].NewRawSize) {
 			DeleteSection(i);
 			i--;
@@ -1341,13 +1339,13 @@ bool Asm::Assemble() {
 			return false;
 		}
 		memcpy(buf.pBytes, holder.textSection()->buffer().data() + Sections[i].NewRVA - SectionHeaders[0].VirtualAddress, buf.u64Size);
-		SectionData.Replace(i, buf);
+		SectionData[i] = buf;
 		IMAGE_SECTION_HEADER header = SectionHeaders[i];
 		header.VirtualAddress = Sections[i].NewRVA;
 		header.SizeOfRawData = Sections[i].NewRawSize;
 		header.Misc.VirtualSize = Sections[i].NewVirtualSize;
 		header.Characteristics |= IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE;
-		SectionHeaders.Replace(i, header);
+		SectionHeaders[i] = header;
 	}
 	
 	// Insert relocation data
@@ -1378,7 +1376,7 @@ bool Asm::Assemble() {
 	// Fix function ranges
 	for (int i = 0; i < FunctionRanges.Size(); i++) {
 		FunctionRange range = FunctionRanges[i];
-		for (int j = 0; j < range.Entries.Size(); j++) range.Entries.Replace(j, TranslateOldAddress(range.Entries[j]));
+		for (int j = 0; j < range.Entries.Size(); j++) range.Entries[j] = TranslateOldAddress(range.Entries[j]);
 		
 		// Bandaid fix
 		DWORD offset = 0;
@@ -1389,7 +1387,7 @@ bool Asm::Assemble() {
 		DWORD dwOldStart = range.dwStart;
 		range.dwStart = TranslateOldAddress(dwOldStart);
 		range.dwSize = TranslateOldAddress(dwOldStart + range.dwSize) - range.dwStart - offset;
-		FunctionRanges.Replace(i, range);
+		FunctionRanges[i] = range;
 	}
 
 	// Fix resources
@@ -1451,7 +1449,7 @@ void Asm::CleanHeaders() {
 	for (int i = 0; i < SectionHeaders.Size(); i++) {
 		sec = SectionHeaders[i];
 		sec.Characteristics &= ~(IMAGE_SCN_CNT_CODE | IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_CNT_INITIALIZED_DATA);
-		SectionHeaders.Replace(i, sec);
+		SectionHeaders[i] = sec;
 	}
 }
 
@@ -1492,7 +1490,7 @@ bool Asm::Strip() {
 							IMAGE_SECTION_HEADER Header = SectionHeaders[sym.SectionNumber - 1];
 							Header.Misc.VirtualSize = 0;
 							Header.VirtualAddress = 0;
-							SectionHeaders.Replace(sym.SectionNumber - 1, Header);
+							SectionHeaders[sym.SectionNumber - 1] = Header;
 							LOG(Info, MODULE_REASSEMBLER, "Unloaded section %.8s (%s)\n", SectionHeaders[sym.SectionNumber - 1].Name, str);
 						}
 					}
@@ -1520,7 +1518,7 @@ bool Asm::Strip() {
 							IMAGE_SECTION_HEADER Header = SectionHeaders[pSyms[i].SectionNumber - 1];
 							Header.Misc.VirtualSize = 0;
 							Header.VirtualAddress = 0;
-							SectionHeaders.Replace(pSyms[i].SectionNumber - 1, Header);
+							SectionHeaders[pSyms[i].SectionNumber - 1] = Header;
 							LOG(Info, MODULE_REASSEMBLER, "Unloaded section %.8s (%s)\n", SectionHeaders[pSyms[i].SectionNumber - 1].Name, str);
 						}
 					}
@@ -1653,65 +1651,8 @@ DWORD GetLineSize(_In_ const Line& line) {
 	return 0;
 }
 
-size_t Asm::GetNumLines() {
-	size_t ret = 0;
-	for (int i = 0; i < Sections.Size(); i++) {
-		ret += Sections[i].Lines->nItems;
-	}
-	return ret;
-}
-
 Vector<AsmSection> Asm::GetSections() {
 	Vector<AsmSection> clone = Sections;
 	//clone.bCannotBeReleased = true;
 	return clone;
-}
-
-Buffer GenerateRelocSection(Vector<DWORD> Relocations) {
-	Buffer ret = { 0 };
-	ret.Allocate(sizeof(IMAGE_BASE_RELOCATION));
-	IMAGE_BASE_RELOCATION* pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes);
-	pReloc->SizeOfBlock = sizeof(IMAGE_BASE_RELOCATION);
-	pReloc->VirtualAddress = 0;
-
-	// If nothing needs to be relocated, generate NULL relocation
-	if (!Relocations.Size())
-		return ret;
-
-	pReloc->VirtualAddress = Relocations[0] & ~0xFFF;
-	QWORD RelocOff = 0;
-	for (int i = 0; i < Relocations.Size(); i++) {
-		// Generate new rva
-		if (pReloc->VirtualAddress + 0x1000 <= Relocations[i]) {
-			// Add pad
-			if (ret.u64Size % sizeof(DWORD)) {
-				ret.Allocate(ret.u64Size + sizeof(WORD));
-				pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
-				pReloc->SizeOfBlock += sizeof(WORD);
-				*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = 0;
-			}
-
-			// Create new thingymadoodle
-			RelocOff = ret.u64Size;
-			ret.Allocate(ret.u64Size + sizeof(IMAGE_BASE_RELOCATION));
-			pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
-			pReloc->SizeOfBlock = sizeof(IMAGE_BASE_RELOCATION);
-			pReloc->VirtualAddress = Relocations[i] & ~0xFFF;
-		}
-
-		// Add entry
-		ret.Allocate(ret.u64Size + sizeof(WORD));
-		pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
-		pReloc->SizeOfBlock += sizeof(WORD);
-		*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = 0b1010000000000000 | ((Relocations[i] - pReloc->VirtualAddress) & 0xFFF);
-	}
-
-	// Add pad
-	if (ret.u64Size % sizeof(DWORD)) {
-		ret.Allocate(ret.u64Size + sizeof(WORD));
-		pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
-		pReloc->SizeOfBlock += sizeof(WORD);
-		*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = 0;
-	}
-	return ret;
 }

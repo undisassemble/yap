@@ -154,7 +154,7 @@ bool LoadProject() {
 	return true;
 }
 
-void Buffer::Merge(_In_ Buffer Other, _In_ bool bDontFree) {
+void Buffer::Merge(_In_ Buffer Other, _In_ bool bFreeOther) {
     if (!Other.pBytes || !Other.u64Size) {
         return;
     } else if (!pBytes || !u64Size) {
@@ -167,7 +167,7 @@ void Buffer::Merge(_In_ Buffer Other, _In_ bool bDontFree) {
             exit(1);
         }
         memcpy(pBytes + u64Size - Other.u64Size, Other.pBytes, Other.u64Size);
-        if (!bDontFree) {
+        if (bFreeOther) {
             Other.Release();
         }
     }

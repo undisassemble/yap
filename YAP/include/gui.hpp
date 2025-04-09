@@ -16,8 +16,8 @@
 /*!
  * @brief Starts the UI.
  * 
- * @return true Success.
- * @return false Failure.
+ * @retval true Success.
+ * @retval false Failure.
  */
 bool BeginGUI();
 
@@ -29,12 +29,12 @@ void ApplyImGuiTheme();
 /*!
  * @brief Opens the file selection menu.
  * 
- * @param pOut Buffer to store file path to.
- * @param szOut Size of the `pOut` buffer.
- * @param pFilter File type filter. Check `lpstrFilter` in https://learn.microsoft.com/en-us/windows/win32/api/commdlg/ns-commdlg-openfilenamea.
- * @param pFileNameOffset Pointer to receive offset of the beginning of the file name.
- * @param bSaveTo Opened dialogue is a 'save file' dialogue instead of 'load file'.
- * @return true Success.
- * @return false Failure.
+ * @param [out] pOut Buffer to store file path to.
+ * @param [in] szOut Size of the `pOut` buffer.
+ * @param [in] pFilter File type filter. Check `lpstrFilter` in https://learn.microsoft.com/en-us/windows/win32/api/commdlg/ns-commdlg-openfilenamea.
+ * @param [out] pFileNameOffset Pointer to receive offset of the beginning of the file name (optional).
+ * @param [in] bSaveTo Opened dialogue is a 'save file' dialogue instead of 'load file'.
+ * @retval true Success.
+ * @retval false Failure.
  */
 bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo);

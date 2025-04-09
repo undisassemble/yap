@@ -288,8 +288,8 @@ void PE::OverwriteSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_opt_ size
 	IMAGE_SECTION_HEADER Header = SectionHeaders[wIndex];
 	Header.SizeOfRawData = szBytes;
 	SectionData[wIndex].Release();
-	SectionData.Replace(wIndex, data);
-	SectionHeaders.Replace(wIndex, Header);
+	SectionData[wIndex] = data;
+	SectionHeaders[wIndex] = Header;
 }
 
 void PE::InsertSection(_In_ WORD wIndex, _In_opt_ BYTE* pBytes, _In_ IMAGE_SECTION_HEADER Header) {
@@ -320,7 +320,7 @@ void PE::FixHeaders() {
 		Header = SectionHeaders[i];
 		Header.PointerToRawData = Raw;
 		Header.VirtualAddress = RVA;
-		SectionHeaders.Replace(i, Header);
+		SectionHeaders[i] = Header;
 		RVA += Header.Misc.VirtualSize;
 		Raw += Header.SizeOfRawData;
 	}
@@ -550,4 +550,53 @@ IMAGE_SYMBOL PE::GetSymbol(_In_ int i) {
 	if (!pSyms || Status || NTHeaders.FileHeader.NumberOfSymbols <= i) return ret;
 
 	return pSyms[i];
+}
+
+Buffer GenerateRelocSection(_In_ Vector<DWORD> Relocations) {
+	Buffer ret = { 0 };
+	ret.Allocate(sizeof(IMAGE_BASE_RELOCATION));
+	IMAGE_BASE_RELOCATION* pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes);
+	pReloc->SizeOfBlock = sizeof(IMAGE_BASE_RELOCATION);
+	pReloc->VirtualAddress = 0;
+
+	// If nothing needs to be relocated, generate NULL relocation
+	if (!Relocations.Size())
+		return ret;
+
+	pReloc->VirtualAddress = Relocations[0] & ~0xFFF;
+	QWORD RelocOff = 0;
+	for (int i = 0; i < Relocations.Size(); i++) {
+		// Generate new rva
+		if (pReloc->VirtualAddress + 0x1000 <= Relocations[i]) {
+			// Add pad
+			if (ret.u64Size % sizeof(DWORD)) {
+				ret.Allocate(ret.u64Size + sizeof(WORD));
+				pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
+				pReloc->SizeOfBlock += sizeof(WORD);
+				*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = 0;
+			}
+
+			// Create new thingymadoodle
+			RelocOff = ret.u64Size;
+			ret.Allocate(ret.u64Size + sizeof(IMAGE_BASE_RELOCATION));
+			pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
+			pReloc->SizeOfBlock = sizeof(IMAGE_BASE_RELOCATION);
+			pReloc->VirtualAddress = Relocations[i] & ~0xFFF;
+		}
+
+		// Add entry
+		ret.Allocate(ret.u64Size + sizeof(WORD));
+		pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
+		pReloc->SizeOfBlock += sizeof(WORD);
+		*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = 0b1010000000000000 | ((Relocations[i] - pReloc->VirtualAddress) & 0xFFF);
+	}
+
+	// Add pad
+	if (ret.u64Size % sizeof(DWORD)) {
+		ret.Allocate(ret.u64Size + sizeof(WORD));
+		pReloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(ret.pBytes + RelocOff);
+		pReloc->SizeOfBlock += sizeof(WORD);
+		*reinterpret_cast<WORD*>(ret.pBytes + ret.u64Size - sizeof(WORD)) = 0;
+	}
+	return ret;
 }

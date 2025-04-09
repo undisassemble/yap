@@ -114,10 +114,10 @@ public:
 	/*!
 	 * @brief Converts and assembles a decoded instruction.
 	 * 
-	 * @param pLine Pointer to decoded line.
-	 * @param pLabel Pointer to label referenced, if used.
-	 * @return true Success.
-	 * @return false Failure.
+	 * @param [in] pLine Pointer to decoded line.
+	 * @param [in] pLabel Pointer to label referenced, if used.
+	 * @retval true Success.
+	 * @retval false Failure.
 	 */
 	bool FromDis(_In_ Line* pLine, _In_ Label* pLabel = NULL);
 
@@ -129,7 +129,7 @@ public:
 	/*!
 	 * @brief Generate garbage assembly stub, clobbers most registers.
 	 * 
-	 * @return size_t Size of stub, in bytes.
+	 * @return Size of stub, in bytes.
 	 */
 	size_t garbage();
 
@@ -151,7 +151,7 @@ public:
 	/*!
 	 * @brief Causes disassembly desynchronization by popping to rip.
 	 * 
-	 * @param o0 Register to clobber.
+	 * @param [in] o0 Register to clobber.
 	 */
 	void desync_mov(Gpq o0);
 
@@ -169,9 +169,9 @@ public:
 	 * @brief Resolve memory and push to top of stack.
 	 * @todo Make this work with labels and with RIP.
 	 * 
-	 * @param o0 Memory operand to resolve.
-	 * @return true Success.
-	 * @return false Failure, treat as if resolve wasn't used.
+	 * @param [in] o0 Memory operand to resolve.
+	 * @retval true Success.
+	 * @retval false Failure, treat as if resolve wasn't used.
 	 */
 	bool resolve(Mem o0);
 

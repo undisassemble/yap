@@ -52,10 +52,10 @@ enum LoggingLevel_t : int {
 /*!
  * @brief Log information to console and log file.
  * 
- * @param level Prefix.
- * @param mod Module producing the log.
- * @param str Formatted string to log.
- * @param ... Additional information from `str`.
+ * @param [in] level Prefix.
+ * @param [in] mod Module producing the log.
+ * @param [in] str Formatted string to log.
+ * @param [in] ... Additional information from `str`.
  * @see LoggingLevel_t
  */
 void LOG(LoggingLevel_t level, char* mod, char* str, ...);
@@ -96,18 +96,17 @@ struct Buffer {
 
 	/*!
 	 * @brief Merge with another buffer.
-	 * @todo Get rid of the double-negative.
 	 * 
-	 * @param Other Other buffer to merge with.
-	 * @param bDontFree Don't release other buffers memory.
+	 * @param [in] Other Other buffer to merge with.
+	 * @param [in] bFreeOther Release other buffers memory.
 	 */
-	void Merge(_In_ Buffer Other, _In_ bool bDontFree = false);
+	void Merge(_In_ Buffer Other, _In_ bool bFreeOther = true);
 
 	/*!
 	 * @brief Allocate `Size` bytes.
 	 * @remark This is not cumulative, if you have 5 bytes reserved and allocate 3 you get 3, not 8.
 	 * 
-	 * @param Size Number of bytes to allocate.
+	 * @param [in] Size Number of bytes to allocate.
 	 */
 	void Allocate(_In_ uint64_t Size);
 
@@ -163,7 +162,7 @@ struct Vector {
 	 * @brief Reserves additional memory.
 	 * @remark Unlike `Buffer::Allocate(_In_ uint64_t Size)`, this is cumulative and adds additional memory.
 	 * 
-	 * @param nItems Number of items to 
+	 * @param [in] nItems Number of items to 
 	 */
 	void Reserve(_In_ int nItems) {
 		raw.Allocate(raw.u64Size + nItems * sizeof(T));
@@ -171,15 +170,14 @@ struct Vector {
 
 	/*!
 	 * @brief Merge with another vector.
-	 * @todo Get rid of the double-negative.
 	 * 
-	 * @param Other Other vector to merge with.
-	 * @param bDontFree Don't free the other vector.
+	 * @param [in] Other Other vector to merge with.
+	 * @param [in] bFreeOther Don't free the other vector.
 	 */
-	void Merge(_In_ Vector<T> Other, _In_ bool bDontFree = false) {
+	void Merge(_In_ Vector<T> Other, _In_ bool bFreeOther = false) {
 		raw.u64Size = nItems * sizeof(T);
-		raw.Merge(Other.raw, true);
-		if (!bDontFree) Other.Release();
+		raw.Merge(Other.raw, false);
+		if (bFreeOther) Other.Release();
 		nItems += Other.nItems;
 		Data.InUse += Other.nItems * sizeof(T);
 	}
@@ -187,7 +185,7 @@ struct Vector {
 	/*!
 	 * @brief Number of items in the vector.
 	 * 
-	 * @return size_t Number of items.
+	 * @return Number of items.
 	 */
 	size_t Size() {
 		return nItems;
@@ -196,7 +194,7 @@ struct Vector {
 	/*!
 	 * @brief Total number of items that can fit before more memory will be reserved.
 	 * 
-	 * @return size_t Number of items.
+	 * @return Number of items.
 	 */
 	size_t Capacity() {
 		return raw.u64Size / sizeof(T);
@@ -241,10 +239,10 @@ struct Vector {
 	/*!
 	 * @brief Get item at index i.
 	 * 
-	 * @param i Index.
-	 * @return T Item.
+	 * @param [in] i Index.
+	 * @return Item.
 	 */
-	T At(_In_ DWORD i) {
+	T& At(_In_ DWORD i) {
 		if (!raw.pBytes || !raw.u64Size || Size() <= i) {
 			T ret;
 			ZeroMemory(&ret, sizeof(T));
@@ -255,19 +253,28 @@ struct Vector {
 
 	/*!
 	 * @brief Get item at index i.
-	 * @todo Return reference, deprecate `Replace`.
 	 * 
-	 * @param i Index.
-	 * @return T Item.
+	 * @param [in] i Index.
+	 * @return Item.
 	 */
-	T operator[](_In_ int i) {
+	T& operator[](_In_ int i) {
+		return At(i);
+	}
+
+	/*!
+	 * @brief Get item at index i.
+	 * 
+	 * @param [in] i Index.
+	 * @return Item.
+	 */
+	const T& operator[](_In_ int i) const {
 		return At(i);
 	}
 
 	/*!
 	 * @brief Push item to end of vector.
 	 * 
-	 * @param Item Item to push.
+	 * @param [in] Item Item to push.
 	 */
 	void Push(_In_ T Item) {
 		if (bCannotBeReleased) return;
@@ -280,9 +287,9 @@ struct Vector {
 	/*!
 	 * @brief Push vector of items to end of vector.
 	 * 
-	 * @param Items Items to push.
+	 * @param [in] Items Items to push.
 	 */
-	void Push(Vector<T> Items) {
+	void Push(_In_ Vector<T> Items) {
 		for (int i = 0; i < Items.Size(); i++) {
 			Push(Items[i]);
 		}
@@ -291,7 +298,7 @@ struct Vector {
 	/*!
 	 * @brief Pop item from end vector.
 	 * 
-	 * @return T Popped item.
+	 * @return Popped item.
 	 */
 	T Pop() {
 		if (!raw.u64Size || !raw.pBytes || bCannotBeReleased) {
@@ -311,10 +318,10 @@ struct Vector {
 
 	/*!
 	 * @brief Replace item at index i.
-	 * @todo Deprecate.
+	 * @deprecated Use `operator[]` instead.
 	 * 
-	 * @param i Index of item to replace.
-	 * @param Item Item to replace it with.
+	 * @param [in] i Index of item to replace.
+	 * @param [in] Item Item to replace it with.
 	 */
 	void Replace(_In_ DWORD i, _In_ T Item) {
 		if (i < Size()) {
@@ -325,8 +332,8 @@ struct Vector {
 	/*!
 	 * @brief Replace single element with vector.
 	 * 
-	 * @param i Index to replace.
-	 * @param Items Items to replace it with.
+	 * @param [in] i Index to replace.
+	 * @param [in] Items Items to replace it with.
 	 */
 	void Replace(_In_ DWORD i, _In_ Vector<T> Items) {
 		if (!Items.Size() || i >= Size()) return;
@@ -343,8 +350,8 @@ struct Vector {
 	/*!
 	 * @brief Replaces multiple elements with vector.
 	 * 
-	 * @param i Index to begin replacement.
-	 * @param Items Items to replace with.
+	 * @param [in] i Index to begin replacement.
+	 * @param [in] Items Items to replace with.
 	 */
 	void Overwrite(_In_ DWORD i, _In_ Vector<T> Items) {
 		for (int j = 0; j < Items.Size() && i < Size(); j++ && i++) {
@@ -366,8 +373,8 @@ struct Vector {
 	/*!
 	 * @brief Insert item at index.
 	 * 
-	 * @param i Index to insert item.
-	 * @param Item Item to be inserted.
+	 * @param [in] i Index to insert item.
+	 * @param [in] Item Item to be inserted.
 	 */
 	void Insert(_In_ DWORD i, _In_ T Item) {
 		if (i > Size() || bCannotBeReleased) return;
@@ -390,8 +397,8 @@ struct Vector {
 	/*!
 	 * @brief Insert multiple items at index.
 	 * 
-	 * @param i Index to insert items.
-	 * @param Items Items to be inserted.
+	 * @param [in] i Index to insert items.
+	 * @param [in] Items Items to be inserted.
 	 */
 	void Insert(_In_ DWORD i, _In_ Vector<T> Items) {
 		if (i > Size() || bCannotBeReleased) return;
@@ -418,7 +425,7 @@ struct Vector {
 	/*!
 	 * @brief Remove item at idex.
 	 * 
-	 * @param i Index to remove item from.
+	 * @param [in] i Index to remove item from.
 	 */
 	void Remove(_In_ DWORD i) {
 		if (!raw.u64Size || !raw.pBytes || i >= Size() || bCannotBeReleased) return;
@@ -430,8 +437,9 @@ struct Vector {
 	/*!
 	 * @brief Finds an item.
 	 * 
-	 * @param Item Item to search for.
-	 * @return int Index of item or -1 if not found.
+	 * @param [in] Item Item to search for.
+	 * @return Index of item.
+	 * @retval -1 Not found.
 	 */
 	int Find(_In_ T Item) {
 		for (int i = 0, n = Size(); i < n; i++) {
@@ -443,9 +451,9 @@ struct Vector {
 	/*!
 	 * @brief Checks to see if a matching item exists.
 	 * 
-	 * @param Item Item to search for.
-	 * @return true Present.
-	 * @return false Not present.
+	 * @param [in] Item Item to search for.
+	 * @retval true Present.
+	 * @retval false Not present.
 	 */
 	bool Includes(_In_ T Item) {
 		return Find(Item) >= 0;
@@ -548,10 +556,10 @@ uint64_t rand64();
 /*!
  * @brief Similar to MessageBox, opens a modal and waits for user input.
  * 
- * @param pText Modal text.
- * @param pTitle Modal title.
- * @param uType Modal icon and buttons.
- * @return int Which button was selected.
+ * @param [in] pText Modal text.
+ * @param [in] pTitle Modal title.
+ * @param [in] uType Modal icon and buttons.
+ * @return Which button was selected.
  */
 int Modal(_In_ char* pText, _In_ char* pTitle = "Error", _In_ UINT uType = MB_OK);
 

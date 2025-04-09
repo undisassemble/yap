@@ -263,7 +263,7 @@ void DrawGUI() {
 				if (ImGui::InputText(buf, name, sizeof(name))) {
 					ToVirt_t entry = Options.VM.VMFuncs[i];
 					memcpy(entry.Name, name, sizeof(name));
-					Options.VM.VMFuncs.Replace(i, entry);
+					Options.VM.VMFuncs[i] = entry;
 				}
 				ImGui::PopID();
 				ImGui::SetItemTooltip("Name of exported function");
@@ -274,7 +274,7 @@ void DrawGUI() {
 				if (ImGui::Checkbox("Remove Export", &bSet)) {
 					ToVirt_t entry = Options.VM.VMFuncs[i];
 					entry.bRemoveExport = bSet;
-					Options.VM.VMFuncs.Replace(i, entry);
+					Options.VM.VMFuncs[i] = entry;
 				}
 				ImGui::PopID();
 				ImGui::SetItemTooltip("Remove function from export table");
@@ -284,7 +284,6 @@ void DrawGUI() {
 				wsprintfA(buf, "BtnRemove%d", i);
 				ImGui::PushID(buf);
 				if (ImGui::Button("Remove")) {
-					uint64_t holder = 0;
 					Options.VM.VMFuncs.Remove(i);
 					n--;
 					i--;

@@ -135,20 +135,10 @@ struct FunctionRange {
 /*!
  * @brief Get the size of a line
  * 
- * @param line Line to get the size of
- * @return DWORD Size of the line
+ * @param [in] line Line to get the size of
+ * @return Size of the line
  */
 DWORD GetLineSize(_In_ const Line& line);
-
-/*!
- * @brief Encodes an array of relocation RVAs into a valid relocation directory.
- * @note Relocations must be sorted from least to greatest.
- * @todo Move to `pe.hpp`.
- * 
- * @param Relocations Relocation RVAs.
- * @return Buffer Raw relocation section.
- */
-Buffer GenerateRelocSection(Vector<DWORD> Relocations);
 
 /*!
  * @brief Handles disassembly, assembly, and assembly modifications.
@@ -160,37 +150,39 @@ private:
 	/*!
 	 * @brief Disassembles data starting at `dwRVA`.
 	 * 
-	 * @param dwRVA RVA to begin disassembly.
-	 * @return true Success.
-	 * @return false Failure.
+	 * @param [in] dwRVA RVA to begin disassembly.
+	 * @retval true Success.
+	 * @retval false Failure.
 	 */
 	bool DisasmRecursive(_In_ DWORD dwRVA);
 
 	/*!
 	 * @brief Disassembles or fixes exception info.
 	 * 
-	 * @param pFunc Pointer to `RUNTIME_FUNCTION` to be checked.
-	 * @param bFixAddr `true` to fix addresses, `false` to disassemble functions.
-	 * @return true Success.
-	 * @return false Failure.
+	 * @param [in] pFunc Pointer to `RUNTIME_FUNCTION` to be checked.
+	 * @param [in] bFixAddr `true` to fix addresses, `false` to disassemble functions.
+	 * @retval true Success.
+	 * @retval false Failure.
 	 */
 	bool CheckRuntimeFunction(_In_ RUNTIME_FUNCTION* pFunc, _In_ bool bFixAddr = false);
 
 	/*!
 	 * @brief Get the next original line.
 	 * 
-	 * @param dwSec Section to search.
-	 * @param dwIndex Index to begin search.
-	 * @return DWORD Index of line, or `_UI32_MAX` if not found.
+	 * @param [in] dwSec Section to search.
+	 * @param [in] dwIndex Index to begin search.
+	 * @return Index of line.
+	 * @retval _UI32_MAX Not found.
 	 */
 	DWORD GetNextOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex);
 
 	/*!
 	 * @brief Get the previous original line.
 	 * 
-	 * @param dwSec Section to search.
-	 * @param dwIndex Index to begin search.
-	 * @return DWORD Index of line, or `_UI32_MAX` if not found.
+	 * @param [in] dwSec Section to search.
+	 * @param [in] dwIndex Index to begin search.
+	 * @return Index of line.
+	 * @retval _UI32_MAX Not found.
 	 */
 	DWORD GetPrevOriginal(_In_ DWORD dwSec, _In_ DWORD dwIndex);
 
@@ -210,29 +202,29 @@ public:
 	/*!
 	 * @brief Parses PE from file.
 	 * 
-	 * @param sFileName File name.
+	 * @param [in] sFileName File name.
 	 */
 	Asm(_In_ char* sFileName);
 
 	/*!
 	 * @brief Parses PE from file.
 	 * 
-	 * @param hFile File handle.
+	 * @param [in] hFile File handle.
 	 */
 	Asm(_In_ HANDLE hFile);
 	
 	/*!
 	 * @brief Finds functions compatible with partial loading.
 	 * 
-	 * @return true Success.
-	 * @return false Failure.
+	 * @retval true Success.
+	 * @retval false Failure.
 	 */
 	bool Analyze();
 
 	/*!
 	 * @brief Retrieves the function ranges found by `Analyze()`.
 	 * 
-	 * @return Vector<FunctionRange> Discovered functions.
+	 * @return Discovered functions.
 	 * 
 	 * @see Analyze
 	 * @see FunctionRange
@@ -242,8 +234,8 @@ public:
 	/*!
 	 * @brief Strips debug info & symbols.
 	 * 
-	 * @return true Success.
-	 * @return false Failure.
+	 * @retval true Success.
+	 * @retval false Failure.
 	 */
 	bool Strip();
 
@@ -256,98 +248,95 @@ public:
 	 * @brief Translates a RVA from the original binary to the new assembled binary.
 	 * @remark Should only be used after `Assemble()` has been called.
 	 * 
-	 * @param dwRVA RVA to translate.
-	 * @return DWORD New RVA, or `NULL` on failure.
+	 * @param [in] dwRVA RVA to translate.
+	 * @return New RVA.
+	 * @retval NULL Unable to translate.
 	 */
 	DWORD TranslateOldAddress(_In_ DWORD dwRVA);
 
 	/*!
 	 * @brief Finds position where line with given RVA should be inserted.
 	 * 
-	 * @param dwSec Section to insert line.
-	 * @param dwRVA RVA of line to insert.
-	 * @return DWORD Index where line should be inserted, `_UI32_MAX - 1` if RVA already exists, or `_UI32_MAX` on error.
+	 * @param [in] dwSec Section to insert line.
+	 * @param [in] dwRVA RVA of line to insert.
+	 * @return Index where line should be inserted.
+	 * @retval _UI32_MAX-1 Line with RVA already exists.
+	 * @retval _UI32_MAX Unable to find position.
 	 */
 	DWORD FindPosition(_In_ DWORD dwSec, _In_ DWORD dwRVA);
 
 	/*!
 	 * @brief Finds line in section with given RVA.
 	 * 
-	 * @param dwSec Section that contains the line.
-	 * @param dwRVA RVA of line to find.
-	 * @return DWORD Index of line or `_UI32_MAX` if not found.
+	 * @param [in] dwSec Section that contains the line.
+	 * @param [in] dwRVA RVA of line to find.
+	 * @return Index of line.
+	 * @retval _UI32_MAX Line not found.
 	 */
 	DWORD FindIndex(_In_ DWORD dwSec, _In_ DWORD dwRVA);
 	
 	/*!
 	 * @brief Finds section that contains the given RVA.
 	 * 
-	 * @param dwRVA RVA to find.
-	 * @return DWORD Section index or `_UI32_MAX` if not found.
+	 * @param [in] dwRVA RVA to find.
+	 * @return Section index.
+	 * @retval _UI32_MAX Section not found.
 	 */
 	DWORD FindSectionIndex(_In_ DWORD dwRVA);
 
 	/*!
 	 * @brief Disassembles application.
 	 * 
-	 * @return true Success.
-	 * @return false Failure.
+	 * @retval true Success.
+	 * @retval false Failure.
 	 */
 	bool Disassemble();
 
 	/*!
 	 * @brief Assembles application.
 	 * 
-	 * @return true Success.
-	 * @return false Failure.
+	 * @retval true Success.
+	 * @retval false Failure.
 	 */
 	bool Assemble();
 
 	/*!
 	 * @brief Inserts new asm instruction.
 	 * 
-	 * @param SectionIndex Index of section to insert line.
-	 * @param LineIndex Index to insert into.
-	 * @param line Line to be inserted.
+	 * @param [in] SectionIndex Index of section to insert line.
+	 * @param [in] LineIndex Index to insert into.
+	 * @param [in] line Line to be inserted.
 	 */
 	void InsertLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex, _In_ Line line);
 
 	/*!
 	 * @brief Deletes asm instruction.
 	 * 
-	 * @param SectionIndex Section containing line.
-	 * @param LineIndex Index of line to delete.
+	 * @param [in] SectionIndex Section containing line.
+	 * @param [in] LineIndex Index of line to delete.
 	 */
 	void DeleteLine(_In_ DWORD SectionIndex, _In_ DWORD LineIndex);
 
 	/*!
 	 * @brief Removes data from given range.
 	 * 
-	 * @param dwRVA RVA to begin removal.
-	 * @param dwSize Size of data to remove.
+	 * @param [in] dwRVA RVA to begin removal.
+	 * @param [in] dwSize Size of data to remove.
 	 */
 	void RemoveData(_In_ DWORD dwRVA, _In_ DWORD dwSize);
 
 	/*!
 	 * @brief Calculates the new size of a section.
 	 * 
-	 * @param SectionIndex Section index.
-	 * @return DWORD Size of section.
+	 * @param [in] SectionIndex Section index.
+	 * @return Size of section.
 	 */
 	DWORD GetAssembledSize(_In_ DWORD SectionIndex);
 
 	/*!
-	 * @brief Gets the total number of lines.
-	 * @todo Remove this function.
-	 * 
-	 * @return size_t Total number of lines.
-	 */
-	size_t GetNumLines();
-
-	/*!
 	 * @brief Retrieves list of sections.
 	 * 
-	 * @return Vector<AsmSection> Sections.
+	 * @return Sections.
 	 */
 	Vector<AsmSection> GetSections();
 
