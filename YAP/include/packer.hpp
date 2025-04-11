@@ -1,7 +1,7 @@
 /*!
- * @file debugger.hpp
+ * @file packer.hpp
  * @author undisassemble
- * @brief Debugger definitions
+ * @brief Packer definitions
  * @version 0.0.0
  * @date 2025-04-08
  * @copyright MIT License
@@ -111,5 +111,3 @@ struct _ShellcodeData {
  * @retval false Failure.
  */
 bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary);
-
-#include "vm.hpp"

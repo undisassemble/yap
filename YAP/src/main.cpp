@@ -208,13 +208,6 @@ DWORD WINAPI Begin(void* args) {
 			pAssembly->CleanHeaders();
 		}
 
-		// Virtualize
-		if (Options.VM.bEnabled && !Virtualize(pAssembly)) {
-			Modal("Failed to virtualize PE", "Error", MB_OK | MB_ICONERROR);
-			LOG(Failed, MODULE_YAP, "Failed to virtualize PE\n");
-			goto th_exit;
-		}
-
 		// Assemble
 		if (!pAssembly->Assemble()) {
 			Modal("Assembly failed", "Error", MB_OK | MB_ICONERROR);

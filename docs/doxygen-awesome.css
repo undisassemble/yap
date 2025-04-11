@@ -28,19 +28,21 @@ SOFTWARE.
 */
 
 html {
+    color-scheme: dark;
+
     /* primary theme color. This will affect the entire websites color scheme: links, arrows, labels, ... */
-    --primary-color: #1779c4;
-    --primary-dark-color: #335c80;
-    --primary-light-color: #70b1e9;
+    --primary-color: #1982d2;
+    --primary-dark-color: #86a9c4;
+    --primary-light-color: #4779ac;
     --on-primary-color: #ffffff;
 
     /* page base colors */
-    --page-background-color: #ffffff;
-    --page-foreground-color: #2f4153;
-    --page-secondary-foreground-color: #6f7e8e;
+    --page-background-color: #222528;
+    --page-foreground-color: #d2dbde;
+    --page-secondary-foreground-color: #859399;
 
     /* color for all separators on the website: hr, borders, ... */
-    --separator-color: #dedede;
+    --separator-color: #38393b;
 
     /* border radius for all rounded components. Will affect many components, like dropdowns, memitems, codeblocks, ... */
     --border-radius-large: 8px;
@@ -53,9 +55,9 @@ html {
     --spacing-large: 16px;
 
     /* default box shadow used for raising an element above the normal content. Used in dropdowns, search result, ... */
-    --box-shadow: 0 2px 8px 0 rgba(0,0,0,.075);
+    --box-shadow: 0 2px 8px 0 rgba(0,0,0,.35);
 
-    --odd-color: rgba(0,0,0,.028);
+    --odd-color: rgba(100,100,100,.06);
 
     /* font-families. will affect all text on the website
      * font-family: the normal font for text, headlines, menus
@@ -81,31 +83,31 @@ html {
     --toc-max-height: calc(100vh - 2 * var(--spacing-medium) - 85px);
 
     /* colors for various content boxes: @warning, @note, @deprecated @bug */
-    --warning-color: #faf3d8;
-    --warning-color-dark: #f3a600;
-    --warning-color-darker: #5f4204;
-    --note-color: #e4f3ff;
-    --note-color-dark: #1879C4;
-    --note-color-darker: #274a5c;
-    --todo-color: #e4dafd;
-    --todo-color-dark: #5b2bdd;
-    --todo-color-darker: #2a0d72;
-    --deprecated-color: #ecf0f3;
-    --deprecated-color-dark: #5b6269;
-    --deprecated-color-darker: #43454a;
-    --bug-color: #f8d1cc;
-    --bug-color-dark: #b61825;
-    --bug-color-darker: #75070f;
-    --invariant-color: #d8f1e3;
-    --invariant-color-dark: #44b86f;
-    --invariant-color-darker: #265532;
+    --warning-color: #3b2e04;
+    --warning-color-dark: #f1b602;
+    --warning-color-darker: #ceb670;
+    --note-color: #163750;
+    --note-color-dark: #1982D2;
+    --note-color-darker: #dcf0fa;
+    --todo-color: #2a2536;
+    --todo-color-dark: #7661b3;
+    --todo-color-darker: #ae9ed6;
+    --deprecated-color: #2e323b;
+    --deprecated-color-dark: #738396;
+    --deprecated-color-darker: #abb0bd;
+    --bug-color: #2e1917;
+    --bug-color-dark: #ad2617;
+    --bug-color-darker: #f5b1aa;
+    --invariant-color: #303a35;
+    --invariant-color-dark: #76ce96;
+    --invariant-color-darker: #cceed5;
 
     /* blockquote colors */
-    --blockquote-background: #f8f9fa;
-    --blockquote-foreground: #636568;
+    --blockquote-background: #222325;
+    --blockquote-foreground: #7e8c92;
 
     /* table colors */
-    --tablehead-background: #f1f1f1;
+    --tablehead-background: #2a2c2f;
     --tablehead-foreground: var(--page-foreground-color);
 
     /* menu-display: block | none
@@ -116,7 +118,7 @@ html {
 
     --menu-focus-foreground: var(--on-primary-color);
     --menu-focus-background: var(--primary-color);
-    --menu-selected-background: rgba(0,0,0,.05);
+    --menu-selected-background: rgba(0,0,0,.4);
 
 
     --header-background: var(--page-background-color);
@@ -134,26 +136,26 @@ html {
     --searchbar-border-radius: var(--searchbar-height);
 
     /* code block colors */
-    --code-background: #f5f5f5;
+    --code-background: #2a2c2f;
     --code-foreground: var(--page-foreground-color);
 
     /* fragment colors */
-    --fragment-background: #F8F9FA;
-    --fragment-foreground: #37474F;
-    --fragment-keyword: #bb6bb2;
-    --fragment-keywordtype: #8258b3;
-    --fragment-keywordflow: #d67c3b;
-    --fragment-token: #438a59;
-    --fragment-comment: #969696;
-    --fragment-link: #5383d6;
-    --fragment-preprocessor: #46aaa5;
-    --fragment-linenumber-color: #797979;
-    --fragment-linenumber-background: #f4f4f5;
-    --fragment-linenumber-border: #e3e5e7;
+    --fragment-background: #282c34;
+    --fragment-foreground: #dbe4eb;
+    --fragment-keyword: #cc99cd;
+    --fragment-keywordtype: #ab99cd;
+    --fragment-keywordflow: #e08000;
+    --fragment-token: #7ec699;
+    --fragment-comment: #999999;
+    --fragment-link: #98c0e3;
+    --fragment-preprocessor: #65cabe;
+    --fragment-linenumber-color: #cccccc;
+    --fragment-linenumber-background: #35393c;
+    --fragment-linenumber-border: #1f1f1f;
     --fragment-lineheight: 20px;
 
     /* sidebar navigation (treeview) colors */
-    --side-nav-background: #fbfbfb;
+    --side-nav-background: rgb(45,47,50);
     --side-nav-foreground: var(--page-foreground-color);
     --side-nav-arrow-opacity: 0;
     --side-nav-arrow-hover-opacity: 0.9;
@@ -171,7 +173,7 @@ html {
     --webkit-scrollbar-padding: 4px;
     --webkit-scrollbar-color: var(--separator-color);
 
-    --animation-duration: .12s
+    --animation-duration: .12s;
 }
 
 @media screen and (max-width: 767px) {
@@ -181,67 +183,6 @@ html {
         --toc-font-size: 15px;
         --code-font-size: 15px; /* affects code, fragment */
         --title-font-size: 22px;
-    }
-}
-
-@media (prefers-color-scheme: dark) {
-    html:not(.light-mode) {
-        color-scheme: dark;
-
-        --primary-color: #1982d2;
-        --primary-dark-color: #86a9c4;
-        --primary-light-color: #4779ac;
-
-        --box-shadow: 0 2px 8px 0 rgba(0,0,0,.35);
-
-        --odd-color: rgba(100,100,100,.06);
-
-        --menu-selected-background: rgba(0,0,0,.4);
-
-        --page-background-color: #222528;
-        --page-foreground-color: #d2dbde;
-        --page-secondary-foreground-color: #859399;
-        --separator-color: #38393b;
-        --side-nav-background: rgb(45,47,50);
-
-        --code-background: #2a2c2f;
-
-        --tablehead-background: #2a2c2f;
-    
-        --blockquote-background: #222325;
-        --blockquote-foreground: #7e8c92;
-
-        --warning-color: #3b2e04;
-        --warning-color-dark: #f1b602;
-        --warning-color-darker: #ceb670;
-        --note-color: #163750;
-        --note-color-dark: #1982D2;
-        --note-color-darker: #dcf0fa;
-        --todo-color: #2a2536;
-        --todo-color-dark: #7661b3;
-        --todo-color-darker: #ae9ed6;
-        --deprecated-color: #2e323b;
-        --deprecated-color-dark: #738396;
-        --deprecated-color-darker: #abb0bd;
-        --bug-color: #2e1917;
-        --bug-color-dark: #ad2617;
-        --bug-color-darker: #f5b1aa;
-        --invariant-color: #303a35;
-        --invariant-color-dark: #76ce96;
-        --invariant-color-darker: #cceed5;
-
-        --fragment-background: #282c34;
-        --fragment-foreground: #dbe4eb;
-        --fragment-keyword: #cc99cd;
-        --fragment-keywordtype: #ab99cd;
-        --fragment-keywordflow: #e08000;
-        --fragment-token: #7ec699;
-        --fragment-comment: #999999;
-        --fragment-link: #98c0e3;
-        --fragment-preprocessor: #65cabe;
-        --fragment-linenumber-color: #cccccc;
-        --fragment-linenumber-background: #35393c;
-        --fragment-linenumber-border: #1f1f1f;
     }
 }
 

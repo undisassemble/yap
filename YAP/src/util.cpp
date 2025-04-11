@@ -91,15 +91,8 @@ bool SaveProject() {
 	WriteFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
 
 	// Write data
-	BYTE* pTemp = Options.VM.VMFuncs.raw.pBytes;
-	Options.VM.VMFuncs.raw.pBytes = NULL;
 	WriteFile(hFile, &Options, sizeof(Options_t), NULL, NULL);
-	Options.VM.VMFuncs.raw.pBytes = pTemp;
-
-	// Write VM funcs
-	for (int i = 0; i < Options.VM.VMFuncs.Size(); i++) {
-		WriteFile(hFile, &Options.VM.VMFuncs[i], sizeof(ToVirt_t), NULL, NULL);
-	}
+	
 	CloseHandle(hFile);
 	LOG(Success, MODULE_YAP, "Saved project to %s\n", Data.Project);
 	return true;
@@ -108,7 +101,6 @@ bool SaveProject() {
 bool LoadProject() {
 	char sig[3] = { 0 };
 	DWORD ver = 0;
-	Options.VM.VMFuncs.Release();
 
 	// Open file
 	HANDLE hFile = CreateFileA(Data.Project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -144,11 +136,6 @@ bool LoadProject() {
 	// Read data
 	ReadFile(hFile, &Options, sizeof(Options_t), NULL, NULL);
 	
-	// Read VM funcs
-	Options.VM.VMFuncs.raw.pBytes = reinterpret_cast<BYTE*>(malloc(Options.VM.VMFuncs.raw.u64Size));
-	for (int i = 0; i < Options.VM.VMFuncs.Size(); i++) {
-		ReadFile(hFile, Options.VM.VMFuncs.raw.pBytes + i * sizeof(ToVirt_t), sizeof(ToVirt_t), NULL, NULL);
-	}
 	CloseHandle(hFile);
 	LOG(Success, MODULE_YAP, "Loaded %s\n", Data.Project);
 	return true;

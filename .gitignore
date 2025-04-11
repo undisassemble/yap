@@ -22,3 +22,4 @@ yap.rc
 *.inc
 __pycache__
 .vscode
+html

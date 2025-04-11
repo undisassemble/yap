@@ -233,68 +233,6 @@ void DrawGUI() {
 			ImGui::EndTabItem();
 		}
 
-#ifdef _DEBUG
-		if (ImGui::BeginTabItem(ICON_MICROCHIP " VM")) {
-			if (!Options.Packing.bEnabled || !Options.Reassembly.bEnabled) {
-				ImGui::BeginDisabled();
-				bool bDisabled = false;
-				ImGui::Checkbox("Enable VM", &bDisabled);
-			} else {
-				IMGUI_TOGGLE("Enable VM", Options.VM.bEnabled);
-			}
-			ImGui::SetItemTooltip("Enables virtualization functionality, requires packer & reassembler to be enabled.");
-			if (ImGui::Button("Add Function (Max 256)")) {
-				if (Options.VM.VMFuncs.Size() < 256) {
-					ToVirt_t empty;
-					Options.VM.VMFuncs.Push(empty);
-				}
-			}
-
-			for (int i = 0, n = Options.VM.VMFuncs.Size(); i < n; i++) {
-				// Label
-				char buf[512];
-
-				// Dropdown
-				wsprintfA(buf, "BtnFn%d", i);
-				ImGui::PushID(buf);
-				wsprintfA(buf, "Function %d", i + 1);
-				char name[sizeof(Options.VM.VMFuncs[i].Name)] = { 0 };
-				memcpy(name, Options.VM.VMFuncs[i].Name, sizeof(name));
-				if (ImGui::InputText(buf, name, sizeof(name))) {
-					ToVirt_t entry = Options.VM.VMFuncs[i];
-					memcpy(entry.Name, name, sizeof(name));
-					Options.VM.VMFuncs[i] = entry;
-				}
-				ImGui::PopID();
-				ImGui::SetItemTooltip("Name of exported function");
-				ImGui::SameLine();
-				wsprintfA(buf, "BtnCheck%d", i);
-				ImGui::PushID(buf);
-				bool bSet = Options.VM.VMFuncs[i].bRemoveExport;
-				if (ImGui::Checkbox("Remove Export", &bSet)) {
-					ToVirt_t entry = Options.VM.VMFuncs[i];
-					entry.bRemoveExport = bSet;
-					Options.VM.VMFuncs[i] = entry;
-				}
-				ImGui::PopID();
-				ImGui::SetItemTooltip("Remove function from export table");
-
-				// Remove button
-				ImGui::SameLine();
-				wsprintfA(buf, "BtnRemove%d", i);
-				ImGui::PushID(buf);
-				if (ImGui::Button("Remove")) {
-					Options.VM.VMFuncs.Remove(i);
-					n--;
-					i--;
-				}
-				ImGui::PopID();
-			}
-			if (!Options.Packing.bEnabled || !Options.Reassembly.bEnabled) ImGui::EndDisabled();
-			ImGui::EndTabItem();
-		}
-#endif
-
 		if (ImGui::BeginTabItem(ICON_GEARS " Advanced")) {
 			if (ImGui::TreeNode("Packer")) {
 				BYTE MIN = 0;
@@ -319,10 +257,6 @@ void DrawGUI() {
 				IMGUI_TOGGLE("Full-random section names", Options.Advanced.bTrueRandomSecNames);
 				ImGui::InputText("Section 1 name", Options.Advanced.Sec1Name, 9);
 				ImGui::InputText("Section 2 name", Options.Advanced.Sec2Name, 9);
-				ImGui::TreePop();
-			}
-			if (ImGui::TreeNode("VM")) {
-				IMGUI_TOGGLE("Delete virtualized functions", Options.Advanced.bDeleteVirtualizedFunctions);
 				ImGui::TreePop();
 			}
 			ImGui::EndTabItem();

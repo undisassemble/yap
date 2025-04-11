@@ -16,3 +16,9 @@ GENERATE_TREEVIEW      = YES
 DISABLE_INDEX          = YES
 FULL_SIDEBAR           = NO
 SEARCHENGINE           = YES
+HTML_COLORSTYLE        = DARK
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = YES
+PREDEFINED             = __declspec(x)=
+PREDEFINED            += __attribute__(x)=

@@ -464,11 +464,6 @@ struct Vector {
 	//}
 };
 
-struct ToVirt_t {
-	bool bRemoveExport : 1 = true;
-	char Name[25] = { 0 };
-};
-
 #ifndef UTIL_STRUCT_ONLY
 struct Options_t {
 	struct {
@@ -499,13 +494,6 @@ struct Options_t {
 		int EncodingCounts = 1;
 	} Packing;
 
-	// Requires packing
-	struct {
-		bool bEnabled : 1 = false;
-		bool bVirtEntry : 1 = false;
-		Vector<ToVirt_t> VMFuncs;
-	} VM;
-
 	struct {
 		bool bEnabled : 1 = false;
 		bool bRemoveData : 1 = false;
@@ -518,7 +506,6 @@ struct Options_t {
 	} Reassembly;
 
 	struct {
-		bool bDeleteVirtualizedFunctions : 1 = false;
 		bool bTrueRandomSecNames : 1 = false;
 		bool bSemiRandomSecNames : 1 = true;
 		bool bFakeSymbols : 1 = true;
