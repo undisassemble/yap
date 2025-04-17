@@ -243,11 +243,7 @@ struct Vector {
 	 * @return Item.
 	 */
 	T& At(_In_ DWORD i) {
-		if (!raw.pBytes || !raw.u64Size || Size() <= i) {
-			T ret;
-			ZeroMemory(&ret, sizeof(T));
-			return ret;
-		}
+		// It's better for this to crash than give bad data
 		return ((T*)raw.pBytes)[i];
 	}
 
@@ -258,7 +254,7 @@ struct Vector {
 	 * @return Item.
 	 */
 	T& operator[](_In_ int i) {
-		return At(i);
+		return ((T*)raw.pBytes)[i];
 	}
 
 	/*!
@@ -268,7 +264,7 @@ struct Vector {
 	 * @return Item.
 	 */
 	const T& operator[](_In_ int i) const {
-		return At(i);
+		return ((T*)raw.pBytes)[i];
 	}
 
 	/*!
