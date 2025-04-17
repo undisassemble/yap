@@ -211,7 +211,7 @@ DWORD PE::RVAToRaw(_In_ DWORD dwRVA) {
 		return 0;
 
 	WORD wIndex = FindSectionByRVA(dwRVA);
-	if (wIndex >= SectionHeaders.Size()) return 0;
+	if (wIndex >= SectionHeaders.Size() || !SectionHeaders[wIndex].PointerToRawData || SectionHeaders[wIndex].SizeOfRawData < dwRVA - SectionHeaders[wIndex].VirtualAddress) return 0;
 	return SectionHeaders[wIndex].PointerToRawData + (dwRVA - SectionHeaders[wIndex].VirtualAddress);
 }
 
@@ -220,7 +220,7 @@ DWORD PE::RawToRVA(_In_ DWORD dwRaw) {
 		return 0;
 
 	WORD wIndex = FindSectionByRaw(dwRaw);
-	if (wIndex >= SectionHeaders.Size()) return 0;
+	if (wIndex >= SectionHeaders.Size() || !SectionHeaders[wIndex].VirtualAddress || SectionHeaders[wIndex].Misc.VirtualSize < dwRaw - SectionHeaders[wIndex].PointerToRawData) return 0;
 	return SectionHeaders[wIndex].VirtualAddress + (dwRaw - SectionHeaders[wIndex].PointerToRawData);
 }
 
@@ -407,7 +407,7 @@ bool PE::ProduceBinary(_In_ char* sName) {
 	return bRet;
 }
 
-Vector<DWORD> PE::GetExportedFunctionRVAs() {
+Vector<DWORD> PE::GetExportedSymbolRVAs() {
 	// Get export table
 	Vector<DWORD> vec;
 	vec.bCannotBeReleased = true;
@@ -426,7 +426,7 @@ Vector<DWORD> PE::GetExportedFunctionRVAs() {
 	return vec;
 }
 
-Vector<char*> PE::GetExportedFunctionNames() {
+Vector<char*> PE::GetExportedSymbolNames() {
 	// Get export table
 	Vector<char*> vec;
 	if (!NTHeaders.OptionalHeader.DataDirectory[0].Size || !NTHeaders.OptionalHeader.DataDirectory[0].VirtualAddress) return vec;

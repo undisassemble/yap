@@ -230,7 +230,6 @@ public:
 
 	/*!
 	 * @brief Translates a runtime offset to a file offset.
-	 * @todo Ensure this works when getting virtual address that doesn't exist raw.
 	 * 
 	 * @param [in] dwRVA RVA to translate.
 	 * @return File offset.
@@ -240,7 +239,6 @@ public:
 
 	/*!
 	 * @brief Translates a file offset to a runtime offset.
-	 * @todo Ensure this works when getting raw address that never gets loaded.
 	 * 
 	 * @param [in] dwRaw File offset.
 	 * @return Virtual address.
@@ -268,19 +266,17 @@ public:
 
 	/*!
 	 * @brief Gets RVAs of exported functions.
-	 * @todo Rename to GetExportedSymbolRVAs
 	 * 
 	 * @return Exported RVAs.
 	 */
-	Vector<DWORD> GetExportedFunctionRVAs();
+	Vector<DWORD> GetExportedSymbolRVAs();
 
 	/*!
 	 * @brief Gets names of exported functions.
-	 * @todo Rename to GetExportedSymbolNames
 	 * 
 	 * @return Exported names.
 	 */
-	Vector<char*> GetExportedFunctionNames();
+	Vector<char*> GetExportedSymbolNames();
 
 	/*!
 	 * @brief Gets list of imported DLLs.

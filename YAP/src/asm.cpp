@@ -844,8 +844,8 @@ bool Asm::Disassemble() {
 	Data.sTask = "Disassembling exports";
 	Data.fTotalProgress = 2.f / 6.f;
 	{
-		Vector<DWORD> Exports = GetExportedFunctionRVAs();
-		Vector<char*> ExportNames = GetExportedFunctionNames();
+		Vector<DWORD> Exports = GetExportedSymbolRVAs();
+		Vector<char*> ExportNames = GetExportedSymbolNames();
 		for (int i = 0; i < Exports.Size(); i++) {
 			if (!DisasmRecursive(Exports[i])) {
 				return false;

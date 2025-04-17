@@ -1330,8 +1330,8 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	if (pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].VirtualAddress && pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].Size) {
 		IMAGE_EXPORT_DIRECTORY Exports = { 0 };
 		IMAGE_EXPORT_DIRECTORY OriginalExports = pOriginal->ReadRVA<IMAGE_EXPORT_DIRECTORY>(pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].VirtualAddress);
-		Vector<DWORD> exports = pOriginal->GetExportedFunctionRVAs();
-		Vector<char*> names = pOriginal->GetExportedFunctionNames();
+		Vector<DWORD> exports = pOriginal->GetExportedSymbolRVAs();
+		Vector<char*> names = pOriginal->GetExportedSymbolNames();
 		pNT->OptionalHeader.DataDirectory[0].VirtualAddress = SecHeader.VirtualAddress + shell.u64Size;
 
 		Exports.Base = OriginalExports.Base;
