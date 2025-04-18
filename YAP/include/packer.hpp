@@ -14,17 +14,16 @@
 
 /*!
  * @brief Result of a SHA256 operation.
- * @bug This is wrong because of endianness.
  */
 struct Sha256Digest {
 	struct {
-		uint64_t high = 0; //!< Bytes 0-7
-		uint64_t low = 0;  //!< Bytes 8-15
-	} high;
-	struct {
-		uint64_t high = 0; //!< Bytes 16-23
-		uint64_t low = 0;  //!< Bytes 24-31
+		uint64_t low = 0;  //!< Bytes 0-7
+		uint64_t high = 0; //!< Bytes 8-15
 	} low;
+	struct {
+		uint64_t low = 0;  //!< Bytes 16-23
+		uint64_t high = 0; //!< Bytes 24-31
+	} high;
 };
 
 /*!

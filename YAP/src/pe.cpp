@@ -456,25 +456,27 @@ char* PE::ReadRVAString(_In_ DWORD dwRVA) {
 	return reinterpret_cast<char*>(SectionData[wIndex].pBytes + (dwRVA - SectionHeaders[wIndex].VirtualAddress));
 }
 
-void PE::WriteRVA(_In_ DWORD dwRVA, _In_ void* pData, _In_ size_t szData) {
+bool PE::WriteRVA(_In_ DWORD dwRVA, _In_ void* pData, _In_ size_t szData) {
 	// Verify stuff
 	WORD wSectionIndex = FindSectionByRVA(dwRVA);
 	if (!pData || !szData || wSectionIndex > NTHeaders.FileHeader.NumberOfSections - 1 || !SectionHeaders[wSectionIndex].SizeOfRawData || SectionHeaders[wSectionIndex].VirtualAddress > dwRVA || SectionHeaders[wSectionIndex].VirtualAddress + SectionHeaders[wSectionIndex].SizeOfRawData < dwRVA + szData) {
-		return;
+		return false;
 	}
 
 	// Write data
 	memcpy(SectionData[wSectionIndex].pBytes + (dwRVA - SectionHeaders[wSectionIndex].VirtualAddress), pData, szData);
+	return true;
 }
 
-void PE::ReadRVA(_In_ DWORD dwRVA, _Out_ void* pData, _In_ size_t szData) {
+bool PE::ReadRVA(_In_ DWORD dwRVA, _Out_ void* pData, _In_ size_t szData) {
 	WORD wSectionIndex = FindSectionByRVA(dwRVA);
 	if (!pData || !szData || wSectionIndex > NTHeaders.FileHeader.NumberOfSections - 1 || !SectionHeaders[wSectionIndex].SizeOfRawData || SectionHeaders[wSectionIndex].VirtualAddress > dwRVA || SectionHeaders[wSectionIndex].VirtualAddress + SectionHeaders[wSectionIndex].SizeOfRawData < dwRVA + szData) {
-		ZeroMemory(pData, szData); // This region is defaulted to zero anyways so �\_(._.)_/�
-		return;
+		ZeroMemory(pData, szData);
+		return false;
 	}
 
 	memcpy(pData, SectionData[wSectionIndex].pBytes + (dwRVA - SectionHeaders[wSectionIndex].VirtualAddress), szData);
+	return true;
 }
 
 Vector<DWORD> PE::GetRelocations() {

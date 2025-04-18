@@ -3,14 +3,13 @@
  * @author undisassemble
  * @brief Portable executable parser definitions
  * @version 0.0.0
- * @date 2025-04-08
+ * @date 2025-04-18
  * @copyright MIT License
  */
 
 #pragma once
 
 #include "util.hpp"
-#include <winnt.h>
 
 /*!
  * @brief Status of PE class.
@@ -107,36 +106,38 @@ public:
 
 	/*!
 	 * @brief Writes data at the RVA.
-	 * @todo Change `pData` and `szData` to `Buffer`.
-	 * @todo Return status.
 	 * 
 	 * @param [in] dwRVA RVA to write to.
 	 * @param [in] pData Data to be written.
 	 * @param [in] szData Size of data in `pData`.
+	 * @retval true Success.
+	 * @retval false Failure.
 	 */
-	void WriteRVA(_In_ DWORD dwRVA, _In_ void* pData, _In_ size_t szData);
+	bool WriteRVA(_In_ DWORD dwRVA, _In_ void* pData, _In_ size_t szData);
 
 	/*!
 	 * @brief Reads data at the RVA.
-	 * @todo Change `pData` and `szData` to `Buffer` or have it return a `Buffer`.
 	 * 
 	 * @param [in] dwRVA RVA to read from.
 	 * @param [out] pData Buffer to contain data.
 	 * @param [in] szData Size of `pData`.
+	 * @retval true Success.
+	 * @retval false Failure.
 	 */
-	void ReadRVA(_In_ DWORD dwRVA, _Out_ void* pData, _In_ size_t szData);
+	bool ReadRVA(_In_ DWORD dwRVA, _Out_ void* pData, _In_ size_t szData);
 
 	/*!
 	 * @brief Writes data at the RVA.
-	 * @todo Return status.
 	 * 
 	 * @tparam T Type to be written.
 	 * @param [in] dwRVA RVA to write to.
 	 * @param [in] Data Data to be written.
+	 * @retval true Success.
+	 * @retval false Failure.
 	 */
 	template <typename T>
-	void WriteRVA(_In_ DWORD dwRVA, _In_ T Data) {
-		WriteRVA(dwRVA, &Data, sizeof(T));
+	bool WriteRVA(_In_ DWORD dwRVA, _In_ T Data) {
+		return WriteRVA(dwRVA, &Data, sizeof(T));
 	}
 
 	/*!
@@ -167,7 +168,6 @@ public:
 
 	/*!
 	 * @brief Overwrite a section with new data.
-	 * @todo Replace `pBytes` and `szBytes` with `Buffer`.
 	 * 
 	 * @param [in] wIndex Index of section to overwrite.
 	 * @param [in] pBytes Bytes to be replaced with (optional).
