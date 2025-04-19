@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-04-08
+ * @date 2025-04-18
  * @copyright MIT License
  */
 
@@ -504,12 +504,17 @@ void DrawGUI() {
 	ImGui::End();
 }
 
+void GLFWErrorHandler(int error, const char* message) {
+	LOG(Failed, MODULE_YAP, "GLFW error %d: %s\n", error, message);
+}
+
 bool BeginGUI() {
 	if (bInitialized)
 		return false;
 	bInitialized = true;
 
 	// Initialize
+	glfwSetErrorCallback(GLFWErrorHandler);
 	if (!glfwInit()) return false;
 	if (!ImGui::CreateContext()) return false;
 	ImGuiIO& io = ImGui::GetIO();
@@ -536,6 +541,7 @@ bool BeginGUI() {
 	glfwWindowHint(GLFW_DECORATED, 0);
 	glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, 1);
 	GLFWwindow* pWindow = glfwCreateWindow(width, height, "Yet Another Packer", NULL, NULL);
+	if (!pWindow) return false;
 	Data.hWnd = glfwGetWin32Window(pWindow);
 	int x, y, mon_x, mon_y;
 	glfwGetMonitorWorkarea(glfwGetPrimaryMonitor(), &x, &y, &mon_x, &mon_y);
