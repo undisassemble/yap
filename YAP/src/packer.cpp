@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-04-08
+ * @date 2025-04-20
  * @copyright MIT License
  */
 
@@ -452,11 +452,11 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 		Buffer compressed = PackSection(pOriginal->SectionData[i]);
 		compressing = 0;
 		if (!compressed.pBytes || !compressed.u64Size) return buf;
-		LOG(Info_Extended, MODULE_PACKER, "Packed section %.8s (%lld)\n", pOriginal->SectionHeaders[i].Name, (int64_t)compressed.u64Size - pOriginal->SectionHeaders[i].SizeOfRawData);
+		LOG(Info, MODULE_PACKER, "Packed section %.8s (%lld)\n", pOriginal->SectionHeaders[i].Name, (int64_t)compressed.u64Size - pOriginal->SectionHeaders[i].SizeOfRawData);
 		if (compressed.u64Size > _UI32_MAX) {
 			LOG(Failed, MODULE_PACKER, "Packed section size was too large\n");
-			LOG(Info_Extended, MODULE_PACKER, "Size: %p bytes\n", compressed.u64Size);
-			LOG(Info_Extended, MODULE_PACKER, "Max size: %p bytes\n", _UI32_MAX);
+			LOG(Info, MODULE_PACKER, "Size: %p bytes\n", compressed.u64Size);
+			LOG(Info, MODULE_PACKER, "Max size: %p bytes\n", _UI32_MAX);
 			return buf;
 		}
 		Copied.OverwriteSection(i, compressed.pBytes, compressed.u64Size);
@@ -531,7 +531,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	ShellcodeData.Sha256_InitOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Init);
 	ShellcodeData.Sha256_UpdateOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Update);
 	ShellcodeData.Sha256_FinalOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Final);
-	LOG(Info_Extended, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
+	LOG(Info, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	buf.Allocate(holder.textSection()->buffer().size());
 	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
 	if (Options.Packing.bAntiDump) *reinterpret_cast<QWORD*>(buf.pBytes + szOffSzShell) = buf.u64Size;
@@ -671,7 +671,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			for (int j, i = 0; i < Imports.Size(); i++) {
 				char* name = pOriginal->ReadRVAString(Imports[i].Name);
 				if (!lstrcmpA(name, "yap.dll")) {
-					LOG(Info_Extended, MODULE_PACKER, "SDK imported\n");
+					LOG(Info, MODULE_PACKER, "SDK imported\n");
 					ShellcodeData.RequestedFunctions.iIndex = i;
 					continue;
 				}
@@ -736,7 +736,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 		for (int j, i = 0; i < Imports.Size(); i++) {
 			char* name = pOriginal->ReadRVAString(Imports[i].Name);
 			if (!Options.Packing.bHideIAT && !_stricmp(name, "yap.dll")) {
-				LOG(Info_Extended, MODULE_PACKER, "SDK imported\n");
+				LOG(Info, MODULE_PACKER, "SDK imported\n");
 				ShellcodeData.RequestedFunctions.iIndex = i;
 				continue;
 			}
@@ -1021,7 +1021,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 		LOG(Failed, MODULE_PACKER, "Failed to generate internal shellcode\n");
 		return buf;
 	}
-	LOG(Info_Extended, MODULE_PACKER, "Internal code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
+	LOG(Info, MODULE_PACKER, "Internal code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	ShellcodeData.LoadedOffset = holder.labelOffsetFromBase(entrypt) + holder.baseAddress();
 	if (holder.hasRelocEntries()) {
 		for (int i = 0; i < holder.relocEntries().size(); i++) {
@@ -1158,7 +1158,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	SecHeader.VirtualAddress = pNT->OptionalHeader.SizeOfHeaders;
 	SecHeader.VirtualAddress += (SecHeader.VirtualAddress % 0x1000) ? 0x1000 - (SecHeader.VirtualAddress % 0x1000) : 0;
 	ShellcodeData.BaseOffset = SecHeader.VirtualAddress - RVAOfFirst;
-	LOG(Info_Extended, MODULE_PACKER, "Packed binary relocated %lld bytes.\n", ShellcodeData.BaseOffset);
+	LOG(Info, MODULE_PACKER, "Packed binary relocated %lld bytes.\n", ShellcodeData.BaseOffset);
 	ShellcodeData.BaseAddress = ShellcodeData.BaseOffset + pOriginal->NTHeaders.OptionalHeader.SizeOfImage;
 	ShellcodeData.bUsingTLSCallbacks = Options.Packing.bDelayedEntry || Options.Packing.bAntiDebug || Options.Packing.bAntiPatch || (pOriginal->GetTLSCallbacks() && *pOriginal->GetTLSCallbacks());
 	ShellcodeData.EntryOff = 0x30 + rand() & 0xCF;

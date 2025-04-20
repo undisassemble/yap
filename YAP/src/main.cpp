@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-04-08
+ * @date 2025-04-20
  * @copyright MIT License
  */
 
@@ -292,14 +292,14 @@ DWORD WINAPI Begin(void* args) {
 		if (Data.bUserCancelled) {
 			LOG(Info, MODULE_YAP, "User cancelled\n");
 		} else {
-			LOG(Info_Extended, MODULE_YAP, "Saved to: %s\n", Data.SaveFileName);
+			LOG(Info, MODULE_YAP, "Saved to: %s\n", Data.SaveFileName);
 		}
 	} else {
 		if (!pAssembly->ProduceBinary(reinterpret_cast<char*>(args))) {
 			Modal("Failed to save file", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Failed to save file\n");
 		} else {
-			LOG(Info_Extended, MODULE_YAP, "Save to: %s\n", reinterpret_cast<char*>(args));
+			LOG(Info, MODULE_YAP, "Save to: %s\n", reinterpret_cast<char*>(args));
 		}
 	}
 

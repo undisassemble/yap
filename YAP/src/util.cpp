@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2025-04-18
+ * @date 2025-04-20
  * @copyright MIT License
  */
 
@@ -125,8 +125,8 @@ bool LoadProject() {
 	if (ver != __YAP_CONFIG_VERSION__) {
 		Modal("Version mismatch", "Error", MB_OK | MB_ICONERROR);
 		LOG(Failed, MODULE_YAP, "Version mismatch\n");
-		LOG(Info_Extended, MODULE_YAP, "Current version: %d\n", __YAP_CONFIG_VERSION__);
-		LOG(Info_Extended, MODULE_YAP, "Project version: %d\n", ver);
+		LOG(Info, MODULE_YAP, "Current version: %d\n", __YAP_CONFIG_VERSION__);
+		LOG(Info, MODULE_YAP, "Project version: %d\n", ver);
 		CloseHandle(hFile);
 		Data.Project[0] = 0;
 		return false;
@@ -172,9 +172,6 @@ void vLOG(LoggingLevel_t level, const char* mod, const char* str, va_list vargs)
 				break;
 			case Info:
 				WriteConsoleA(hStdOut, LOG_INFO "[", sizeof(LOG_INFO), NULL, NULL);
-				break;
-			case Info_Extended:
-				WriteConsoleA(hStdOut, LOG_INFO_EXTRA "[", sizeof(LOG_INFO_EXTRA), NULL, NULL);
 			}
 			WriteConsoleA(hStdOut, mod, strlen(mod), NULL, NULL);
 			WriteConsoleA(hStdOut, "]: \t", 4, NULL, NULL);
@@ -196,9 +193,6 @@ void vLOG(LoggingLevel_t level, const char* mod, const char* str, va_list vargs)
 				break;
 			case Info:
 				WriteFile(hLogFile, "[?] [", 5, NULL, NULL);
-				break;
-			case Info_Extended:
-				WriteFile(hLogFile, "[>] [", 5, NULL, NULL);
 			}
 			WriteFile(hLogFile, mod, strlen(mod), NULL, NULL);
 			WriteFile(hLogFile, "]: \t", 4, NULL, NULL);

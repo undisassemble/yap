@@ -27,7 +27,6 @@
 // Logging stuff
 #define LOG_SUCCESS "\x1B[32m[+]\x1B[39m "
 #define LOG_INFO "\x1B[36m[?]\x1B[39m "
-#define LOG_INFO_EXTRA  "\x1B[36m[>]\x1B[39m "
 #define LOG_WARNING "\x1B[33m[*]\x1B[39m "
 #define LOG_ERROR "\x1B[31m[-]\x1B[39m "
 #define MODULE_YAP "YAP"
@@ -44,7 +43,6 @@ enum LoggingLevel_t : int {
 	Success,      //!< [+] prefix
 	Warning,      //!< [*] prefix
 	Info,         //!< [?] prefix
-	Info_Extended //!< [>] prefix
 };
 
 /*!
