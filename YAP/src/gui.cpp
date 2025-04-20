@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-04-18
+ * @date 2025-04-20
  * @copyright MIT License
  */
 
@@ -20,7 +20,7 @@
 #include "imgui_internal.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include "asm.hpp"
+#include "relib/asm.hpp"
 #include <Zycore/Zycore.h>
 
 // Globals
@@ -301,6 +301,7 @@ void DrawGUI() {
 		if (ImGui::BeginTabItem(ICON_CIRCLE_INFO " Version")) {
 			ImGui::SeparatorText("Version information");
 			ImGui::Text("YAP: " __YAP_VERSION__);
+			ImGui::Text("relib: " __RELIB_VERSION__);
 			ImGui::Text("ImGui: " IMGUI_VERSION);
 			ImGui::Text("Zydis: %d.%d.%d", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
 			ImGui::Text("Zycore: %d.%d.%d", ZYCORE_VERSION_MAJOR(ZYCORE_VERSION), ZYCORE_VERSION_MINOR(ZYCORE_VERSION), ZYCORE_VERSION_PATCH(ZYCORE_VERSION));

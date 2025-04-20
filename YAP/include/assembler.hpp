@@ -9,7 +9,8 @@
 
 #pragma once
 #include "util.hpp"
-#include "asm.hpp"
+#include "relib/asm.hpp"
+using namespace x86;
 
 /*!
  * @brief Data about a link to be resolved after assembly.

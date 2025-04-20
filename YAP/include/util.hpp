@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2025-04-08
+ * @date 2025-04-19
  * @copyright MIT License
  */
 
@@ -18,13 +18,11 @@
 #include <commdlg.h>
 #include <shellapi.h>
 #include <stdint.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include "version.hpp"
-typedef uint64_t QWORD;
+#include "relib/relib.hpp"
 #ifndef UTIL_STRUCT_ONLY
-#include <asmjit/asmjit.h>
-#include <Zydis/Zydis.h>
-using namespace asmjit;
-using namespace x86;
 
 // Logging stuff
 #define LOG_SUCCESS "\x1B[32m[+]\x1B[39m "
@@ -58,7 +56,18 @@ enum LoggingLevel_t : int {
  * @param [in] ... Additional information from `str`.
  * @see LoggingLevel_t
  */
-void LOG(LoggingLevel_t level, char* mod, char* str, ...);
+void LOG(LoggingLevel_t level, const char* mod, const char* str, ...);
+
+/*!
+ * @brief Log information to console and log file.
+ * @remark Caller must handle va_start and va_end.
+ * 
+ * @param [in] level Prefix.
+ * @param [in] mod Module producing the log.
+ * @param [in] str Formatted string to log.
+ * @param [in] vargs Additional information from `str`.
+ */
+void vLOG(LoggingLevel_t level, const char* mod, const char* str, va_list vargs);
 
 // Macros
 #define IMGUI_TOGGLE(str, var) { bool _TEMP_BOOL = var; if(ImGui::Checkbox(str, &_TEMP_BOOL)) { var = _TEMP_BOOL; } } // Allows ImGui::Checkbox to be used with bitfields
@@ -86,35 +95,6 @@ enum State_t : BYTE {
 	Assembling
 };
 #endif // UTIL_STRUCT_ONLY
-
-/*!
- * @brief Buffer for raw data.
- */
-struct Buffer {
-	BYTE* pBytes;     //!< Pointer to raw data.
-	uint64_t u64Size; //!< Size of `pBytes`.
-
-	/*!
-	 * @brief Merge with another buffer.
-	 * 
-	 * @param [in] Other Other buffer to merge with.
-	 * @param [in] bFreeOther Release other buffers memory.
-	 */
-	void Merge(_In_ Buffer Other, _In_ bool bFreeOther = true);
-
-	/*!
-	 * @brief Allocate `Size` bytes.
-	 * @remark This is not cumulative, if you have 5 bytes reserved and allocate 3 you get 3, not 8.
-	 * 
-	 * @param [in] Size Number of bytes to allocate.
-	 */
-	void Allocate(_In_ uint64_t Size);
-
-	/*!
-	 * @brief Release memory used by buffer.
-	 */
-	void Release();
-};
 
 struct Data_t {
 	char Project[MAX_PATH] = { 0 };
@@ -145,320 +125,6 @@ DWORD WINAPI Begin(void* args);
 extern Data_t Data;
 extern HANDLE hLogFile;
 extern HANDLE hStdOut;
-
-/*!
- * @brief List it items.
- * 
- * @tparam T Type of data stored.
- */
-template <typename T>
-struct Vector {
-	Buffer raw = { 0 };
-	DWORD nItems = 0;
-	bool bExponentialGrowth : 1 = false; //!< Whether extra memory should be reserved when limit reached, faster on larger vectors.
-	bool bCannotBeReleased : 1 = false;  //!< When enabled `Release()` does nothing. Use if the buffer is within another memory block.
-
-	/*!
-	 * @brief Reserves additional memory.
-	 * @remark Unlike `Buffer::Allocate(_In_ uint64_t Size)`, this is cumulative and adds additional memory.
-	 * 
-	 * @param [in] nItems Number of items to 
-	 */
-	void Reserve(_In_ int nItems) {
-		raw.Allocate(raw.u64Size + nItems * sizeof(T));
-	}
-
-	/*!
-	 * @brief Merge with another vector.
-	 * 
-	 * @param [in] Other Other vector to merge with.
-	 * @param [in] bFreeOther Don't free the other vector.
-	 */
-	void Merge(_In_ Vector<T> Other, _In_ bool bFreeOther = false) {
-		raw.u64Size = nItems * sizeof(T);
-		raw.Merge(Other.raw, false);
-		if (bFreeOther) Other.Release();
-		nItems += Other.nItems;
-		Data.InUse += Other.nItems * sizeof(T);
-	}
-
-	/*!
-	 * @brief Number of items in the vector.
-	 * 
-	 * @return Number of items.
-	 */
-	size_t Size() {
-		return nItems;
-	}
-
-	/*!
-	 * @brief Total number of items that can fit before more memory will be reserved.
-	 * 
-	 * @return Number of items.
-	 */
-	size_t Capacity() {
-		return raw.u64Size / sizeof(T);
-	}
-
-	/*!
-	 * @brief Reserve memory based on number of items.
-	 */
-	void Grow() {
-		if (bCannotBeReleased) return;
-
-		// Create buffer
-		if (raw.u64Size < sizeof(T) || !raw.pBytes || !raw.u64Size) {
-			raw.Allocate(sizeof(T) * (bExponentialGrowth ? 10 : 1));
-			if (!raw.pBytes) {
-				DebugBreak();
-				exit(1);
-			}
-			ZeroMemory(raw.pBytes, raw.u64Size);
-		}
-		
-		// Expand buffer
-		else if (raw.u64Size < nItems * sizeof(T)) {
-			uint64_t OldSize = raw.u64Size;
-			uint64_t NewSize = OldSize;
-			if (bExponentialGrowth) {
-				while (NewSize < nItems * sizeof(T)) {
-					NewSize = sizeof(T) * (NewSize / sizeof(T)) * 1.1;
-				}
-			} else {
-				NewSize = nItems * sizeof(T);
-			}
-			raw.Allocate(NewSize);
-			if (!raw.pBytes) {
-				DebugBreak();
-				exit(1);
-			}
-			ZeroMemory(raw.pBytes + OldSize, NewSize - OldSize);
-		}
-	}
-
-	/*!
-	 * @brief Get item at index i.
-	 * 
-	 * @param [in] i Index.
-	 * @return Item.
-	 */
-	T& At(_In_ DWORD i) {
-		// It's better for this to crash than give bad data
-		return ((T*)raw.pBytes)[i];
-	}
-
-	/*!
-	 * @brief Get item at index i.
-	 * 
-	 * @param [in] i Index.
-	 * @return Item.
-	 */
-	T& operator[](_In_ int i) {
-		return ((T*)raw.pBytes)[i];
-	}
-
-	/*!
-	 * @brief Get item at index i.
-	 * 
-	 * @param [in] i Index.
-	 * @return Item.
-	 */
-	const T& operator[](_In_ int i) const {
-		return ((T*)raw.pBytes)[i];
-	}
-
-	/*!
-	 * @brief Push item to end of vector.
-	 * 
-	 * @param [in] Item Item to push.
-	 */
-	void Push(_In_ T Item) {
-		if (bCannotBeReleased) return;
-		nItems++;
-		Grow();
-		memcpy(raw.pBytes + (nItems - 1) * sizeof(T), &Item, sizeof(T));
-		Data.InUse += sizeof(T);
-	}
-
-	/*!
-	 * @brief Push vector of items to end of vector.
-	 * 
-	 * @param [in] Items Items to push.
-	 */
-	void Push(_In_ Vector<T> Items) {
-		for (int i = 0; i < Items.Size(); i++) {
-			Push(Items[i]);
-		}
-	}
-
-	/*!
-	 * @brief Pop item from end vector.
-	 * 
-	 * @return Popped item.
-	 */
-	T Pop() {
-		if (!raw.u64Size || !raw.pBytes || bCannotBeReleased) {
-			T ret;
-			ZeroMemory(&ret, sizeof(T));
-			return ret;
-		}
-		T ret = At(Size() - 1);
-		Data.InUse -= sizeof(T);
-		if (Size() == 1) {
-			Release();
-		} else {
-			nItems--;
-		}
-		return ret;
-	}
-
-	/*!
-	 * @brief Replace item at index i.
-	 * @deprecated Use `operator[]` instead.
-	 * 
-	 * @param [in] i Index of item to replace.
-	 * @param [in] Item Item to replace it with.
-	 */
-	void Replace(_In_ DWORD i, _In_ T Item) {
-		if (i < Size()) {
-			((T*)raw.pBytes)[i] = Item;
-		}
-	}
-
-	/*!
-	 * @brief Replace single element with vector.
-	 * 
-	 * @param [in] i Index to replace.
-	 * @param [in] Items Items to replace it with.
-	 */
-	void Replace(_In_ DWORD i, _In_ Vector<T> Items) {
-		if (!Items.Size() || i >= Size()) return;
-		Replace(i, Items[0]);
-		Items.nItems--;
-		Items.raw.pBytes += sizeof(T);
-		Items.raw.u64Size -= sizeof(T);
-		Insert(i + 1, Items);
-		Items.raw.u64Size += sizeof(T);
-		Items.raw.pBytes -= sizeof(T);
-		Items.nItems++;
-	}
-
-	/*!
-	 * @brief Replaces multiple elements with vector.
-	 * 
-	 * @param [in] i Index to begin replacement.
-	 * @param [in] Items Items to replace with.
-	 */
-	void Overwrite(_In_ DWORD i, _In_ Vector<T> Items) {
-		for (int j = 0; j < Items.Size() && i < Size(); j++ && i++) {
-			((T*)raw.pBytes)[i] = Items[j];
-		}
-	}
-
-	/*!
-	 * @brief Release memory being used.
-	 */
-	void Release() {
-		if (!bCannotBeReleased) {
-			raw.Release();
-			Data.InUse -= sizeof(T) * nItems;
-			nItems = 0;
-		}
-	}
-
-	/*!
-	 * @brief Insert item at index.
-	 * 
-	 * @param [in] i Index to insert item.
-	 * @param [in] Item Item to be inserted.
-	 */
-	void Insert(_In_ DWORD i, _In_ T Item) {
-		if (i > Size() || bCannotBeReleased) return;
-		if (i == Size()) {
-			Push(Item);
-			return;
-		}
-		DEBUG_ONLY(uint64_t TickCount = GetTickCount64());
-		nItems++;
-		Grow();
-
-		// Shift memory
-		memmove(raw.pBytes + (i + 1) * sizeof(T), raw.pBytes + i * sizeof(T), (nItems - i - 1) * sizeof(T));
-		
-		// Insert item
-		Replace(i, Item);
-		DEBUG_ONLY(Data.TimeSpentInserting += GetTickCount64() - TickCount);
-	}
-
-	/*!
-	 * @brief Insert multiple items at index.
-	 * 
-	 * @param [in] i Index to insert items.
-	 * @param [in] Items Items to be inserted.
-	 */
-	void Insert(_In_ DWORD i, _In_ Vector<T> Items) {
-		if (i > Size() || bCannotBeReleased) return;
-		DEBUG_ONLY(uint64_t TickCount = GetTickCount64());
-
-		// Size stuff
-		nItems += Items.nItems;
-		Grow();
-
-		// Add to end
-		if (i == Size()) {
-			memcpy(raw.pBytes + i * sizeof(T), Items.raw.pBytes, Items.nItems * sizeof(T));
-		}
-
-		// Shift and insert
-		else {
-			memmove(raw.pBytes + (i + Items.nItems) * sizeof(T), raw.pBytes + i * sizeof(T), (nItems - i - Items.nItems) * sizeof(T));
-			memcpy(raw.pBytes + i * sizeof(T), Items.raw.pBytes, Items.nItems * sizeof(T));
-		}
-
-		DEBUG_ONLY(Data.TimeSpentInserting += GetTickCount64() - TickCount);
-	}
-
-	/*!
-	 * @brief Remove item at idex.
-	 * 
-	 * @param [in] i Index to remove item from.
-	 */
-	void Remove(_In_ DWORD i) {
-		if (!raw.u64Size || !raw.pBytes || i >= Size() || bCannotBeReleased) return;
-		memcpy(raw.pBytes + sizeof(T) * i, raw.pBytes + sizeof(T) * (i + 1), (nItems * sizeof(T)) - sizeof(T) * (i + 1));
-		nItems--;
-		Data.InUse -= sizeof(T);
-	}
-
-	/*!
-	 * @brief Finds an item.
-	 * 
-	 * @param [in] Item Item to search for.
-	 * @return Index of item.
-	 * @retval -1 Not found.
-	 */
-	int Find(_In_ T Item) {
-		for (int i = 0, n = Size(); i < n; i++) {
-			if (!memcmp(&Item, &((T*)raw.pBytes)[i], sizeof(T))) return i;
-		}
-		return -1;
-	}
-
-	/*!
-	 * @brief Checks to see if a matching item exists.
-	 * 
-	 * @param [in] Item Item to search for.
-	 * @retval true Present.
-	 * @retval false Not present.
-	 */
-	bool Includes(_In_ T Item) {
-		return Find(Item) >= 0;
-	}
-
-	//~Vector() {
-		//Release();
-	//}
-};
 
 #ifndef UTIL_STRUCT_ONLY
 struct Options_t {

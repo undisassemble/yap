@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "asm.hpp"
+#include "relib/asm.hpp"
 #include "LzmaEnc.h"
 
 /*!

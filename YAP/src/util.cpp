@@ -8,7 +8,6 @@
  */
 
 #include "util.hpp"
-#include "errhandlingapi.h"
 
 void SaveSettings() {
 	// Get file
@@ -141,50 +140,69 @@ bool LoadProject() {
 	return true;
 }
 
-void Buffer::Merge(_In_ Buffer Other, _In_ bool bFreeOther) {
-    if (!Other.pBytes || !Other.u64Size) {
-        return;
-    } else if (!pBytes || !u64Size) {
-        pBytes = Other.pBytes;
-        u64Size = Other.u64Size;
-    } else {
-        Allocate(u64Size + Other.u64Size);
-        if (!pBytes) {
-            DebugBreak();
-            exit(1);
-        }
-        memcpy(pBytes + u64Size - Other.u64Size, Other.pBytes, Other.u64Size);
-        if (bFreeOther) {
-            Other.Release();
-        }
-    }
-}
-
-void Buffer::Allocate(_In_ uint64_t Size) {
-	if (!Size) {
-		Release();
-		return;
-	}
-	Data.Reserved += Size - u64Size;
-	Data.InUse += Size - u64Size;
-	u64Size = Size;
-	pBytes = reinterpret_cast<BYTE*>(realloc(pBytes, u64Size));
-}
-
-void Buffer::Release() {
-    if (pBytes) {
-		free(pBytes);
-		Data.Reserved -= u64Size;
-		Data.InUse -= u64Size;
-	}
-    pBytes = NULL;
-    u64Size = 0;
-}
-
 uint64_t rand64() {
 	uint64_t ret = rand();
 	ret = ret << 16 | rand();
 	ret = ret << 16 | rand();
 	ret = ret << 16 | rand();
 	return ret;
+}
+
+void LOG(LoggingLevel_t level, const char* mod, const char* str, ...) {
+	va_list args;
+	va_start(args, str);
+	vLOG(level, mod, str, args);
+	va_end(args);
+}
+
+void vLOG(LoggingLevel_t level, const char* mod, const char* str, va_list vargs) {
+	char buffer[MAX_PATH];
+	vsnprintf(buffer, sizeof(buffer), str, vargs);
+	if (Data.bUsingConsole) {
+		if (level) {
+			switch (level) {
+			case Failed:
+				WriteConsoleA(hStdOut, LOG_ERROR "[", sizeof(LOG_ERROR), NULL, NULL);
+				break;
+			case Success:
+				WriteConsoleA(hStdOut, LOG_SUCCESS "[", sizeof(LOG_SUCCESS), NULL, NULL);
+				break;
+			case Warning:
+				WriteConsoleA(hStdOut, LOG_WARNING "[", sizeof(LOG_WARNING), NULL, NULL);
+				break;
+			case Info:
+				WriteConsoleA(hStdOut, LOG_INFO "[", sizeof(LOG_INFO), NULL, NULL);
+				break;
+			case Info_Extended:
+				WriteConsoleA(hStdOut, LOG_INFO_EXTRA "[", sizeof(LOG_INFO_EXTRA), NULL, NULL);
+			}
+			WriteConsoleA(hStdOut, mod, strlen(mod), NULL, NULL);
+			WriteConsoleA(hStdOut, "]: \t", 4, NULL, NULL);
+		}
+		WriteConsoleA(hStdOut, buffer, lstrlenA(buffer), NULL, NULL);
+	}
+
+	if (hLogFile) {
+		if (level) {
+			switch (level) {
+			case Failed:
+				WriteFile(hLogFile, "[-] [", 5, NULL, NULL);
+				break;
+			case Success:
+				WriteFile(hLogFile, "[+] [", 5, NULL, NULL);
+				break;
+			case Warning:
+				WriteFile(hLogFile, "[*] [", 5, NULL, NULL);
+				break;
+			case Info:
+				WriteFile(hLogFile, "[?] [", 5, NULL, NULL);
+				break;
+			case Info_Extended:
+				WriteFile(hLogFile, "[>] [", 5, NULL, NULL);
+			}
+			WriteFile(hLogFile, mod, strlen(mod), NULL, NULL);
+			WriteFile(hLogFile, "]: \t", 4, NULL, NULL);
+		}
+		WriteFile(hLogFile, buffer, strlen(buffer), NULL, NULL);
+	}
 }

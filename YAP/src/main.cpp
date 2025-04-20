@@ -7,14 +7,14 @@
  * @copyright MIT License
  */
 
+#include "relib/relib.hpp"
 #include "util.hpp"
-#include "asm.hpp"
-#include "pe.hpp"
+#include "relib/asm.hpp"
+#include "relib/pe.hpp"
 #include "packer.hpp"
 #include "gui.hpp"
 #include "debugger.hpp"
 #include <time.h>
-#include <stdarg.h>
 #include <GLFW/glfw3.h>
 
 // Forward declares
@@ -35,6 +35,26 @@ HANDLE hLogFile = NULL;
 HANDLE hStdOut = NULL;
 Asm* pAssembly = NULL;
 
+// Shtuff
+void ReLibLogError(const char* message, ...) {
+	va_list args;
+	va_start(args, message);
+	vLOG(Failed, MODULE_REASSEMBLER, message, args);
+	va_end(args);
+}
+void ReLibLogWarn(const char* message, ...) {
+	va_list args;
+	va_start(args, message);
+	vLOG(Warning, MODULE_REASSEMBLER, message, args);
+	va_end(args);
+}
+void ReLibLog(const char* message, ...) {
+	va_list args;
+	va_start(args, message);
+	vLOG(Info, MODULE_REASSEMBLER, message, args);
+	va_end(args);
+}
+
 // Main function
 int main(int argc, char** argv) {
 	// Crash handler setup
@@ -46,6 +66,9 @@ int main(int argc, char** argv) {
 	}
 
 	// General setup
+	relib::SetErrorCallback(ReLibLogError);
+	relib::SetWarningCallback(ReLibLogWarn);
+	relib::SetLoggingCallback(ReLibLog);
 	srand(time(NULL));
 	hLogFile = CreateFile("yap.log.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hLogFile || hLogFile == INVALID_HANDLE_VALUE) {
@@ -130,13 +153,6 @@ DWORD WINAPI Begin(void* args) {
 		if (!pAssembly->Disassemble()) {
 			Modal("Disassembly failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Disassembly failed\n");
-			goto th_exit;
-		}
-
-		// Analyze
-		if (!pAssembly->Analyze()) {
-			Modal("Asm analysis failed", "Error", MB_OK | MB_ICONERROR);
-			LOG(Failed, MODULE_YAP, "Asm analysis failed\n");
 			goto th_exit;
 		}
 
@@ -311,6 +327,7 @@ void Console::help(char* name) {
 
 void Console::buildversion() {
 	LOG(Nothing, MODULE_YAP, "YAP: " __YAP_VERSION__ "\n");
+	LOG(Nothing, MODULE_YAP, "relib: " __RELIB_VERSION__ "\n");
 	LOG(Nothing, MODULE_YAP, "ImGui: " IMGUI_VERSION "\n");
 	LOG(Nothing, MODULE_YAP, "Zydis: %d.%d.%d\n", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
 	LOG(Nothing, MODULE_YAP, "AsmJit: %d.%d.%d\n", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
@@ -392,60 +409,5 @@ void Console::SetupConsole() {
 		}
 	} else {
 		LOG(Failed, MODULE_YAP, "Failed to attach to console (%d)\n", GetLastError());
-	}
-}
-
-void LOG(LoggingLevel_t level, char* mod, char* str, ...) {
-	va_list args;
-	char buffer[MAX_PATH];
-	va_start(args, str);
-	vsnprintf(buffer, sizeof(buffer), str, args);
-	va_end(args);
-	if (Data.bUsingConsole) {
-		if (level) {
-			switch (level) {
-			case Failed:
-				WriteConsoleA(hStdOut, LOG_ERROR "[", sizeof(LOG_ERROR), NULL, NULL);
-				break;
-			case Success:
-				WriteConsoleA(hStdOut, LOG_SUCCESS "[", sizeof(LOG_SUCCESS), NULL, NULL);
-				break;
-			case Warning:
-				WriteConsoleA(hStdOut, LOG_WARNING "[", sizeof(LOG_WARNING), NULL, NULL);
-				break;
-			case Info:
-				WriteConsoleA(hStdOut, LOG_INFO "[", sizeof(LOG_INFO), NULL, NULL);
-				break;
-			case Info_Extended:
-				WriteConsoleA(hStdOut, LOG_INFO_EXTRA "[", sizeof(LOG_INFO_EXTRA), NULL, NULL);
-			}
-			WriteConsoleA(hStdOut, mod, strlen(mod), NULL, NULL);
-			WriteConsoleA(hStdOut, "]: \t", 4, NULL, NULL);
-		}
-		WriteConsoleA(hStdOut, buffer, lstrlenA(buffer), NULL, NULL);
-	}
-
-	if (hLogFile) {
-		if (level) {
-			switch (level) {
-			case Failed:
-				WriteFile(hLogFile, "[-] [", 5, NULL, NULL);
-				break;
-			case Success:
-				WriteFile(hLogFile, "[+] [", 5, NULL, NULL);
-				break;
-			case Warning:
-				WriteFile(hLogFile, "[*] [", 5, NULL, NULL);
-				break;
-			case Info:
-				WriteFile(hLogFile, "[?] [", 5, NULL, NULL);
-				break;
-			case Info_Extended:
-				WriteFile(hLogFile, "[>] [", 5, NULL, NULL);
-			}
-			WriteFile(hLogFile, mod, strlen(mod), NULL, NULL);
-			WriteFile(hLogFile, "]: \t", 4, NULL, NULL);
-		}
-		WriteFile(hLogFile, buffer, strlen(buffer), NULL, NULL);
 	}
 }

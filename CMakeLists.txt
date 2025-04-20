@@ -30,10 +30,10 @@ elseif (NOT (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "Rel
 	message(FATAL_ERROR "CMAKE_BUILD_TYPE must be either Debug or Release")
 endif()
 find_package(Python3 REQUIRED)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}/garbage")
-option(ENABLE_DUMPING "Enable option to dump disassembly in debug builds (uses more memory)" OFF)
+set(CMAKE_SHARED_LIBRARY_PREFIX "")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}/garbage")
 
 # Versioning stuff
 configure_file("YAP/include/version.hpp.in" "YAP/include/version.hpp")
@@ -83,11 +83,12 @@ include_directories(
 	"YAP/dependencies/lzma"
 	"YAP/dependencies/imgui"
 	"YAP/dependencies/imgui/backends"
-	"YAP/dependencies/asmjit/src"
-	"YAP/dependencies/zydis/include"
-	"YAP/dependencies/zydis/src"
-	"YAP/dependencies/zydis/dependencies/zycore/include"
-	"YAP/dependencies/zydis/dependencies/zycore/src"
+	"YAP/dependencies/relib/include"
+	"YAP/dependencies/relib/dependencies/asmjit/src"
+	"YAP/dependencies/relib/dependencies/zydis/include"
+	"YAP/dependencies/relib/dependencies/zydis/src"
+	"YAP/dependencies/relib/dependencies/zydis/dependencies/zycore/include"
+	"YAP/dependencies/relib/dependencies/zydis/dependencies/zycore/src"
 	"YAP/dependencies/glfw/include"
 )
 
@@ -99,7 +100,6 @@ file(GLOB SOURCES_GLFW
 )
 add_library(glfw3 SHARED ${SOURCES_GLFW})
 target_link_options(glfw3 PUBLIC -mwindows)
-set_target_properties(glfw3 PROPERTIES PREFIX "")
 set_target_properties(glfw3 PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_custom_command(TARGET glfw3 POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:glfw3>)
@@ -116,42 +116,9 @@ add_library(imgui SHARED ${SOURCES_IMGUI})
 target_compile_options(imgui PUBLIC -fpermissive)
 target_link_options(imgui PUBLIC -mwindows)
 target_link_libraries(imgui glfw3)
-set_target_properties(imgui PROPERTIES PREFIX "")
 set_target_properties(imgui PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_custom_command(TARGET imgui POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:imgui>)
-endif()
-
-# asmjit
-file(GLOB SOURCES_ASMJIT
-	"YAP/dependencies/asmjit/src/asmjit/core/*.cpp"
-	"YAP/dependencies/asmjit/src/asmjit/x86/*.cpp"
-	"YAP/meta/asmjit.rc"
-)
-add_library(asmjit SHARED ${SOURCES_ASMJIT})
-target_link_options(asmjit PUBLIC -mwindows)
-target_compile_options(asmjit PUBLIC -fpermissive)
-set_target_properties(asmjit PROPERTIES PREFIX "")
-set_target_properties(asmjit PROPERTIES SUFFIX ".dll")
-if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
-	add_custom_command(TARGET asmjit POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:asmjit>)
-endif()
-
-# zydis
-file(GLOB SOURCES_ZYDIS
-	"YAP/dependencies/zydis/src/*.c"
-	"YAP/dependencies/zydis/dependencies/zycore/src/*.c"
-	"YAP/dependencies/zydis/dependencies/zycore/src/API/*.c"
-	"YAP/dependencies/zydis/resources/VersionInfo.rc"
-)
-add_library(zydis SHARED ${SOURCES_ZYDIS})
-target_link_options(zydis PUBLIC -mwindows)
-set_target_properties(zydis PROPERTIES PREFIX "")
-set_target_properties(zydis PROPERTIES SUFFIX ".dll")
-target_compile_definitions(zydis PUBLIC ZYCORE_SHOULD_EXPORT)
-target_compile_definitions(zydis PUBLIC ZYDIS_SHOULD_EXPORT)
-if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
-	add_custom_command(TARGET zydis POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:zydis>)
 endif()
 
 # lzma
@@ -161,12 +128,13 @@ file(GLOB SOURCES_LZMA
 )
 add_library(lzma SHARED ${SOURCES_LZMA})
 target_link_options(lzma PUBLIC -mwindows)
-set_target_properties(lzma PROPERTIES PREFIX "")
 set_target_properties(lzma PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_custom_command(TARGET lzma POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:lzma>)
 endif()
 
+# relib
+add_subdirectory("YAP/dependencies/relib")
 
 
 ##### YAP #####
@@ -203,9 +171,8 @@ target_link_libraries(YAPClient d3dcompiler)
 target_link_libraries(YAPClient dwmapi)
 target_link_libraries(YAPClient opengl32)
 target_link_libraries(YAPClient imgui)
-target_link_libraries(YAPClient zydis)
-target_link_libraries(YAPClient asmjit)
 target_link_libraries(YAPClient lzma)
+target_link_libraries(YAPClient relib)
 set_target_properties(YAPClient PROPERTIES PREFIX "")
 set_target_properties(YAPClient PROPERTIES SUFFIX ".exe")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
