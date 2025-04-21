@@ -7,6 +7,7 @@
  * @copyright MIT License
  */
 
+#include "assembler.hpp"
 #include "relib/relib.hpp"
 #include "util.hpp"
 #include "relib/asm.hpp"
@@ -225,6 +226,16 @@ DWORD WINAPI Begin(void* args) {
 		}
 
 		// Assemble
+		Environment env(Arch::kX64);
+		CodeHolder holder;
+		holder.init(env);
+		AsmJitErrorHandler ErrorHandler;
+		holder.setErrorHandler(&ErrorHandler);
+		ProtectedAssembler a(&holder);
+		a.bForceStrict = true;
+		a.bMutate = false;
+		a.bSubstitute = false;
+		pAssembly->SetAssembler(reinterpret_cast<Assembler*>(&a));
 		if (!pAssembly->Assemble()) {
 			Modal("Assembly failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Assembly failed\n");

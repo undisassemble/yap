@@ -103,6 +103,11 @@ public:
 	bool bFailed = false;
 
 	/*!
+	 * @brief Force strict mode until disabled
+	 */
+	bool bForceStrict = false;
+
+	/*!
 	 * @brief How much the generated code should be mutated.
 	 */
 	BYTE MutationLevel = 3;
@@ -111,16 +116,6 @@ public:
 	 * @brief Resolves unsolved links created by `resolve(Mem o0)`.
 	 */
 	void resolvelinks();
-
-	/*!
-	 * @brief Converts and assembles a decoded instruction.
-	 * 
-	 * @param [in] pLine Pointer to decoded line.
-	 * @param [in] pLabel Pointer to label referenced, if used.
-	 * @retval true Success.
-	 * @retval false Failure.
-	 */
-	bool FromDis(_In_ Line* pLine, _In_ Label* pLabel = NULL);
 
 	/*!
 	 * @brief Generate stub in between instructions.

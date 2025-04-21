@@ -3,12 +3,11 @@
  * @author undisassemble
  * @brief Obfuscating assembler functions
  * @version 0.0.0
- * @date 2025-04-08
+ * @date 2025-04-20
  * @copyright MIT License
  */
 
 #include "assembler.hpp"
-#include "asmtranslations.hpp"
 #include "util.hpp"
 
 // SDK defs
@@ -22,152 +21,6 @@ void AsmJitErrorHandler::handleError(_In_ Error error, _In_ const char* message,
 	bFailed = true;
 }
 
-bool ProtectedAssembler::FromDis(_In_ Line* pLine, _In_ Label* pLabel) {
-	if (!pLine || pLine->Type != Decoded) return false;
-
-	// Special ops
-	if (pLine->Decoded.Instruction.mnemonic == ZYDIS_MNEMONIC_NOP && pLine->Decoded.Instruction.operand_count_visible > 0 && pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY && (pLine->Decoded.Operands[0].mem.disp.value & 0xFFFFFF00) == 0x89658000) {
-		BYTE op = pLine->Decoded.Operands[0].mem.disp.value & 0xFF;
-		if (op & YAP_OP_REASM_MUTATION) {
-			bMutate = MutationLevel = op & 0b01111111;
-			LOG(Info, MODULE_REASSEMBLER, "Set mutation level to %d (at RVA %#010x)\n", MutationLevel, pLine->OldRVA);
-		} else if (op & YAP_OP_REASM_SUB) {
-			bSubstitute = op & 1;
-			LOG(Info, MODULE_REASSEMBLER, "%s substitution (at RVA %#010x)\n", bSubstitute ? "Enabled" : "Disabled", pLine->OldRVA);
-		} else {
-			LOG(Warning, MODULE_REASSEMBLER, "Reasm macro noticed, but unable to interpret instruction.\n");
-		}
-		return true;
-	}
-
-	// Mutate
-	strict();
-	if (!bWaitingOnEmit && !HeldLocks) { stub(); }
-	else { bWaitingOnEmit = false; }
-	this->bFailed = ::bFailed;
-
-	// Prefixes
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_LOCK) lock();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REP) rep();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPE) repe();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPNE) repne();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPZ) repz();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_REPNZ) repnz();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XRELEASE) xrelease();
-	if (pLine->Decoded.Instruction.attributes & ZYDIS_ATTRIB_HAS_XACQUIRE) xacquire();
-	
-	// Special instructions
-	if (!pLine->Decoded.Instruction.operand_count_visible) {
-		switch (pLine->Decoded.Instruction.mnemonic) {
-		case ZYDIS_MNEMONIC_MOVSB: return movsb();
-		case ZYDIS_MNEMONIC_MOVSW: return movsw();
-		case ZYDIS_MNEMONIC_MOVSD: return movsd();
-		case ZYDIS_MNEMONIC_MOVSQ: return movsq();
-		case ZYDIS_MNEMONIC_STOSB: return stosb();
-		case ZYDIS_MNEMONIC_STOSW: return stosw();
-		case ZYDIS_MNEMONIC_STOSD: return stosd();
-		case ZYDIS_MNEMONIC_STOSQ: return stosq();
-		}
-	}
-
-	// Convert mnemonic
-	InstId mnem = ZydisToAsmJit::Mnemonics[pLine->Decoded.Instruction.mnemonic];
-	if (!mnem) {
-#ifdef ENABLE_DUMPING
-		char formatted[MAX_PATH];
-		ZydisFormatter fmt;
-		ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
-		ZydisFormatterFormatInstruction(&fmt, &pLine->Decoded.Instruction, pLine->Decoded.Operands, pLine->Decoded.Instruction.operand_count_visible, formatted, sizeof(formatted), pLine->OldRVA, NULL);
-		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate mnemonic: %s\n", formatted);
-#else
-		LOG(Failed, MODULE_REASSEMBLER, "Failed to translate mnemonic: %d\n", pLine->Decoded.Instruction.mnemonic);
-#endif
-		this->bFailed = true;
-		return false;
-	}
-
-	// Convert operands
-	Operand_ ops[4] = { 0 };
-	for (int i = 0; i < pLine->Decoded.Instruction.operand_count_visible && i < 4; i++) {
-		Mem memop;
-		Imm immop;
-		int scale = 0;
-		
-		switch (pLine->Decoded.Operands[i].type) {
-		case ZYDIS_OPERAND_TYPE_IMMEDIATE:
-			if (pLabel && pLine->Decoded.Instruction.operand_count_visible == 1) { // Probably jmp or smthn
-				ops[0] = *pLabel;
-			} else {
-				immop = Imm();
-				immop._setValueInternal(pLine->Decoded.Operands[i].imm.value.s, ImmType::kInt);
-				ops[i] = immop;
-			}
-			break;
-		case ZYDIS_OPERAND_TYPE_REGISTER:
-			ops[i] = ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].reg.value];
-			break;
-#ifdef ENABLE_DUMPING
-		case ZYDIS_OPERAND_TYPE_POINTER:
-			memop = Mem(pLine->Decoded.Operands[i].ptr.offset);
-			memop.setSegment(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].ptr.segment]._baseId); // might need to be changed, relies on segment being a zydis encoded register
-			memop.setSize(pLine->Decoded.Operands[i].size / 8);
-			ops[i] = memop;
-			break;
-#endif
-		case ZYDIS_OPERAND_TYPE_MEMORY:
-			if (pLine->Decoded.Operands[i].mem.scale == 2) scale = 1;
-			else if (pLine->Decoded.Operands[i].mem.scale == 4) scale = 2;
-			else if (pLine->Decoded.Operands[i].mem.scale == 8) scale = 3;
-			if (pLabel) {
-				memop = Mem(*pLabel, ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], scale, 0);
-			} else {
-				memop = Mem(ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.base], ZydisToAsmJit::Registers[pLine->Decoded.Operands[i].mem.index], scale, pLine->Decoded.Operands[i].mem.disp.has_displacement ? (pLine->Decoded.Operands[i].mem.disp.value & 0xFFFFFFFF) : 0);
-			}
-			if (pLine->Decoded.Operands[i].mem.segment == ZYDIS_REGISTER_GS) memop.setSegment(gs);
-			else if (pLine->Decoded.Operands[i].mem.segment == ZYDIS_REGISTER_FS) memop.setSegment(fs);
-			memop.setSize(pLine->Decoded.Operands[i].size / 8);
-			ops[i] = memop;
-		}
-	}
-	if (pLine->Decoded.Instruction.operand_count_visible > 4) {
-#ifdef ENABLE_DUMPING
-		char formatted[MAX_PATH];
-		ZydisFormatter fmt;
-		ZydisFormatterInit(&fmt, ZYDIS_FORMATTER_STYLE_INTEL);
-		ZydisFormatterFormatInstruction(&fmt, &pLine->Decoded.Instruction, pLine->Decoded.Operands, pLine->Decoded.Instruction.operand_count_visible, formatted, sizeof(formatted), pLine->OldRVA, NULL);
-		LOG(Warning, MODULE_REASSEMBLER, "Unable to process all operands: %s\n", formatted);
-#else
-		LOG(Warning, MODULE_REASSEMBLER, "Unable to process all operands\n");
-#endif
-	}
-	
-	// Substitution
-	// TODO: Change this for a better solution
-	if (bSubstitute) {
-		switch (mnem) {
-		case Inst::kIdRet:
-			if (!pLine->Decoded.Instruction.operand_count_visible) return ret();
-			break;
-		case Inst::kIdMov:
-			if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) {
-				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Gp*>(&ops[1]));
-				else if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Imm*>(&ops[1]));
-				else return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Mem*>(&ops[1]));
-			} else {
-				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) return mov(*reinterpret_cast<Mem*>(&ops[0]), *reinterpret_cast<Gp*>(&ops[1]));
-				else return mov(*reinterpret_cast<Mem*>(&ops[0]), *reinterpret_cast<Imm*>(&ops[1]));
-			}
-			break;
-		case Inst::kIdCall:
-			if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && pLabel) return call(*pLabel);
-			else if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) return call(*reinterpret_cast<Gp*>(&ops[0]));
-			break;
-		}
-	}
-	bStrict = false;
-	return !Assembler::_emit(mnem, ops[0], ops[1], ops[2], &ops[3]);
-}
-
 bool ProtectedAssembler::resolve(Mem o0) {
 	// Check compatibility
 	if ((o0.hasBaseLabel() && !code()->isLabelBound(o0.baseId())) || // I have no idea why the fuck this isnt working, but im just going to ignore it for now
@@ -178,7 +31,7 @@ bool ProtectedAssembler::resolve(Mem o0) {
 		return false;
 	}
 
-	bool fq = bStrict;
+	bool fq = bStrict || bForceStrict;
 	Gp reg;
 	do {
 		reg = truerandreg();
@@ -339,7 +192,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 	HeldLocks++;
 	const BYTE sz = 32;
 	const BYTE beg_unsafe = 17;
-	BYTE end = (bStrict DEBUG_ONLY(|| Options.Debug.bStrictMutation)) ? beg_unsafe : sz;
+	BYTE end = (bStrict || bForceStrict DEBUG_ONLY(|| Options.Debug.bStrictMutation)) ? beg_unsafe : sz;
 	Mem peb = ptr(0x60);
 	peb.setSegment(gs);
 	switch (rand() % end) {
@@ -692,7 +545,7 @@ size_t ProtectedAssembler::garbage() {
 }
 
 void ProtectedAssembler::desync() {
-	if (!bMutate || bStrict) return;
+	if (!bMutate || bStrict || bForceStrict) return;
 	HeldLocks++;
 	db(0xEB);
 	block();
@@ -701,7 +554,7 @@ void ProtectedAssembler::desync() {
 }
 
 void ProtectedAssembler::desync_jz() {
-	if (!bMutate || bStrict) return;
+	if (!bMutate || bStrict || bForceStrict) return;
 	HeldLocks++;
 	db(0x74);
 	block();
@@ -710,7 +563,7 @@ void ProtectedAssembler::desync_jz() {
 }
 
 void ProtectedAssembler::desync_jnz() {
-	if (!bMutate || bStrict) return;
+	if (!bMutate || bStrict || bForceStrict) return;
 	HeldLocks++;
 	db(0x75);
 	block();
@@ -741,7 +594,7 @@ Error ProtectedAssembler::lea(Gp o0, Mem o1) {
 Error ProtectedAssembler::call(Gp o0) {
 	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
 	BYTE dist = 64 + (rand() % 192);
-	if (bStrict) dist = 0;
+	if (bStrict || bForceStrict) dist = 0;
 	push(o0);
 	push(o0);
 	push(o0);
@@ -771,7 +624,7 @@ Error ProtectedAssembler::call(Label o0) {
 	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
 	Gp reg = truerandreg();
 	BYTE dist = 64 + (rand() % 192);
-	if (bStrict) dist = 0;
+	if (bStrict || bForceStrict) dist = 0;
 	push(reg);
 	push(reg);
 	push(reg);
@@ -800,7 +653,7 @@ Error ProtectedAssembler::call(Mem o0) {
 	Gp reg = truerandreg();
 	o0.setSize(8);
 	BYTE dist = 64 + (rand() % 192);
-	if (bStrict) dist = 0;
+	if (bStrict || bForceStrict) dist = 0;
 	if (resolve(o0)) {
 		xchg(reg, ptr(rsp));
 		mov(reg, ptr(reg));
@@ -949,8 +802,49 @@ Error ProtectedAssembler::ret(Imm o0) {
 
 // Emitter hook
 Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) {
-	if (!bWaitingOnEmit && !HeldLocks) { stub(); bStrict = false; }
+	// Special ops
+	/*if (instId == Inst::kIdNop && o0.opType() == OperandType::kMem && (*reinterpret_cast<Mem*>(&o0)) && (pLine->Decoded.Operands[0].mem.disp.value & 0xFFFFFF00) == 0x89658000) {
+		BYTE op = pLine->Decoded.Operands[0].mem.disp.value & 0xFF;
+		if (op & YAP_OP_REASM_MUTATION) {
+			bMutate = MutationLevel = op & 0b01111111;
+			LOG(Info, MODULE_REASSEMBLER, "Set mutation level to %d (at RVA %#010x)\n", MutationLevel, pLine->OldRVA);
+		} else if (op & YAP_OP_REASM_SUB) {
+			bSubstitute = op & 1;
+			LOG(Info, MODULE_REASSEMBLER, "%s substitution (at RVA %#010x)\n", bSubstitute ? "Enabled" : "Disabled", pLine->OldRVA);
+		} else {
+			LOG(Warning, MODULE_REASSEMBLER, "Reasm macro noticed, but unable to interpret instruction.\n");
+		}
+		return true;
+	}*/
+
+	// Mutate
+	if (!bWaitingOnEmit && !HeldLocks) { stub(); }
 	else { bWaitingOnEmit = false; }
 	this->bFailed = ::bFailed;
+	
+	// Substitution
+	// TODO: Change this for a better solution
+	/*if (bSubstitute) {
+		switch (mnem) {
+		case Inst::kIdRet:
+			if (!pLine->Decoded.Instruction.operand_count_visible) return ret();
+			break;
+		case Inst::kIdMov:
+			if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) {
+				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Gp*>(&ops[1]));
+				else if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Imm*>(&ops[1]));
+				else return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Mem*>(&ops[1]));
+			} else {
+				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) return mov(*reinterpret_cast<Mem*>(&ops[0]), *reinterpret_cast<Gp*>(&ops[1]));
+				else return mov(*reinterpret_cast<Mem*>(&ops[0]), *reinterpret_cast<Imm*>(&ops[1]));
+			}
+			break;
+		case Inst::kIdCall:
+			if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && pLabel) return call(*pLabel);
+			else if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) return call(*reinterpret_cast<Gp*>(&ops[0]));
+			break;
+		}
+	}*/
+	bStrict = false;
 	return Assembler::_emit(instId, o0, o1, o2, opExt);
 }

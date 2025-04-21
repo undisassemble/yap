@@ -5,6 +5,12 @@
  * @version 0.0.0
  * @date 2025-04-08
  * @copyright MIT License
+ * @bug Doesn't work with DLLs
+ * @todo Fix partial loading
+ * @todo Export protection
+ * @todo Anti-patch
+ * @todo Anti-sandbox
+ * @todo Anti-VM
  */
 
 #pragma once
