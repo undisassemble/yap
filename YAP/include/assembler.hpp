@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler definitions
  * @version 0.0.0
- * @date 2025-04-08
+ * @date 2025-04-22
  * @copyright MIT License
  */
 
@@ -103,7 +103,7 @@ public:
 	bool bFailed = false;
 
 	/*!
-	 * @brief Force strict mode until disabled
+	 * @brief Force strict mode until manually disabled
 	 */
 	bool bForceStrict = false;
 
@@ -171,18 +171,6 @@ public:
 	 */
 	bool resolve(Mem o0);
 
-	Error call(Gp o0);
-	Error call(Imm o0);
-	Error call(Label o0);
-	Error call(Mem o0);
-	Error mov(Gp o0, Imm o1);
-	Error mov(Gp o0, Gp o1);
-	Error mov(Gp o0, Mem o1);
-	Error mov(Mem o0, Imm o1);
-	Error mov(Mem o0, Gp o1);
-	Error movzx(Gp o0, Mem o1);
-	Error movzx(Gp o0, Gp o1);
-	Error lea(Gp o0, Mem o1);
 	Error db(uint8_t o0, size_t o1 = 1) { block(); return Assembler::db(o0, o1); }
 	Error dw(uint16_t o0, size_t o1 = 1) { block(); return Assembler::dw(o0, o1); }
 	Error dd(uint32_t o0, size_t o1 = 1) { block(); return Assembler::dd(o0, o1); }
@@ -210,8 +198,6 @@ public:
 	Error jl(Imm o0) { strict(); return Assembler::jl(o0); }
 	Error jle(Label o0) { strict(); return Assembler::jle(o0); }
 	Error jle(Imm o0) { strict(); return Assembler::jle(o0); }
-	Error ret();
-	Error ret(Imm o0);
 	Error align(AlignMode o0, uint32_t o1) override { HeldLocks++; Error ret = Assembler::align(o0, o1); HeldLocks--; return ret; }
 	Error _emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) override;
 	ProtectedAssembler(CodeHolder* pHolder = NULL) : Assembler(pHolder) {}

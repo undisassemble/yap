@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler functions
  * @version 0.0.0
- * @date 2025-04-20
+ * @date 2025-04-22
  * @copyright MIT License
  */
 
@@ -582,195 +582,6 @@ void ProtectedAssembler::desync_mov(Gpq o0) {
 	for (int i = 0; i < dist + 6; i++) db(rand() & 0xFF);
 }
 
-Error ProtectedAssembler::lea(Gp o0, Mem o1) {
-	if (bWaitingOnEmit || !bMutate || o0.size() != 8) return Assembler::lea(o0, o1);
-	bool j = bStrict;
-	if (!resolve(o1)) return Assembler::lea(o0, o1);
-	bStrict = j;
-	return pop(o0);
-}
-
-// TODO: This probably doesnt work with strict
-Error ProtectedAssembler::call(Gp o0) {
-	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
-	BYTE dist = 64 + (rand() % 192);
-	if (bStrict || bForceStrict) dist = 0;
-	push(o0);
-	push(o0);
-	push(o0);
-	Label after = newLabel();
-	lea(o0, ptr(after));
-	if (dist) add(o0, dist);
-	mov(ptr(rsp, 0x10), o0);
-	pop(o0);
-	ret();
-	bind(after);
-	for (int i = 0; i < dist; i++) {
-		BYTE byte = 0;
-		do {
-			byte = rand() & 0xFF;
-		} while (byte == 0xC3 || byte == 0xCB || !byte);
-		db(byte);
-	}
-	return 0;
-}
-
-Error ProtectedAssembler::call(Imm o0) {
-	return Assembler::call(o0);
-}
-
-// TODO: This probably doesnt work with strict
-Error ProtectedAssembler::call(Label o0) {
-	if (bWaitingOnEmit || !bMutate) return Assembler::call(o0);
-	Gp reg = truerandreg();
-	BYTE dist = 64 + (rand() % 192);
-	if (bStrict || bForceStrict) dist = 0;
-	push(reg);
-	push(reg);
-	push(reg);
-	Label after = newLabel();
-	lea(reg, ptr(after));
-	if (dist) add(reg, dist);
-	mov(ptr(rsp, 0x10), reg);
-	lea(reg, ptr(o0));
-	mov(ptr(rsp, 0x08), reg);
-	pop(reg);
-	ret();
-	bind(after);
-	for (int i = 0; i < dist; i++) {
-		BYTE byte = 0;
-		do {
-			byte = rand() & 0xFF;
-		} while (byte == 0xC3 || byte == 0xCB || !byte);
-		db(byte);
-	}
-	return 0;
-}
-
-// TODO: This probably doesnt work with strict
-Error ProtectedAssembler::call(Mem o0) {
-	if (bWaitingOnEmit || !bMutate || o0.baseReg() == rsp) return Assembler::call(o0);
-	Gp reg = truerandreg();
-	o0.setSize(8);
-	BYTE dist = 64 + (rand() % 192);
-	if (bStrict || bForceStrict) dist = 0;
-	if (resolve(o0)) {
-		xchg(reg, ptr(rsp));
-		mov(reg, ptr(reg));
-		xchg(reg, ptr(rsp));
-		push(qword_ptr(rsp));
-	} else {
-		push(o0);
-		push(o0);
-	}
-	push(reg);
-	Label after = newLabel();
-	lea(reg, ptr(after));
-	if (dist) add(reg, dist);
-	mov(ptr(rsp, 0x10), reg);
-	pop(reg);
-	ret();
-	bind(after);
-	for (int i = 0; i < dist; i++) {
-		BYTE byte = 0;
-		do {
-			byte = rand() & 0xFF;
-		} while (byte == 0xC3 || byte == 0xCB || !byte);
-		db(byte);
-	}
-	return 0;
-}
-
-Error ProtectedAssembler::mov(Gp o0, Imm o1) {
-	// Cause of zero-extending we can safely turn DWORD registers into QWORD ones
-	if (bWaitingOnEmit || !bMutate || o0.size() < 4 || o1.value() > 0x7FFFFFFF) return Assembler::mov(o0, o1);
-	bool j = bStrict;
-	push(o1);
-	bStrict = j;
-	return pop(o0.r64());
-}
-
-Error ProtectedAssembler::mov(Gp o0, Gp o1) {
-	if (o0.r64() == rsp || o1.r64() == rsp || bWaitingOnEmit || !bMutate || o0.size() != o1.size() || o0.size() == 1 || o0.size() == 4) return Assembler::mov(o0, o1);
-	bool j = bStrict;
-	push(o1);
-	bStrict = j;
-	return pop(o0);
-}
-
-Error ProtectedAssembler::mov(Gp o0, Mem o1) {
-	o1.setSize(o0.size());
-	if (bWaitingOnEmit || !bMutate || o0.size() == 1 || o0.size() == 4 || o1.baseReg() == rsp) return Assembler::mov(o0, o1);
-	bool j = bStrict;
-	push(o1);
-	bStrict = j;
-	return pop(o0);
-}
-
-Error ProtectedAssembler::mov(Mem o0, Imm o1) {
-	if (bWaitingOnEmit || !bMutate || o0.size() != 8 || o0.baseReg() == rsp) return Assembler::mov(o0, o1);
-	bool j = bStrict;
-	if (resolve(o0)) {
-		bStrict = j;
-		push(o1);
-		Gp reg = truerandreg();
-		bStrict = j;
-		xchg(reg, ptr(rsp, 8));
-		bStrict = j;
-		pop(qword_ptr(reg));
-		bStrict = j;
-		return pop(reg);
-	} else {
-		push(o1);
-		bStrict = j;
-		return pop(o0);
-	}
-}
-
-Error ProtectedAssembler::mov(Mem o0, Gp o1) {
-	o0.setSize(o1.size());
-	if (bWaitingOnEmit || !bMutate || o1.size() == 1 || o1.size() == 4 || o0.baseReg() == rsp) return Assembler::mov(o0, o1);
-	bool j = bStrict;
-	if (resolve(o0)) {
-		Gp reg;
-		do {
-			reg = truerandreg();
-		} while (reg == o1.r64());
-		bStrict = j;
-		push(o1);
-		bStrict = j;
-		xchg(reg, ptr(rsp, o1.size()));
-		bStrict = j;
-		if (o1.size() == 8) pop(qword_ptr(reg));
-		else pop(word_ptr(reg));
-		bStrict = j;
-		return pop(reg);
-	} else {
-		push(o1);
-		bStrict = j;
-		return pop(o0);
-	}
-}
-
-Error ProtectedAssembler::movzx(Gp o0, Mem o1) {
-	return Assembler::movzx(o0, o1);
-	if (o1.hasBaseReg() && o1.baseReg() == rsp) return Assembler::movzx(o0, o1);
-	o0 = o0.r64();
-	if (bWaitingOnEmit || !bMutate || o1.size() != 2) return Assembler::movzx(o0, o1);
-	push(0);
-	pop(o0);
-	Gp o16 = o0.r16();
-	push(o16);
-	push(o16);
-	push(o16);
-	push(o1);
-	return pop(o0);
-}
-
-Error ProtectedAssembler::movzx(Gp o0, Gp o1) {
-	return Assembler::movzx(o0, o1);
-}
-
 uint64_t ProtectedAssembler::GetStackSize() {
 	uint64_t ret = 0;
 	for (int i = 0, n = stack.Size(); i < n; i++) {
@@ -779,72 +590,34 @@ uint64_t ProtectedAssembler::GetStackSize() {
 	return ret;
 }
 
-Error ProtectedAssembler::ret() {
-	if (stack.Size()) restorestack();
-	if (bWaitingOnEmit || !bMutate) return Assembler::ret();
-	Gp reg = truerandreg();
-	bool j = bStrict;
-	push(reg);
-	bStrict = j;
-	mov(reg, qword_ptr(0x7FFE02F8));
-	bStrict = j;
-	xchg(qword_ptr(rsp), reg);
-	bStrict = j;
-	pop(qword_ptr(rip));
-	return dq(rand64());
-}
-
-// I doubt I will ever use this one
-Error ProtectedAssembler::ret(Imm o0) {
-	if (stack.Size()) restorestack();
-	return Assembler::ret(o0);
-}
-
 // Emitter hook
 Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) {
 	// Special ops
-	/*if (instId == Inst::kIdNop && o0.opType() == OperandType::kMem && (*reinterpret_cast<Mem*>(&o0)) && (pLine->Decoded.Operands[0].mem.disp.value & 0xFFFFFF00) == 0x89658000) {
-		BYTE op = pLine->Decoded.Operands[0].mem.disp.value & 0xFF;
+	if (instId == Inst::kIdNop && o0.isMem() && reinterpret_cast<const Mem*>(&o0)->hasOffset() && (reinterpret_cast<const Mem*>(&o0)->offset() & 0xFFFFFF00) == 0x89658000) {
+		BYTE op = reinterpret_cast<const Mem*>(&o0)->offset() & 0xFF;
 		if (op & YAP_OP_REASM_MUTATION) {
 			bMutate = MutationLevel = op & 0b01111111;
-			LOG(Info, MODULE_REASSEMBLER, "Set mutation level to %d (at RVA %#010x)\n", MutationLevel, pLine->OldRVA);
+			LOG(Info, MODULE_REASSEMBLER, "Set mutation level to %d\n", MutationLevel);
 		} else if (op & YAP_OP_REASM_SUB) {
 			bSubstitute = op & 1;
-			LOG(Info, MODULE_REASSEMBLER, "%s substitution (at RVA %#010x)\n", bSubstitute ? "Enabled" : "Disabled", pLine->OldRVA);
+			LOG(Info, MODULE_REASSEMBLER, "%s substitution\n", bSubstitute ? "Enabled" : "Disabled");
 		} else {
 			LOG(Warning, MODULE_REASSEMBLER, "Reasm macro noticed, but unable to interpret instruction.\n");
 		}
 		return true;
-	}*/
+	}
 
 	// Mutate
 	if (!bWaitingOnEmit && !HeldLocks) { stub(); }
-	else { bWaitingOnEmit = false; }
 	this->bFailed = ::bFailed;
 	
 	// Substitution
-	// TODO: Change this for a better solution
-	/*if (bSubstitute) {
-		switch (mnem) {
-		case Inst::kIdRet:
-			if (!pLine->Decoded.Instruction.operand_count_visible) return ret();
-			break;
-		case Inst::kIdMov:
-			if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) {
-				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Gp*>(&ops[1]));
-				else if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Imm*>(&ops[1]));
-				else return mov(*reinterpret_cast<Gp*>(&ops[0]), *reinterpret_cast<Mem*>(&ops[1]));
-			} else {
-				if (pLine->Decoded.Operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER) return mov(*reinterpret_cast<Mem*>(&ops[0]), *reinterpret_cast<Gp*>(&ops[1]));
-				else return mov(*reinterpret_cast<Mem*>(&ops[0]), *reinterpret_cast<Imm*>(&ops[1]));
-			}
-			break;
-		case Inst::kIdCall:
-			if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && pLabel) return call(*pLabel);
-			else if (pLine->Decoded.Operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER) return call(*reinterpret_cast<Gp*>(&ops[0]));
-			break;
-		}
-	}*/
-	bStrict = false;
+	bool bOldForce = bForceStrict;
+	if (bSubstitute && !bWaitingOnEmit) {
+		bForceStrict |= bStrict;
+		#include "modules/substitution.inc"
+	}
+	bForceStrict = bOldForce;
+	bStrict = bWaitingOnEmit = false;
 	return Assembler::_emit(instId, o0, o1, o2, opExt);
 }
