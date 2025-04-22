@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
     lea rcx, [NTD]
     call ShellcodeData.Labels.GetModuleHandleW
     mov rcx, rax

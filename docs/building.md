@@ -9,6 +9,11 @@ git submodule update --init --recursive
 ```
 
 
+## Dependencies
+
+Debian: `sudo apt install cmake python3 mingw-w64`
+
+
 ## Basic build
 
 ```

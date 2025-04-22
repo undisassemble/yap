@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
 ; GetModuleHandleW
 ; GLOBAL
 ShellcodeData.Labels.GetModuleHandleW:

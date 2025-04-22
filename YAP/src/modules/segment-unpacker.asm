@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
 _UnloadSegment:
     call UnloadSegment
 LoadSegment:

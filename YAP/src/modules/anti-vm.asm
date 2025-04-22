@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
     mov eax, 1
     cpuid
     bt ecx, 31

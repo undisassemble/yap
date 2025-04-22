@@ -7,6 +7,8 @@
 #     %elif condition                       Else if statement
 #     %else                                 Else statement
 #     %endif                                Ends if statement
+#     %define                               Same as #define
+#     %undef                                Same as #undef
 #     %include                              Include file
 #     ; GLOBAL                              Following label is global, and should not be created
 #     ; RAW_C line                          line is C code that should be embedded in the source
@@ -29,6 +31,7 @@ SOURCES = [
     "masquerading.asm",
     "ms-signing.asm",
     "segment-unpacker.asm",
+    "substitution.asm",
     
     # Main parts
     "tls.asm",
@@ -37,6 +40,9 @@ SOURCES = [
     "importer.asm",
     "sdk.asm"
 ]
+
+# Defined by source
+ASSEMBLER = ""
 
 # Dont change
 IfStack = []
@@ -197,7 +203,7 @@ def parse_mem(operand: str) -> str:
     return line
 
 def parse_line(line: str) -> str:
-    global GlobalLabel, IfStack, NeededLabels, BoundLabels, ValidRegs
+    global GlobalLabel, IfStack, NeededLabels, BoundLabels, ValidRegs, ASSEMBLER
     line = line.strip()
     if not line or line == '':
         return ""
@@ -217,27 +223,27 @@ def parse_line(line: str) -> str:
     elif line[0] == '%':
         if line.lower().startswith("%if "):
             IfStack.append(1)
-            return "if (" + line.split("%if ")[1] + ") {\n"
+            return "if (" + line[4:] + ") {\n"
         elif line.lower().startswith("%elif "):
             if IfStack.__len__() < 1:
                 raise Exception("ELIF when not in an if statement")
             if IfStack[-1]:
-                return "} else if (" + line.split("%elif ")[1] + ") {\n"
+                return "} else if (" + line[6:] + ") {\n"
             else:
-                return "#elif " + line.split("%elif ")[1] + "\n"
-        elif line.lower().startswith("%else"):
+                return "#elif " + line[6:] + "\n"
+        elif line.lower().startswith("%else "):
             if IfStack.__len__() < 1:
                 raise Exception("ELSE when not in an if statement")
             if IfStack[-1]:
                 return "} else {\n"
             else:
                 return "#else\n"
-        elif line.lower().startswith("%ifdef"):
+        elif line.lower().startswith("%ifdef "):
             IfStack.append(0)
-            return "#if defined(" + line.split("%ifdef ")[1] + ")\n"
-        elif line.lower().startswith("%ifndef"):
+            return "#if defined(" + line[7:] + ")\n"
+        elif line.lower().startswith("%ifndef "):
             IfStack.append(0)
-            return "#if !defined(" + line.split("%ifndef ")[1] + ")\n"
+            return "#if !defined(" + line[8:] + ")\n"
         elif line.lower().startswith("%endif"):
             if IfStack.__len__() < 1:
                 raise Exception("ENDIF when not in an if statement")
@@ -247,6 +253,13 @@ def parse_line(line: str) -> str:
                 return "#endif\n"
         elif line.lower().startswith("%include "):
             return "#include " + line[9:] + "\n"
+        elif line.lower().startswith("%define "):
+            if line[8:].strip().startswith("ASSEMBLER"):
+                ASSEMBLER = line[8:].strip()[9:].strip()
+            else:
+                return "#define " + line[8:] + "\n"
+        elif line.lower().startswith("%undef "):
+            return "#undef " + line[7:] + "\n"
 
 
     # Parse line
@@ -266,15 +279,15 @@ def parse_line(line: str) -> str:
             if not GlobalLabel:
                 NeededLabels.append(line[:-1])
             GlobalLabel = False
-            return "a.bind(" + line[:-1] + ");\n"
+            return f"{ASSEMBLER}bind(" + line[:-1] + ");\n"
 
         # Instructions without operands
         if line.count(' ') == 0:
-            return f"a.{line}();\n"
+            return f"{ASSEMBLER}{line}();\n"
 
         # Prefixes
         while line.split(' ')[0].lower() in Prefixes:
-            toret += "a." + line.split(' ')[0].lower() + "();\n"
+            toret += ASSEMBLER + line.split(' ')[0].lower() + "();\n"
             line = ' '.join(line.split(' ')[1:])
 
         mnem = line.split(' ')[0].lower()
@@ -296,11 +309,11 @@ def parse_line(line: str) -> str:
         # Write mnemonic + prefixes
         l = mnem.split(' ')
         for i in range(l.__len__() - 1):
-            toret += f"a.{l[i]}();\n"
+            toret += f"{ASSEMBLER}{l[i]}();\n"
         if l[-1] in MnemonicConversions:
-            toret += f"a.{MnemonicConversions[l[-1]]}("
+            toret += f"{ASSEMBLER}{MnemonicConversions[l[-1]]}("
         else:
-            toret += f"a.{l[-1]}("
+            toret += f"{ASSEMBLER}{l[-1]}("
         del l
 
         first = True
@@ -321,7 +334,7 @@ def parse_line(line: str) -> str:
 
 
 def main():
-    global GlobalLabel, IfStack, NeededLabels, BoundLabels, ValidRegs
+    global GlobalLabel, IfStack, NeededLabels, BoundLabels, ValidRegs, ASSEMBLER
     for fname in SOURCES:
         # Clear vars
         NeededLabels = []
@@ -330,6 +343,7 @@ def main():
         GlobalLabel = False
         infile = None
         outfile = None
+        ASSEMBLER = ""
 
         # Open file
         try:
@@ -353,7 +367,7 @@ def main():
 
         # Define labels
         for label in NeededLabels:
-            outfile.write(f"Label {label} = a.newLabel();\n")
+            outfile.write(f"Label {label} = {ASSEMBLER}newLabel();\n")
 
         # Write stuff
         for line in parsed:

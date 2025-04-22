@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
     ; Check buffer size
     mov rax, PEB
     mov rax, [rax + 0x20]

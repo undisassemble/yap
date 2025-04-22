@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
     ; Check if called for process start
     desync
 	desync_mov rax

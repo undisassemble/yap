@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
     jmp _skip
 
     align AlignMode::kCode, alignof(LPCSTR)

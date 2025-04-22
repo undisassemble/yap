@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
 ; GLOBAL
 skip:
     lea rax, [InternalRelOff]

@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
 ; GetLastError
 %if ShellcodeData.RequestedFunctions.GetLastError.bRequested
 ; GLOBAL

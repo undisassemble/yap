@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
     %if Options.Advanced.bMutateAssembly
 		strict
 		jz _entry

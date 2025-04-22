@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
    jmp skip
 
 KRN:

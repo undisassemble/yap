@@ -1,3 +1,5 @@
+%define ASSEMBLER a.
+
     jmp skipdata
 
     align AlignMode::kCode, alignof(CONTEXT)
