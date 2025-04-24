@@ -3,12 +3,13 @@
  * @author undisassemble
  * @brief Debugger functions
  * @version 0.0.0
- * @date 2025-04-20
+ * @date 2025-04-23
  * @copyright MIT License
  */
 
 #include "util.hpp"
 #include "debugger.hpp"
+#include <minwinbase.h>
 #include <tlhelp32.h>
 #include <winternl.h>
 #include <dbghelp.h>
@@ -21,9 +22,13 @@ Vector<MODULEENTRY32> Modules;
 BOOL Syms;
 HANDLE hParent;
 HANDLE hThread;
+DWORD dwParentId = 0;
 
 void LogExceptionRecord(_In_ EXCEPTION_RECORD* pExceptionRecord);
 void AddressToSymbol(_In_ QWORD Address, _Out_ char* buf, _In_ size_t buf_sz);
+void GenerateModuleList();
+CONTEXT GenerateRegisterList(_In_ DWORD dwThreadId);
+void GenerateStackTrace(_In_ CONTEXT context);
 
 void LaunchAsDebugger() {
 	// Open log file
@@ -33,7 +38,6 @@ void LaunchAsDebugger() {
 	}
 
 	// Find parent
-	DWORD dwParentId = 0;
 	PROCESS_BASIC_INFORMATION info = { 0 };
 	if (NtQueryInformationProcess(GetCurrentProcess(), ProcessBasicInformation, &info, sizeof(PROCESS_BASIC_INFORMATION), NULL)) {
 		LOG(Failed, MODULE_YAP, "Failed to get parent PID\n");
@@ -41,6 +45,7 @@ void LaunchAsDebugger() {
 	}
 	dwParentId = (DWORD)info.InheritedFromUniqueProcessId;
 	LOG(Info, MODULE_YAP, "Parent PID: %d\n", dwParentId);
+	LOG(Info, MODULE_YAP, "Build: " __YAP_VERSION__ " " __YAP_BUILD__ "\n");
 	if (!DebugActiveProcess(dwParentId)) {
 		LOG(Failed, MODULE_YAP, "Failed to attach to parent (%d)\n", GetLastError());
 		exit(1);
@@ -54,99 +59,28 @@ void LaunchAsDebugger() {
         LOG(Warning, MODULE_YAP, "Failed to initialize symbols, won\'t be able to provice function names. (%d)\n", GetLastError());
 
     DEBUG_EVENT event = { 0 };
-	MODULEENTRY32 entry = { 0 };
-	entry.dwSize = sizeof(MODULEENTRY32);
 	CONTEXT context;
 	while (1) {
 		if (WaitForDebugEvent(&event, INFINITE)) {
 			if (event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT && event.dwProcessId == dwParentId) {
-				LOG(Info, MODULE_YAP, "Process exited: %lx\n", event.u.ExitProcess.dwExitCode);
+				LOG(Info, MODULE_YAP, "----- PROCESS EXITED -----\n");
+				LOG(Info, MODULE_YAP, "Code: %lx\n", event.u.ExitProcess.dwExitCode);
+				context = GenerateRegisterList(event.dwThreadId);
+				GenerateModuleList();
+				GenerateStackTrace(context);
 				break;
 			}
 
 			else if (event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT && event.u.Exception.ExceptionRecord.ExceptionCode != 0x6ba) {
-				LOG(Failed, MODULE_YAP, "----- Exception recorded -----\n");
-				LOG(Info, MODULE_YAP, "Build: " __YAP_VERSION__ " " __YAP_BUILD__ "\n");
-				
-				// Log registers
-				hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, event.dwThreadId);
-                ZeroMemory(&context, sizeof(CONTEXT));
-                context.ContextFlags = CONTEXT_ALL;
-				if (!hThread) {
-					LOG(Warning, MODULE_YAP, "Failed to open crashed thread (%d)\n", GetLastError());
-				} else if (SuspendThread(hThread) == _UI32_MAX) {
-					LOG(Warning, MODULE_YAP, "Failed to suspend thread (%d)\n", GetLastError());
-				} else if (!GetThreadContext(hThread, &context)) {
-					LOG(Warning, MODULE_YAP, "Failed to get thread context (%d)\n", GetLastError());
-				} else {
-					// This isnt working, I dont know why
-					LOG(Info, MODULE_YAP, "--- CONTEXT ---\n");
-                    LOG(Info, MODULE_YAP, "RIP: %p\n", context.Rip);
-					LOG(Info, MODULE_YAP, "RAX: %p\n", context.Rax);
-					LOG(Info, MODULE_YAP, "RCX: %p\n", context.Rcx);
-					LOG(Info, MODULE_YAP, "RDX: %p\n", context.Rdx);
-					LOG(Info, MODULE_YAP, "RBX: %p\n", context.Rbx);
-					LOG(Info, MODULE_YAP, "RSP: %p\n", context.Rsp);
-					LOG(Info, MODULE_YAP, "RBP: %p\n", context.Rbp);
-					LOG(Info, MODULE_YAP, "RSI: %p\n", context.Rsi);
-					LOG(Info, MODULE_YAP, "RDI: %p\n", context.Rdi);
-					LOG(Info, MODULE_YAP, "R8:  %p\n", context.R8);
-					LOG(Info, MODULE_YAP, "R9:  %p\n", context.R9);
-					LOG(Info, MODULE_YAP, "R10: %p\n", context.R10);
-					LOG(Info, MODULE_YAP, "R11: %p\n", context.R11);
-					LOG(Info, MODULE_YAP, "R12: %p\n", context.R12);
-					LOG(Info, MODULE_YAP, "R13: %p\n", context.R13);
-					LOG(Info, MODULE_YAP, "R14: %p\n", context.R14);
-					LOG(Info, MODULE_YAP, "R15: %p\n", context.R15);
-					ResumeThread(hThread);
-				}
-
-				// Log list of loaded modules
-				Modules.Release();
-				HANDLE hSnap;
-				do {
-					hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
-				} while (hSnap == INVALID_HANDLE_VALUE && GetLastError() == ERROR_BAD_LENGTH);
-				if (hSnap == INVALID_HANDLE_VALUE) {
-					LOG(Warning, MODULE_YAP, "Could not get list of modules (%d)\n", GetLastError());
-				} else {
-					LOG(Info, MODULE_YAP, "--- MODULES ---\n");
-					Module32First(hSnap, &entry);
-					do {
-						Modules.Push(entry);
-						LOG(Info, MODULE_YAP, "%s: \t0x%p -> 0x%p\n", entry.szModule, entry.modBaseAddr, entry.modBaseAddr + entry.modBaseSize);
-					} while (Module32Next(hSnap, &entry));
-				}
-				CloseHandle(hSnap);
-
-				// Log exceptions
+				LOG(Failed, MODULE_YAP, "----- EXCEPTION -----\n");
+				context = GenerateRegisterList(event.dwThreadId);
+				GenerateModuleList();
 				LOG(Info, MODULE_YAP, "--- RECORD(S) ---\n");
 				LogExceptionRecord(&event.u.Exception.ExceptionRecord);
-
-				// Stack trace
-				if (hParent && hThread) {
-					LOG(Info, MODULE_YAP, "--- STACK ---\n");
-					STACKFRAME64 frame = { 0 };
-					frame.AddrPC.Offset = context.Rip;
-                    frame.AddrPC.Mode = AddrModeFlat;
-					frame.AddrStack.Offset = context.Rsp;
-                    frame.AddrStack.Mode = AddrModeFlat;
-                    frame.AddrFrame.Offset = context.Rbp;
-                    frame.AddrFrame.Mode = AddrModeFlat;
-                    char buf[MAX_PATH] = { 0 };
-                    for (int i = 0; i < MAX_STACK_DEPTH; i++) {
-                        if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, hParent, hThread, &frame, &context, NULL, NULL, NULL, NULL)) break;
-                        
-                        AddressToSymbol(frame.AddrPC.Offset, buf, MAX_PATH);
-                        LOG(Info, MODULE_YAP, "Called from 0x%p (%s)\n", frame.AddrPC.Offset, buf);
-
-                        if (i == MAX_STACK_DEPTH - 1) {
-                            LOG(Info, MODULE_YAP, "Max stack depth reached: %d entries\n", MAX_STACK_DEPTH);
-                        }
-                    }
-                }
-				LOG(Info, MODULE_YAP, "----- End of exception -----\n\n\n\n");
+				GenerateStackTrace(context);
+				LOG(Info, MODULE_YAP, "---------------------\n\n");
 			}
+
 			ContinueDebugEvent(event.dwProcessId, event.dwThreadId, DBG_EXCEPTION_NOT_HANDLED);
 		}
 	}
@@ -154,6 +88,89 @@ void LaunchAsDebugger() {
 	exit(0);
 }
 
+
+void GenerateModuleList() {
+	MODULEENTRY32 entry = { 0 };
+	entry.dwSize = sizeof(MODULEENTRY32);
+	Modules.Release();
+	HANDLE hSnap;
+	do {
+		hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, dwParentId);
+	} while (hSnap == INVALID_HANDLE_VALUE && GetLastError() == ERROR_BAD_LENGTH);
+	if (hSnap == INVALID_HANDLE_VALUE) {
+		LOG(Warning, MODULE_YAP, "Could not get list of modules (%d)\n", GetLastError());
+	} else {
+		LOG(Info, MODULE_YAP, "--- MODULES ---\n");
+		Module32First(hSnap, &entry);
+		do {
+			Modules.Push(entry);
+			LOG(Info, MODULE_YAP, "%s: \t0x%p -> 0x%p\n", entry.szModule, entry.modBaseAddr, entry.modBaseAddr + entry.modBaseSize);
+		} while (Module32Next(hSnap, &entry));
+	}
+	CloseHandle(hSnap);
+}
+
+CONTEXT GenerateRegisterList(_In_ DWORD dwThreadId) {
+	CONTEXT context = { 0 };
+	hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, dwThreadId);
+	context.ContextFlags = CONTEXT_ALL;
+	if (!hThread) {
+		LOG(Failed, MODULE_YAP, "Failed to open crashed thread (%d)\n", GetLastError());
+		return context;
+	} else if (SuspendThread(hThread) == _UI32_MAX) {
+		LOG(Warning, MODULE_YAP, "Failed to suspend thread (%d)\n", GetLastError());
+	}
+	if (!GetThreadContext(hThread, &context)) {
+		LOG(Failed, MODULE_YAP, "Failed to get thread context (%d)\n", GetLastError());
+		return context;
+	} else {
+		// This isnt working, I dont know why
+		LOG(Info, MODULE_YAP, "--- CONTEXT ---\n");
+		LOG(Info, MODULE_YAP, "RIP: %p\n", context.Rip);
+		LOG(Info, MODULE_YAP, "RAX: %p\n", context.Rax);
+		LOG(Info, MODULE_YAP, "RCX: %p\n", context.Rcx);
+		LOG(Info, MODULE_YAP, "RDX: %p\n", context.Rdx);
+		LOG(Info, MODULE_YAP, "RBX: %p\n", context.Rbx);
+		LOG(Info, MODULE_YAP, "RSP: %p\n", context.Rsp);
+		LOG(Info, MODULE_YAP, "RBP: %p\n", context.Rbp);
+		LOG(Info, MODULE_YAP, "RSI: %p\n", context.Rsi);
+		LOG(Info, MODULE_YAP, "RDI: %p\n", context.Rdi);
+		LOG(Info, MODULE_YAP, "R8:  %p\n", context.R8);
+		LOG(Info, MODULE_YAP, "R9:  %p\n", context.R9);
+		LOG(Info, MODULE_YAP, "R10: %p\n", context.R10);
+		LOG(Info, MODULE_YAP, "R11: %p\n", context.R11);
+		LOG(Info, MODULE_YAP, "R12: %p\n", context.R12);
+		LOG(Info, MODULE_YAP, "R13: %p\n", context.R13);
+		LOG(Info, MODULE_YAP, "R14: %p\n", context.R14);
+		LOG(Info, MODULE_YAP, "R15: %p\n", context.R15);
+		ResumeThread(hThread);
+	}
+	return context;
+}
+
+void GenerateStackTrace(_In_ CONTEXT context) {
+	if (hParent && hThread) {
+		LOG(Info, MODULE_YAP, "--- STACK ---\n");
+		STACKFRAME64 frame = { 0 };
+		frame.AddrPC.Offset = context.Rip;
+		frame.AddrPC.Mode = AddrModeFlat;
+		frame.AddrStack.Offset = context.Rsp;
+		frame.AddrStack.Mode = AddrModeFlat;
+		frame.AddrFrame.Offset = context.Rbp;
+		frame.AddrFrame.Mode = AddrModeFlat;
+		char buf[MAX_PATH] = { 0 };
+		for (int i = 0; i < MAX_STACK_DEPTH; i++) {
+			if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, hParent, hThread, &frame, &context, NULL, NULL, NULL, NULL)) break;
+			
+			AddressToSymbol(frame.AddrPC.Offset, buf, MAX_PATH);
+			LOG(Info, MODULE_YAP, "Returns to 0x%p (%s)\n", frame.AddrPC.Offset, buf);
+
+			if (i == MAX_STACK_DEPTH - 1) {
+				LOG(Info, MODULE_YAP, "Max stack depth reached: %d entries\n", MAX_STACK_DEPTH);
+			}
+		}
+	}
+}
 
 void AddressToSymbol(_In_ QWORD Address, _Out_ char* buf, _In_ size_t buf_sz) {
     buf[0] = 0;
