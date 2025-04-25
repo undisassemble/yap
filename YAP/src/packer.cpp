@@ -12,7 +12,6 @@
 #include "lzma/Aes.h"
 #include "lzma/Sha256.h"
 #include "util.hpp"
-#include <minwindef.h>
 
 BYTE PartialUnpackingHook[] = {
 	0x50,																// push rax
@@ -161,219 +160,14 @@ Buffer PackSection(_In_ Buffer SectionData) {
 // r8  = uncompressed buffer
 // r9  = uncompressed buffer size
 void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
-	pA->bind(Entry);
-
-	// Labels
 	Label LzmaDec_TryDummy = pA->newLabel();
 	Label LzmaDec_DecodeReal = pA->newLabel();
 	Label LzmaDec_DecodeToDic = pA->newLabel();
 	Label LzmaDecode = pA->newLabel();
-	Label _rcx = pA->newLabel();
-	Label _rdx = pA->newLabel();
-
-	// Data
-	Label _skipdata = pA->newLabel();
-	pA->mov(ptr(_rcx), rcx);
-	pA->mov(ptr(_rdx), rdx);
-	pA->jmp(_skipdata);
-	Label destLen = pA->newLabel();
-	pA->bind(destLen);
-	pA->dq(rand64());
-	Label srcLen = pA->newLabel();
-	pA->bind(srcLen);
-	pA->dq(0);
-	Label propData = pA->newLabel();
-	pA->bind(propData);
-	pA->embed(ShellcodeData.UnpackData.EncodedProp, sizeof(ShellcodeData.UnpackData.EncodedProp));
-	Label alloc = pA->newLabel();
-	pA->bind(alloc);
-	pA->dq(rand64());
-	pA->dq(rand64());
-	Label status = pA->newLabel();
-	pA->bind(status);
-	pA->dq(rand64());
-
-	// Allocate
 	Mem PEB = ptr(0x60);
 	PEB.setSegment(gs);
-	Label ptr_HeapAlloc = pA->newLabel();
-	pA->bind(ptr_HeapAlloc);
-	pA->dq(rand64());
-	Label Mem_alloc = pA->newLabel();
-	pA->bind(Mem_alloc);
-	pA->mov(r8, rdx);
-	pA->mov(edx, 0);
-	pA->mov(rcx, PEB);
-	pA->mov(rcx, ptr(rcx, 0x30));
-	pA->push(rsi);
-	pA->push(rbx);
-	pA->call(ptr(ptr_HeapAlloc));
-	pA->add(rsp, 0x10);
-	pA->ret();
-
-	// Free
-	Label ptr_HeapFree = pA->newLabel();
-	pA->bind(ptr_HeapFree);
-	pA->dq(rand64());
-	Label Mem_free = pA->newLabel();
-	pA->bind(Mem_free);
-	pA->mov(r8, rdx);
-	pA->mov(edx, 0);
-	pA->mov(rcx, PEB);
-	pA->mov(rcx, ptr(rcx, 0x30));
-	pA->push(rsi);
-	pA->push(rbx);
-	pA->call(ptr(ptr_HeapFree));
-	pA->add(rsp, 0x10);
-	pA->ret();
-
-	// More data
-	Label NTD = pA->newLabel();
-	pA->bind(NTD);
-	pA->embed(&Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest));
-	Label HF = pA->newLabel();
-	pA->bind(HF);
-	pA->embed(&Sha256Str("RtlFreeHeap"), sizeof(Sha256Digest));
-	Label HA = pA->newLabel();
-	pA->bind(HA);
-	pA->embed(&Sha256Str("RtlAllocateHeap"), sizeof(Sha256Digest));
-
-	// Do the thingy
-	pA->bind(_skipdata);
-
-	// Decode
-	Label dcd_loop = pA->newLabel();
-	pA->push(rcx);
-	pA->push(rdx);
-	pA->mov(al, DecoderProc[0].value);
-	pA->bind(dcd_loop);
-	for (int i = 1, n = DecoderProc.Size(); i < n; i++) {
-		switch (DecoderProc[i].Mnemonic) {
-		case DI_XOR:
-			if (DecoderProc[i].value) pA->xor_(byte_ptr(rcx), DecoderProc[i].value);
-			else pA->xor_(byte_ptr(rcx), al);
-			break;
-		case DI_NOT:
-			pA->not_(byte_ptr(rcx));
-			break;
-		case DI_NEG:
-			pA->neg(byte_ptr(rcx));
-			break;
-		case DI_ADD:
-			if (DecoderProc[i].value) pA->add(byte_ptr(rcx), DecoderProc[i].value);
-			else pA->add(byte_ptr(rcx), al);
-			break;
-		case DI_SUB:
-			if (DecoderProc[i].value) pA->sub(byte_ptr(rcx), DecoderProc[i].value);
-			else pA->sub(byte_ptr(rcx), al);
-		}
-	}
-	pA->add(al, byte_ptr(rcx));
-	pA->xor_(al, byte_ptr(rcx));
-	pA->inc(rcx);
-	pA->dec(rdx);
-	pA->strict();
-	pA->jnz(dcd_loop);
-	pA->pop(rdx);
-	pA->pop(rcx);
-
-	// Load stuff
-	pA->push(r8);
-	pA->push(r9);
-	pA->push(rdx);
-	pA->push(rcx);
-	pA->push(r8);
-	pA->push(r9);
-	pA->lea(rcx, ptr(NTD));
-	pA->call(ShellcodeData.Labels.GetModuleHandleW);
-	pA->mov(rcx, rax);
-	pA->lea(rdx, ptr(HF));
-	pA->call(ShellcodeData.Labels.GetProcAddress);
-	pA->mov(ptr(ptr_HeapFree), rax);
-	pA->lea(rdx, ptr(HA));
-	pA->call(ShellcodeData.Labels.GetProcAddress);
-	pA->mov(ptr(ptr_HeapAlloc), rax);
-	pA->pop(r9);
-	pA->pop(rcx);
-	pA->pop(r8);
-	pA->pop(rdx);
-
-	// Decompress
-	pA->mov(ptr(srcLen), rdx);
-	pA->mov(ptr(destLen), r9);
-	pA->lea(rdx, ptr(alloc));
-	pA->lea(r9, ptr(Mem_alloc));
-	pA->mov(ptr(rdx), r9);
-	pA->lea(r9, ptr(Mem_free));
-	pA->mov(ptr(rdx, 0x08), r9);
-	pA->mov(ptr(rsp, 0x40), rdx);
-	pA->lea(rdx, ptr(status));
-	pA->mov(ptr(rsp, 0x38), rdx);
-	pA->mov(dword_ptr(rsp, 0x30), 0);
-	pA->mov(dword_ptr(rsp, 0x28), 5);
-	pA->lea(r9, ptr(propData));
-	pA->mov(ptr(rsp, 0x20), r9);
-	pA->lea(r9, ptr(srcLen));
-	pA->lea(rdx, ptr(destLen));
-	pA->call(LzmaDecode);
-	pA->mov(rcx, 0);
-	pA->xchg(ptr(_rcx), rcx);
-	pA->mov(rdx, 0);
-	pA->xchg(ptr(_rdx), rdx);
-	pA->pop(r9);
-	pA->pop(r8);
 	
-	// re-encode thingy madoodle
-	pA->mov(al, DecoderProc[0].value);
-	Label enc_loop = pA->newLabel();
-	pA->mov(r8b, al);
-	pA->bind(enc_loop);
-	pA->add(r8b, ptr(rcx));
-	pA->xor_(r8b, ptr(rcx));
-	for (int i = DecoderProc.Size() - 1; i > 0; i--) {
-		switch (DecoderProc[i].Mnemonic) {
-		case DI_XOR:
-			if (DecoderProc[i].value) pA->xor_(byte_ptr(rcx), DecoderProc[i].value);
-			else pA->xor_(byte_ptr(rcx), al);
-			break;
-		case DI_NOT:
-			pA->not_(byte_ptr(rcx));
-			break;
-		case DI_NEG:
-			pA->neg(byte_ptr(rcx));
-			break;
-		case DI_ADD:
-			if (DecoderProc[i].value) pA->sub(byte_ptr(rcx), DecoderProc[i].value);
-			else pA->sub(byte_ptr(rcx), al);
-			break;
-		case DI_SUB:
-			if (DecoderProc[i].value) pA->add(byte_ptr(rcx), DecoderProc[i].value);
-			else pA->add(byte_ptr(rcx), al);
-		}
-	}
-	pA->mov(al, r8b);
-	pA->inc(rcx);
-	pA->dec(rdx);
-	pA->strict();
-	pA->jnz(enc_loop);
-	pA->ret();
-	
-	pA->bind(_rcx);
-	pA->dq(0);
-	pA->bind(_rdx);
-	pA->dq(0);
-
-	// LzmaDecode
-	#include "LzmaDecode.raw"
-
-	// LzmaDec_DecodeToDic
-	#include "LzmaDec_DecodeToDic.raw"
-
-	// LzmaDec_TryDummy
-	#include "LzmaDec_TryDummy.raw"
-
-	// LzmaDec_DecodeReal
-	#include "LzmaDec_DecodeReal.raw"
+	#include "modules/decoder.inc"
 }
 
 Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
@@ -446,7 +240,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	DWORD NumPacked = 0;
 	Data.sTask = "Compressing";
 	uint64_t DecompressKey = rand64();
-	ULONG sz = 0;
 	compressing = InternalShellcode.u64Size;
 	Buffer CompressedInternal = PackSection(InternalShellcode);
 	if (!CompressedInternal.pBytes || !CompressedInternal.u64Size) return buf;

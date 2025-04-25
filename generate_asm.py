@@ -1,5 +1,5 @@
 # This turns the assembly sources into headers that can be used by the packer, to make it easier to read/modify the packers shellcode
-
+# 
 # Special commands:
 #     %ifdef condition                      Same as C #ifdef, end with %endif
 #     %ifndef condition                     Same as C #ifndef, end with %endif
@@ -12,6 +12,10 @@
 #     %include                              Include file
 #     ; GLOBAL                              Following label is global, and should not be created
 #     ; RAW_C line                          line is C code that should be embedded in the source
+# 
+# Some defines have special meanings:
+#     ASSEMBLER <asm>                       Prefix for instructions
+# 
 # These comments should have their own lines, any comments following source will be ignored.
 # Also, custom instructions like strict or embed work
 
@@ -20,26 +24,6 @@ import math, os
 # Change as needed
 IN_DIR = "./YAP/src/modules/"
 OUT_DIR = "./YAP/include/modules/"
-SOURCES = [
-    # Modules
-    "anti-debug-main.asm",
-    "anti-dump.asm",
-    "anti-sandbox.asm",
-    "anti-sideloading.asm",
-    "anti-vm.asm",
-    "critical.asm",
-    "masquerading.asm",
-    "ms-signing.asm",
-    "segment-unpacker.asm",
-    "substitution.asm",
-    
-    # Main parts
-    "tls.asm",
-    "loader.asm",
-    "loader-functions.asm",
-    "importer.asm",
-    "sdk.asm"
-]
 
 # Defined by source
 ASSEMBLER = ""
@@ -254,8 +238,8 @@ def parse_line(line: str) -> str:
         elif line.lower().startswith("%include "):
             return "#include " + line[9:] + "\n"
         elif line.lower().startswith("%define "):
-            if line[8:].strip().startswith("ASSEMBLER"):
-                ASSEMBLER = line[8:].strip()[9:].strip()
+            if line[8:].strip().startswith("ASSEMBLER "):
+                ASSEMBLER = line[8:].strip()[10:].strip()
             else:
                 return "#define " + line[8:] + "\n"
         elif line.lower().startswith("%undef "):
@@ -335,7 +319,11 @@ def parse_line(line: str) -> str:
 
 def main():
     global GlobalLabel, IfStack, NeededLabels, BoundLabels, ValidRegs, ASSEMBLER
-    for fname in SOURCES:
+    for fname in os.listdir(IN_DIR):
+        if not fname.lower().endswith(".asm"):
+            continue
+        print(f"Parsing {fname}")
+
         # Clear vars
         NeededLabels = []
         BoundLabels = []
