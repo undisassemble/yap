@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler functions
  * @version 0.0.0
- * @date 2025-04-22
+ * @date 2025-04-25
  * @copyright MIT License
  */
 
@@ -593,7 +593,7 @@ uint64_t ProtectedAssembler::GetStackSize() {
 // Emitter hook
 Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) {
 	// Special ops
-	if (instId == Inst::kIdNop && o0.isMem() && reinterpret_cast<const Mem*>(&o0)->hasOffset() && (reinterpret_cast<const Mem*>(&o0)->offset() & 0xFFFFFF00) == 0x89658000) {
+	if (Options.Reassembly.bEnabled && instId == Inst::kIdNop && o0.isMem() && reinterpret_cast<const Mem*>(&o0)->hasOffset() && (reinterpret_cast<const Mem*>(&o0)->offset() & 0xFFFFFF00) == 0x89658000) {
 		BYTE op = reinterpret_cast<const Mem*>(&o0)->offset() & 0xFF;
 		if (op & YAP_OP_REASM_MUTATION) {
 			bMutate = MutationLevel = op & 0b01111111;
@@ -604,20 +604,30 @@ Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand
 		} else {
 			LOG(Warning, MODULE_REASSEMBLER, "Reasm macro noticed, but unable to interpret instruction.\n");
 		}
-		return true;
+		return ErrorCode::kErrorOk;
 	}
 
 	// Mutate
-	if (!bWaitingOnEmit && !HeldLocks) { stub(); }
-	this->bFailed = ::bFailed;
-	
-	// Substitution
-	bool bOldForce = bForceStrict;
-	if (bSubstitute && !bWaitingOnEmit) {
-		bForceStrict |= bStrict;
-		#include "modules/substitution.inc"
+	bool bSubFailed = false;
+	if (!bWaitingOnEmit && !HeldLocks) {
+		bool bOldForce = bForceStrict;
+		bForceStrict = true;// |= bStrict;
+		stub();
+		
+		// Substitution
+		if (bMutate && bSubstitute) {
+			bSubstitute = false;
+			#include "modules/substitution.inc"
+			bSubstitute = true;
+		} else {
+			bSubFailed = true;
+		}
+		
+		bForceStrict = bOldForce;
+		this->bFailed = ::bFailed;
+	} else {
+		bSubFailed = true;
 	}
-	bForceStrict = bOldForce;
 	bStrict = bWaitingOnEmit = false;
-	return Assembler::_emit(instId, o0, o1, o2, opExt);
+	return bSubFailed ? Assembler::_emit(instId, o0, o1, o2, opExt) : ErrorCode::kErrorOk;
 }

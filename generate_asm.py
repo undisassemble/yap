@@ -231,7 +231,7 @@ def parse_line(line: str) -> str:
                 return "} else if (" + line[6:] + ") {\n"
             else:
                 return "#elif " + line[6:] + "\n"
-        elif line.lower().startswith("%else "):
+        elif line.lower().startswith("%else"):
             if IfStack.__len__() < 1:
                 raise Exception("ELSE when not in an if statement")
             if IfStack[-1]:

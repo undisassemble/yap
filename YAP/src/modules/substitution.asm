@@ -1,14 +1,12 @@
 %define mnem(mnemonic) (instId == Inst::mnemonic)
-%define ToGp(op) (*reinterpret_cast<const Gp*>(&op))
-%define ToMem(op) (*reinterpret_cast<const Mem*>(&op))
-%define ToImm(op) (*reinterpret_cast<const Imm*>(&op))
-%define ToLabel(op) (*reinterpret_cast<const Label*>(&op))
+%define ToGp(op) (*reinterpret_cast<Gp*>(const_cast<Operand_*>(&op)))
+%define ToImm(op) (*reinterpret_cast<Imm*>(const_cast<Operand_*>(&op)))
+%define ToMem(op) (*reinterpret_cast<Mem*>(const_cast<Operand_*>(&op)))
+%define ToLabel(op) (*reinterpret_cast<Label*>(const_cast<Operand_*>(&op)))
 
 ; lea reg, mem
-%if mnem(kIdLea) && o0.isGp() && o1.isMem()
-	%if ToGp(o0).isGpq() && resolve(ToMem(o1))
-		pop ToGp(o0)
-	%endif
+%if mnem(kIdLea) && o0.isGp() && o1.isMem() && ToGp(o0).isGpq() && resolve(ToMem(o1))
+	pop ToGp(o0)
 
 ; call reg
 ; TODO: Make sure this works with strict
@@ -142,10 +140,11 @@
 		; RAW_C reg = truerandreg();
 		; RAW_C } while (reg == ToGp(o1).r64());
 		push ToGp(o1)
-		xchg reg, [rsp + ToGp(o1).size()]
 		%if ToGp(o1).size() == 8
+			xchg reg, [rsp + 8]
 			pop qword [reg]
 		%else
+			xchg reg, [rsp + 2]
 			pop word [reg]
 		%endif
 		pop reg
@@ -167,5 +166,11 @@
 	pop qword [rip]
 	dq rand64()
 
+%else
+	; RAW_C bSubFailed = true;
 %endif
+%undef ToLabel
+%undef ToMem
+%undef ToImm
+%undef ToGp
 %undef mnem
