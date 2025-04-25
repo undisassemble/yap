@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-04-20
+ * @date 2025-04-25
  * @copyright MIT License
  */
 
@@ -233,8 +233,9 @@ DWORD WINAPI Begin(void* args) {
 		holder.setErrorHandler(&ErrorHandler);
 		ProtectedAssembler a(&holder);
 		a.bForceStrict = true;
-		a.bMutate = false;
-		a.bSubstitute = false;
+		a.bMutate = Options.Reassembly.MutationLevel > 0;
+		a.bSubstitute = Options.Reassembly.bSubstitution;
+		a.MutationLevel = Options.Reassembly.MutationLevel;
 		pAssembly->SetAssembler(reinterpret_cast<Assembler*>(&a));
 		if (!pAssembly->Assemble()) {
 			Modal("Assembly failed", "Error", MB_OK | MB_ICONERROR);

@@ -607,11 +607,15 @@ Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand
 		return ErrorCode::kErrorOk;
 	}
 
+	// Check prefixes
+	InstOptions OldPrefixes = _instOptions;
+	_instOptions = InstOptions::kNone;
+
 	// Mutate
 	bool bSubFailed = false;
-	if (!bWaitingOnEmit && !HeldLocks) {
+	if (!bWaitingOnEmit && !HeldLocks && !(uint32_t)(OldPrefixes & (InstOptions::kX86_Lock | InstOptions::kX86_Rep | InstOptions::kX86_Repne | InstOptions::kX86_XAcquire | InstOptions::kX86_XRelease))) {
 		bool bOldForce = bForceStrict;
-		bForceStrict = true;// |= bStrict;
+		bForceStrict |= bStrict;
 		stub();
 		
 		// Substitution
@@ -628,6 +632,7 @@ Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand
 	} else {
 		bSubFailed = true;
 	}
+	_instOptions = OldPrefixes;
 	bStrict = bWaitingOnEmit = false;
 	return bSubFailed ? Assembler::_emit(instId, o0, o1, o2, opExt) : ErrorCode::kErrorOk;
 }
