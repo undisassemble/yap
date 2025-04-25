@@ -12,6 +12,7 @@
 #include "lzma/Aes.h"
 #include "lzma/Sha256.h"
 #include "util.hpp"
+#include <minwindef.h>
 
 BYTE PartialUnpackingHook[] = {
 	0x50,																// push rax
@@ -32,7 +33,7 @@ enum DecoderInstMnemonic : BYTE {
 };
 
 struct DecoderInst {
-	DecoderInstMnemonic Mnemonic : 3;
+	DecoderInstMnemonic Mnemonic;
 	DWORD value;
 };
 
@@ -92,8 +93,8 @@ Buffer PackSection(_In_ Buffer SectionData) {
 		inst.value = rand() & 0xFF;
 		DecoderProc.Push(inst);
 		for (int i = 0, n = 10 + (rand() & 15); i < n; i++) {
-			inst.Mnemonic = (DecoderInstMnemonic)(rand() % DI_SUB);
-			inst.value = rand() & 0xFF;
+			inst.Mnemonic = (DecoderInstMnemonic)(rand() % DI_START);
+			inst.value = rand() & 1 ? 0 : rand() & 0xFF;
 			DecoderProc.Push(inst);
 		}
 	}
@@ -134,7 +135,7 @@ Buffer PackSection(_In_ Buffer SectionData) {
 		for (int j = DecoderProc.Size() - 1; j > 0; j--) {
 			switch (DecoderProc[j].Mnemonic) {
 			case DI_XOR:
-				data.pBytes[i] ^= key;
+				data.pBytes[i] ^= DecoderProc[j].value ? DecoderProc[j].value : key;
 				break;
 			case DI_NOT:
 				data.pBytes[i] = ~data.pBytes[i];
@@ -143,10 +144,10 @@ Buffer PackSection(_In_ Buffer SectionData) {
 				data.pBytes[i] = ~data.pBytes[i] + 1;
 				break;
 			case DI_ADD:
-				data.pBytes[i] -= key;
+				data.pBytes[i] -= DecoderProc[j].value ? DecoderProc[j].value : key;
 				break;
 			case DI_SUB:
-				data.pBytes[i] += key;
+				data.pBytes[i] += DecoderProc[j].value ? DecoderProc[j].value : key;
 			}
 		}
 		key = nextkey;
@@ -249,7 +250,8 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	for (int i = 1, n = DecoderProc.Size(); i < n; i++) {
 		switch (DecoderProc[i].Mnemonic) {
 		case DI_XOR:
-			pA->xor_(byte_ptr(rcx), al);
+			if (DecoderProc[i].value) pA->xor_(byte_ptr(rcx), DecoderProc[i].value);
+			else pA->xor_(byte_ptr(rcx), al);
 			break;
 		case DI_NOT:
 			pA->not_(byte_ptr(rcx));
@@ -258,10 +260,12 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 			pA->neg(byte_ptr(rcx));
 			break;
 		case DI_ADD:
-			pA->add(byte_ptr(rcx), al);
+			if (DecoderProc[i].value) pA->add(byte_ptr(rcx), DecoderProc[i].value);
+			else pA->add(byte_ptr(rcx), al);
 			break;
 		case DI_SUB:
-			pA->sub(byte_ptr(rcx), al);
+			if (DecoderProc[i].value) pA->sub(byte_ptr(rcx), DecoderProc[i].value);
+			else pA->sub(byte_ptr(rcx), al);
 		}
 	}
 	pA->add(al, byte_ptr(rcx));
@@ -329,7 +333,8 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	for (int i = DecoderProc.Size() - 1; i > 0; i--) {
 		switch (DecoderProc[i].Mnemonic) {
 		case DI_XOR:
-			pA->xor_(byte_ptr(rcx), al);
+			if (DecoderProc[i].value) pA->xor_(byte_ptr(rcx), DecoderProc[i].value);
+			else pA->xor_(byte_ptr(rcx), al);
 			break;
 		case DI_NOT:
 			pA->not_(byte_ptr(rcx));
@@ -338,10 +343,12 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 			pA->neg(byte_ptr(rcx));
 			break;
 		case DI_ADD:
-			pA->sub(byte_ptr(rcx), al);
+			if (DecoderProc[i].value) pA->sub(byte_ptr(rcx), DecoderProc[i].value);
+			else pA->sub(byte_ptr(rcx), al);
 			break;
 		case DI_SUB:
-			pA->add(byte_ptr(rcx), al);
+			if (DecoderProc[i].value) pA->add(byte_ptr(rcx), DecoderProc[i].value);
+			else pA->add(byte_ptr(rcx), al);
 		}
 	}
 	pA->mov(al, r8b);
