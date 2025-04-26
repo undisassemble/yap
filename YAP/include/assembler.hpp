@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler definitions
  * @version 0.0.0
- * @date 2025-04-22
+ * @date 2025-04-26
  * @copyright MIT License
  */
 
@@ -96,6 +96,11 @@ public:
 	 * @brief Allow substitution of instructions.
 	 */
 	bool bSubstitute = true;
+
+	/*!
+	 * @brief Allows resolve to handle unbound labels, requires that you call resolvelinks after.
+	 */
+	bool bAdvancedResolve = true;
 
 	/*!
 	 * @brief Set to true if any instruction failed.

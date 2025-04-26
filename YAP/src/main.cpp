@@ -233,6 +233,7 @@ DWORD WINAPI Begin(void* args) {
 		holder.setErrorHandler(&ErrorHandler);
 		ProtectedAssembler a(&holder);
 		a.bForceStrict = true;
+		a.bAdvancedResolve = false;
 		a.bMutate = Options.Reassembly.MutationLevel > 0;
 		a.bSubstitute = Options.Reassembly.bSubstitution;
 		a.MutationLevel = Options.Reassembly.MutationLevel;

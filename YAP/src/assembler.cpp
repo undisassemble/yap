@@ -23,7 +23,7 @@ void AsmJitErrorHandler::handleError(_In_ Error error, _In_ const char* message,
 
 bool ProtectedAssembler::resolve(Mem o0) {
 	// Check compatibility
-	if ((o0.hasBaseLabel() && !code()->isLabelBound(o0.baseId())) || // I have no idea why the fuck this isnt working, but im just going to ignore it for now
+	if ((o0.hasBaseLabel() && !code()->isLabelBound(o0.baseId()) && !bAdvancedResolve) ||
 		(o0.hasBaseReg() && o0.baseReg().isGpd() && child_cast<Gpd>(o0.baseReg()) == esp) ||
 		(o0.hasIndexReg() && (o0.indexReg().isRip() || (!o0.indexReg().isGpq() && !o0.indexReg().isGpd()))) ||
 		(o0.hasBaseReg() && (o0.baseReg().isRip() || (!o0.baseReg().isGpq() && !o0.baseReg().isGpd()) || (o0.baseReg().isGpd() && child_cast<Gpd>(o0.baseReg()) == esp))) ||
@@ -613,13 +613,13 @@ Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand
 
 	// Mutate
 	bool bSubFailed = false;
-	if (!bWaitingOnEmit && !HeldLocks && !(uint32_t)(OldPrefixes & (InstOptions::kX86_Lock | InstOptions::kX86_Rep | InstOptions::kX86_Repne | InstOptions::kX86_XAcquire | InstOptions::kX86_XRelease))) {
+	if (bMutate && !bWaitingOnEmit && !(uint32_t)(OldPrefixes & (InstOptions::kX86_Lock | InstOptions::kX86_Rep | InstOptions::kX86_Repne | InstOptions::kX86_XAcquire | InstOptions::kX86_XRelease))) {
 		bool bOldForce = bForceStrict;
 		bForceStrict |= bStrict;
-		stub();
+		if (!HeldLocks) stub();
 		
 		// Substitution
-		if (bMutate && bSubstitute) {
+		if (bSubstitute) {
 			bSubstitute = false;
 			#include "modules/substitution.inc"
 			bSubstitute = true;

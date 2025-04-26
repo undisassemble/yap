@@ -151,7 +151,7 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("Number of times the application should be packed.\n1: packed app\n2: packed packed app\n3: packed packed packed app\netc.");
 			ImGui::SliderInt("Compression level", &Options.Packing.CompressionLevel, 1, 9);
 			ImGui::SetItemTooltip("How compressed the binary should be.");
-			ImGui::SliderInt("Mutation level", &Options.Packing.MutationLevel, 1, 5);
+			ImGui::SliderInt("Mutation level", &Options.Packing.MutationLevel, 0, 5);
 			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
 			IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT);
 			ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT.");
@@ -218,7 +218,7 @@ void DrawGUI() {
 		if (ImGui::BeginTabItem(ICON_CODE " Reassembler")) {
 			IMGUI_TOGGLE("Enabled", Options.Reassembly.bEnabled);
 			ImGui::SetItemTooltip("Disassembles your application, and assembles a new modified version.");
-			ImGui::SliderInt("Mutation level", &Options.Reassembly.MutationLevel, 0, 4);
+			ImGui::SliderInt("Mutation level", &Options.Reassembly.MutationLevel, 0, 5);
 			ImGui::SetItemTooltip("How much garbage code should be inserted between real code (more -> slower).");
 			IMGUI_TOGGLE("Remove useless data", Options.Reassembly.bRemoveData);
 			ImGui::SetItemTooltip("Removes some data from the PE headers.");
