@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2025-04-19
+ * @date 2025-04-26
  * @copyright MIT License
  */
 
@@ -214,3 +214,8 @@ bool LoadProject();
 bool SaveProject();
 void SaveSettings();
 void LoadSettings();
+
+template <typename T, typename __parent>
+T child_cast(__parent p) {
+	return *static_cast<T*>(&p);
+}

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler functions
  * @version 0.0.0
- * @date 2025-04-25
+ * @date 2025-04-26
  * @copyright MIT License
  */
 
@@ -24,9 +24,9 @@ void AsmJitErrorHandler::handleError(_In_ Error error, _In_ const char* message,
 bool ProtectedAssembler::resolve(Mem o0) {
 	// Check compatibility
 	if ((o0.hasBaseLabel() && !code()->isLabelBound(o0.baseId())) || // I have no idea why the fuck this isnt working, but im just going to ignore it for now
-		(o0.hasBaseReg() && o0.baseReg().isGpd() && *reinterpret_cast<Gpd*>(&o0.baseReg()) == esp) ||
+		(o0.hasBaseReg() && o0.baseReg().isGpd() && child_cast<Gpd>(o0.baseReg()) == esp) ||
 		(o0.hasIndexReg() && (o0.indexReg().isRip() || (!o0.indexReg().isGpq() && !o0.indexReg().isGpd()))) ||
-		(o0.hasBaseReg() && (o0.baseReg().isRip() || (!o0.baseReg().isGpq() && !o0.baseReg().isGpd()) || (o0.baseReg().isGpd() && *reinterpret_cast<Gpd*>(&o0.baseReg()) == esp))) ||
+		(o0.hasBaseReg() && (o0.baseReg().isRip() || (!o0.baseReg().isGpq() && !o0.baseReg().isGpd()) || (o0.baseReg().isGpd() && child_cast<Gpd>(o0.baseReg()) == esp))) ||
 		(o0.hasBaseReg() && !o0.hasIndexReg() && !o0.hasOffset())) {
 		return false;
 	}
@@ -44,13 +44,13 @@ bool ProtectedAssembler::resolve(Mem o0) {
 	uint64_t off = 0;
 	if (o0.hasIndexReg()) {
 		if (o0.indexReg().isGpd()) {
-			mov(reg.r32(), *reinterpret_cast<Gpd*>(&o0.indexReg()));
-			if (*reinterpret_cast<Gpd*>(&o0.indexReg()) == esp) {
+			mov(reg.r32(), child_cast<Gpd>(o0.indexReg()));
+			if (child_cast<Gpd>(o0.indexReg()) == esp) {
 				add(reg, fq ? 16 : 8);
 			}
 		} else if (o0.indexReg().isGpq()) {
-			mov(reg, *reinterpret_cast<Gpq*>(&o0.indexReg()));
-			if (*reinterpret_cast<Gpq*>(&o0.indexReg()) == rsp) {
+			mov(reg, child_cast<Gpq>(o0.indexReg()));
+			if (child_cast<Gpq>(o0.indexReg()) == rsp) {
 				add(reg, fq ? 16 : 8);
 			}
 		}
@@ -87,13 +87,13 @@ bool ProtectedAssembler::resolve(Mem o0) {
 		}
 	} else if (o0.hasBaseReg()) {
 		if (o0.baseReg().isGpd()) {
-			push(*reinterpret_cast<Gpq*>(&o0.baseReg()));
-			xchg(*reinterpret_cast<Gpd*>(&o0.baseReg()), *reinterpret_cast<Gpd*>(&o0.baseReg()));
-			add(reg, *reinterpret_cast<Gpq*>(&o0.baseReg()));
-			pop(*reinterpret_cast<Gpq*>(&o0.baseReg()));
+			push(child_cast<Gpq>(o0.baseReg()));
+			xchg(child_cast<Gpd>(o0.baseReg()), child_cast<Gpd>(o0.baseReg()));
+			add(reg, child_cast<Gpq>(o0.baseReg()));
+			pop(child_cast<Gpq>(o0.baseReg()));
 		} else {
-			add(reg, *reinterpret_cast<Gpq*>(&o0.baseReg()));
-			if (*reinterpret_cast<Gpq*>(&o0.baseReg()) == rsp) {
+			add(reg, child_cast<Gpq>(o0.baseReg()));
+			if (child_cast<Gpq>(o0.baseReg()) == rsp) {
 				add(reg, fq ? 16 : 8);
 			}
 		}
@@ -596,7 +596,7 @@ Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand
 	if (Options.Reassembly.bEnabled && instId == Inst::kIdNop && o0.isMem() && reinterpret_cast<const Mem*>(&o0)->hasOffset() && (reinterpret_cast<const Mem*>(&o0)->offset() & 0xFFFFFF00) == 0x89658000) {
 		BYTE op = reinterpret_cast<const Mem*>(&o0)->offset() & 0xFF;
 		if (op & YAP_OP_REASM_MUTATION) {
-			bMutate = MutationLevel = op & 0b01111111;
+			bMutate = (MutationLevel = op & 0b01111111);
 			LOG(Info, MODULE_REASSEMBLER, "Set mutation level to %d\n", MutationLevel);
 		} else if (op & YAP_OP_REASM_SUB) {
 			bSubstitute = op & 1;

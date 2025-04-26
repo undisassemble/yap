@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-04-20
+ * @date 2025-04-26
  * @copyright MIT License
  */
 
@@ -80,7 +80,7 @@ void FeatureWarning(_In_ char* text = NULL) {
 	ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_WARNING]);
 	ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
 	ImGui::PopStyleColor();
-	if (text) ImGui::SetItemTooltip(text);
+	if (text) ImGui::SetItemTooltip("%s", text);
 }
 
 void FeatureInfo(_In_ char* text = NULL) {
@@ -88,7 +88,7 @@ void FeatureInfo(_In_ char* text = NULL) {
 	ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_INFO]);
 	ImGui::Text(ICON_CIRCLE_INFO);
 	ImGui::PopStyleColor();
-	if (text) ImGui::SetItemTooltip(text);
+	if (text) ImGui::SetItemTooltip("%s", text);
 }
 
 void DrawGUI() {
@@ -196,7 +196,7 @@ void DrawGUI() {
 			IMGUI_TOGGLE("Enable process masquerading", Options.Packing.bEnableMasquerade);
 			ImGui::SetItemTooltip("Makes the packed executable appear as a different process (NOT process hollowing).\nPlease note that the smaller the path the easier it is to use.");
 			ImGui::SameLine();
-			ImGui::SetNextItemWidth(width / 2);
+			ImGui::SetNextItemWidth((float)width / 2);
 			ImGui::InputText(" ", Options.Packing.Masquerade, MAX_PATH);
 			ImGui::SameLine();
 			if (ImGui::Button("Scramble")) {
@@ -285,9 +285,9 @@ void DrawGUI() {
 			if (ImGui::Button("Test info")) Modal("Test info", "Information", MB_OK | MB_ICONINFORMATION);
 			
 			// TODO: Avoid looking at this for the foreseeable future
-			ImGui::Text("DecodedInstruction reduction: %d bytes (%.2f%%)", (int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction), 100.f * (int64_t)((int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction)) / (int64_t)sizeof(ZydisDecodedInstruction));
-			ImGui::Text("DecodedOperand reduction: %d bytes (%.2f%%)", (int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand), 100.f * (int64_t)((int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand)) / (int64_t)sizeof(ZydisDecodedOperand));
-			ImGui::Text("Total memory reduction (per line): %d bytes (%.2f%%)", (int64_t)(sizeof(DecodedOperand) + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) + sizeof(ZydisDecodedInstruction)), 100.f * (int64_t)((sizeof(DecodedOperand) + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) + sizeof(ZydisDecodedInstruction))) / (int64_t)(sizeof(Line) - sizeof(DecodedInstruction) - sizeof(DecodedOperand) * 4 + sizeof(ZydisDecodedInstruction) + sizeof(ZydisDecodedOperand) * 4));
+			ImGui::Text("DecodedInstruction reduction: %lld bytes (%.2f%%)", (int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction), 100.f * (int64_t)((int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction)) / (int64_t)sizeof(ZydisDecodedInstruction));
+			ImGui::Text("DecodedOperand reduction: %lld bytes (%.2f%%)", (int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand), 100.f * (int64_t)((int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand)) / (int64_t)sizeof(ZydisDecodedOperand));
+			ImGui::Text("Total memory reduction (per line): %lld bytes (%.2f%%)", (int64_t)(sizeof(DecodedOperand) + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) + sizeof(ZydisDecodedInstruction)), 100.f * (int64_t)((sizeof(DecodedOperand) + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) + sizeof(ZydisDecodedInstruction))) / (int64_t)(sizeof(Line) - sizeof(DecodedInstruction) - sizeof(DecodedOperand) * 4 + sizeof(ZydisDecodedInstruction) + sizeof(ZydisDecodedOperand) * 4));
 			
 			if (ImGui::TreeNode("Icon Tests")) {
 				ImGui::DebugTextEncoding(ICON_FILE_SHIELD ICON_SHIELD ICON_SHIELD_HALVED ICON_TRIANGLE_EXCLAMATION ICON_CIRCLE_INFO ICON_CIRCLE_QUESTION ICON_FOLDER_OPEN ICON_FILE ICON_FLOPPY_DISK ICON_CODE ICON_MICROCHIP ICON_BOX ICON_BOX_OPEN ICON_BOX_ARCHIVE ICON_BUG);
@@ -303,8 +303,8 @@ void DrawGUI() {
 			ImGui::Text("YAP: " __YAP_VERSION__);
 			ImGui::Text("relib: " __RELIB_VERSION__);
 			ImGui::Text("ImGui: " IMGUI_VERSION);
-			ImGui::Text("Zydis: %d.%d.%d", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
-			ImGui::Text("Zycore: %d.%d.%d", ZYCORE_VERSION_MAJOR(ZYCORE_VERSION), ZYCORE_VERSION_MINOR(ZYCORE_VERSION), ZYCORE_VERSION_PATCH(ZYCORE_VERSION));
+			ImGui::Text("Zydis: %lld.%lld.%lld", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
+			ImGui::Text("Zycore: %lld.%lld.%lld", ZYCORE_VERSION_MAJOR(ZYCORE_VERSION), ZYCORE_VERSION_MINOR(ZYCORE_VERSION), ZYCORE_VERSION_PATCH(ZYCORE_VERSION));
 			ImGui::Text("AsmJit: %d.%d.%d", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
 			ImGui::Text("GLFW: %s", glfwGetVersionString());
 			ImGui::Text("OpenGL: %s", glGetString(GL_VERSION));
@@ -338,7 +338,7 @@ void DrawGUI() {
 	// Data
 	else {
 		ImGui::SeparatorText("Overall");
-		ImGui::Text("Memory Usage Status (%d KB committed)", Data.Reserved / 1000);
+		ImGui::Text("Memory Usage Status (%llu KB committed)", Data.Reserved / 1000);
 		ImGui::SameLine();
 		ImGui::ProgressBar(Data.Reserved ? ((double)Data.InUse / Data.Reserved) : (double)0);
 		switch (Data.State) {
@@ -388,7 +388,7 @@ void DrawGUI() {
 				ImGui::SameLine();
 			}
 			
-			ImGui::Text(CurrentModal.pText);
+			ImGui::Text("%s", CurrentModal.pText);
 
 			// Beautiful, isnt it?
 			switch (CurrentModal.uType & MB_TYPEMASK) {

@@ -182,7 +182,6 @@ sum:
 
 ; GLOBAL
 ShellcodeData.RequestedFunctions.GetProcAddress.Func:
-    and rcx, ~(1 << 64)
     push rcx
     push rdx
     lea rcx, [hash]

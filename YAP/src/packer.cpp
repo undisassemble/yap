@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-04-20
+ * @date 2025-04-26
  * @copyright MIT License
  */
 
@@ -39,6 +39,7 @@ struct DecoderInst {
 Vector<DecoderInst> DecoderProc;
 Vector<uint64_t> TLSCallbacks;
 _ShellcodeData ShellcodeData;
+Sha256Digest digest;
 
 // Commonly seen section names
 char ValidSectionNames[] = 
@@ -55,22 +56,20 @@ char ValidSectionNames[] =
 	".rdata\0\0"
 	".xdata\0";
 
-Sha256Digest Sha256Str(_In_ char* pStr) {
+Sha256Digest& Sha256Str(_In_ char* pStr) {
 	CSha256 sha = { 0 };
 	Sha256_Init(&sha);
 	Sha256_Update(&sha, (Byte*)pStr, lstrlenA(pStr));
-	Sha256Digest ret;
-	Sha256_Final(&sha, (Byte*)&ret);
-	return ret;
+	Sha256_Final(&sha, (Byte*)&digest);
+	return digest;
 }
 
-Sha256Digest Sha256WStr(_In_ wchar_t* pStr) {
+Sha256Digest& Sha256WStr(_In_ wchar_t* pStr) {
 	CSha256 sha = { 0 };
 	Sha256_Init(&sha);
 	Sha256_Update(&sha, (Byte*)pStr, lstrlenW(pStr) * 2);
-	Sha256Digest ret;
-	Sha256_Final(&sha, (Byte*)&ret);
-	return ret;
+	Sha256_Final(&sha, (Byte*)&digest);
+	return digest;
 }
 
 void* Alloc(ISzAllocPtr p, size_t size) { return HeapAlloc(GetProcessHeap(), 0, size); }
@@ -354,8 +353,6 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	a.MutationLevel = Options.Packing.MutationLevel;
 	a.desync();
 	Label KERNEL32DLL = a.newLabel();
-	Label NTD = a.newLabel();
-	Label SIP = a.newLabel();
 	Label Sha256_Init = a.newLabel();
 	Label Sha256_Update = a.newLabel();
 	Label Sha256_Final = a.newLabel();
@@ -436,10 +433,6 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	} else {
 		// Skip data
 		Label skip = a.newLabel();
-		Label begin_module = a.newLabel();
-		Label do_name = a.newLabel();
-		Label ret = a.newLabel();
-		Label dont_ret = a.newLabel();
 		a.jmp(skip);
 
 		// data
@@ -661,7 +654,6 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			}
 			a.dd(0);
 
-			WORD nOff = 0;
 			a.bind(skipdata);
 			a.mov(rcx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset);
 			a.mov(rax, ptr(InternalRelOff));
@@ -961,7 +953,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	LOG(Info, MODULE_PACKER, "Packed binary relocated %lld bytes.\n", ShellcodeData.BaseOffset);
 	ShellcodeData.BaseAddress = ShellcodeData.BaseOffset + pOriginal->NTHeaders.OptionalHeader.SizeOfImage;
 	ShellcodeData.bUsingTLSCallbacks = Options.Packing.bDelayedEntry || Options.Packing.bAntiDebug || Options.Packing.bAntiPatch || (pOriginal->GetTLSCallbacks() && *pOriginal->GetTLSCallbacks());
-	ShellcodeData.EntryOff = 0x30 + rand() & 0xCF;
+	ShellcodeData.EntryOff = 0x30 + (rand() & 0xCF);
 	Data.sTask = "Generating internal shellcode";
 	Buffer Internal = GenerateInternalShellcode(pOriginal, pPackedBinary);
 	if (!Internal.u64Size || !Internal.pBytes) return false;

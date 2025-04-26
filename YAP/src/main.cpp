@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-04-25
+ * @date 2025-04-26
  * @copyright MIT License
  */
 
@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
 		STARTUPINFOA si = { 0 };
 		si.cb = sizeof(STARTUPINFOA);
 		PROCESS_INFORMATION pi = { 0 };
-		if (!CreateProcessA("YAPClient.exe", "YAPClient.exe --crash-handler", NULL, NULL, FALSE, NULL, NULL, NULL, &si, &pi)) {
+		if (!CreateProcessA("YAPClient.exe", "YAPClient.exe --crash-handler", NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
 			LOG(Warning, MODULE_YAP, "Failed to start crash handler (%d)\n", GetLastError());
 		} else {
 			CloseHandle(pi.hProcess);

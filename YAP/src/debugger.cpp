@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Debugger functions
  * @version 0.0.0
- * @date 2025-04-23
+ * @date 2025-04-26
  * @copyright MIT License
  */
 
@@ -186,15 +186,15 @@ void AddressToSymbol(_In_ QWORD Address, _Out_ char* buf, _In_ size_t buf_sz) {
         pSymbol->Name[0] = 0;
         DWORD64 off = 0;
         if (SymFromAddr(hParent, Address, &off, pSymbol) && pSymbol->Name[0] && pSymbol->NameLen) {
-            snprintf(buf, buf_sz, "%s + 0x%08lx", pSymbol->Name, off);
+            snprintf(buf, buf_sz, "%s + 0x%08llx", pSymbol->Name, off);
             return;
         }
     }
 
     // If that fails, just do offset from module
     for (int i = 0; i < Modules.Size(); i++) {
-        if (Address >= Modules[i].modBaseAddr && Address < Modules[i].modBaseAddr + Modules[i].modBaseSize) {
-            snprintf(buf, buf_sz, "%s + 0x%08lx", Modules[i].szModule, Address - reinterpret_cast<QWORD>(Modules[i].modBaseAddr));
+        if (Address >= (QWORD)Modules[i].modBaseAddr && Address < (QWORD)Modules[i].modBaseAddr + Modules[i].modBaseSize) {
+            snprintf(buf, buf_sz, "%s + 0x%08llx", Modules[i].szModule, Address - reinterpret_cast<QWORD>(Modules[i].modBaseAddr));
             return;
         }
     }
@@ -241,7 +241,7 @@ void LogExceptionRecord(_In_ EXCEPTION_RECORD* pExceptionRecord) {
 			LOG(Info, MODULE_YAP, "Code: %#010lx\n", pExceptionRecord->ExceptionCode);
 		}
         char buf[MAX_PATH] = { 0 };
-        AddressToSymbol(pExceptionRecord->ExceptionAddress, buf, MAX_PATH);
+        AddressToSymbol((QWORD)pExceptionRecord->ExceptionAddress, buf, MAX_PATH);
 		LOG(Info, MODULE_YAP, "Address: 0x%p (%s)\n", pExceptionRecord->ExceptionAddress, buf);
 		for (int i = 0; i < Modules.Size(); i++) {
 			if (pExceptionRecord->ExceptionAddress >= Modules[i].modBaseAddr && pExceptionRecord->ExceptionAddress < Modules[i].modBaseAddr + Modules[i].modBaseSize) {

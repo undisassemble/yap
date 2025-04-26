@@ -1,8 +1,8 @@
 %define mnem(mnemonic) (instId == Inst::mnemonic)
-%define ToGp(op) (*reinterpret_cast<Gp*>(const_cast<Operand_*>(&op)))
-%define ToImm(op) (*reinterpret_cast<Imm*>(const_cast<Operand_*>(&op)))
-%define ToMem(op) (*reinterpret_cast<Mem*>(const_cast<Operand_*>(&op)))
-%define ToLabel(op) (*reinterpret_cast<Label*>(const_cast<Operand_*>(&op)))
+%define ToGp(op) (child_cast<Gp>(op))
+%define ToImm(op) (child_cast<Imm>(op))
+%define ToMem(op) (child_cast<Mem>(op))
+%define ToLabel(op) (child_cast<Label>(op))
 
 ; lea reg, mem
 %if mnem(kIdLea) && o0.isGp() && o1.isMem() && ToGp(o0).isGpq() && resolve(ToMem(o1))
