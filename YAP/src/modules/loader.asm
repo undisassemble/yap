@@ -31,6 +31,21 @@ _entry:
 	%if Options.Packing.Message[0]
 		lea rax, [message]
 	%endif
+	push rsp
+	push rax
+	push rcx
+	push r8
+	push r9
+	push r10
+	push r11
+	push r12
+	push r13
+	push r14
+	push r15
+	push rdi
+	push rsi
+	push rbx
+	push rbp
 	desync_mov rax
 	garbage
 	desync_mov rdx

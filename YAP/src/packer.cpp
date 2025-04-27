@@ -728,12 +728,26 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	if (pOriginal->NTHeaders.OptionalHeader.AddressOfEntryPoint) {
 		a.mov(rax, pOriginal->NTHeaders.OptionalHeader.AddressOfEntryPoint + ShellcodeData.BaseOffset + pPackedBinary->NTHeaders.OptionalHeader.ImageBase);
 		a.add(rax, ptr(InternalRelOff));
-		a.push(rax);
+		a.mov(ptr(rsp, 0x70), rax);
 		a.garbage();
-		if (Options.Packing.EncodingCounts > 1) {
-			a.xor_(eax, eax);
-			a.strict();
-		}
+		a.pop(rbp);
+		a.pop(rbx);
+		a.pop(rsi);
+		a.pop(rdi);
+		a.pop(r15);
+		a.pop(r14);
+		a.pop(r13);
+		a.pop(r12);
+		a.pop(r11);
+		a.pop(r10);
+		a.pop(r9);
+		a.pop(r8);
+		a.pop(rcx);
+		a.xor_(rax, rax);
+		a.strict();
+		a.pop(rax);
+		a.strict();
+		DEBUG_ONLY(if (Options.Debug.bGenerateBreakpoints) { a.int3(); a.block(); });
 		a.ret();
 	}
 
@@ -905,12 +919,11 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	}
 
 	// NT headers
-	bool bIsDLL = pOriginal->NTHeaders.FileHeader.Characteristics & IMAGE_FILE_DLL;
 	IMAGE_NT_HEADERS64* pNT = &pPackedBinary->NTHeaders;
 	pNT->Signature = IMAGE_NT_SIGNATURE;
 	pNT->FileHeader.Machine = IMAGE_FILE_MACHINE_AMD64;
 	pNT->FileHeader.SizeOfOptionalHeader = sizeof(IMAGE_OPTIONAL_HEADER64);
-	pNT->FileHeader.Characteristics = (bIsDLL ? IMAGE_FILE_DLL : 0) | IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_DEBUG_STRIPPED | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_LINE_NUMS_STRIPPED | IMAGE_FILE_LOCAL_SYMS_STRIPPED;
+	pNT->FileHeader.Characteristics = (pOriginal->NTHeaders.FileHeader.Characteristics & IMAGE_FILE_DLL) | IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_DEBUG_STRIPPED | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_LINE_NUMS_STRIPPED | IMAGE_FILE_LOCAL_SYMS_STRIPPED;
 	DEBUG_ONLY(if (Options.Debug.bDisableRelocations) pNT->FileHeader.Characteristics |= IMAGE_FILE_RELOCS_STRIPPED);
 	pNT->OptionalHeader.Magic = 0x20B;
 	pNT->OptionalHeader.SectionAlignment = 0x1000;
