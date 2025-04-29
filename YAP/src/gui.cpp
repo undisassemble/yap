@@ -337,9 +337,9 @@ void DrawGUI() {
 	// Data
 	else {
 		ImGui::SeparatorText("Overall");
-		ImGui::Text("Memory Usage Status (%llu KB committed)", Data.Reserved / 1000);
+		ImGui::Text("Memory Usage Status (%llu KB committed)", (Data.Reserved + ReLibMetrics.Memory.Reserved) / 1000);
 		ImGui::SameLine();
-		ImGui::ProgressBar(Data.Reserved ? ((double)Data.InUse / Data.Reserved) : (double)0);
+		ImGui::ProgressBar((Data.Reserved + ReLibMetrics.Memory.Reserved) ? ((double)(Data.InUse + ReLibMetrics.Memory.InUse) / (Data.Reserved + ReLibMetrics.Memory.Reserved)) : (double)0);
 		switch (Data.State) {
 		case Packing:
 			ImGui::SeparatorText("Packing");
@@ -355,7 +355,7 @@ void DrawGUI() {
 		}
 		ImGui::Text("Total progress");
 		ImGui::SameLine();
-		ImGui::ProgressBar(Data.fTotalProgress);
+		ImGui::ProgressBar((Data.State == Assembling || Data.State == Disassembling) ? pAssembly->fProgress : Data.fTotalProgress);
 		ImGui::Text("Task: %s", Data.sTask);
 		ImGui::Text("Task progress");
 		ImGui::SameLine();

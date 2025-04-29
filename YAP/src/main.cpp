@@ -151,11 +151,13 @@ DWORD WINAPI Begin(void* args) {
 		LOG(Info, MODULE_YAP, "Starting reassembler\n");
 
 		// Disassemble
+		Data.State = Disassembling;
 		if (!pAssembly->Disassemble()) {
 			Modal("Disassembly failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Disassembly failed\n");
 			goto th_exit;
 		}
+		Data.State = Idle;
 
 		// Dump disassembly
 #ifdef _DEBUG
@@ -238,11 +240,13 @@ DWORD WINAPI Begin(void* args) {
 		a.bSubstitute = Options.Reassembly.bSubstitution;
 		a.MutationLevel = Options.Reassembly.MutationLevel;
 		pAssembly->SetAssembler(reinterpret_cast<Assembler*>(&a));
+		Data.State = Assembling;
 		if (!pAssembly->Assemble()) {
 			Modal("Assembly failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Assembly failed\n");
 			goto th_exit;
 		}
+		Data.State = Idle;
 
 #ifdef _DEBUG
 		if (Options.Debug.bDumpFunctions) {
