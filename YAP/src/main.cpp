@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-04-26
+ * @date 2025-04-29
  * @copyright MIT License
  */
 
@@ -340,7 +340,7 @@ void Console::help(char* name) {
 
 void Console::buildversion() {
 	LOG(Nothing, MODULE_YAP, "YAP: " __YAP_VERSION__ "\n");
-	LOG(Nothing, MODULE_YAP, "relib: " __RELIB_VERSION__ "\n");
+	LOG(Nothing, MODULE_YAP, "ReLib: " __RELIB_VERSION__ "\n");
 	LOG(Nothing, MODULE_YAP, "ImGui: " IMGUI_VERSION "\n");
 	LOG(Nothing, MODULE_YAP, "Zydis: %d.%d.%d\n", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
 	LOG(Nothing, MODULE_YAP, "AsmJit: %d.%d.%d\n", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));

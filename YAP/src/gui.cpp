@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-04-26
+ * @date 2025-04-29
  * @copyright MIT License
  */
 
@@ -284,7 +284,6 @@ void DrawGUI() {
 			ImGui::SameLine();
 			if (ImGui::Button("Test info")) Modal("Test info", "Information", MB_OK | MB_ICONINFORMATION);
 			
-			// TODO: Avoid looking at this for the foreseeable future
 			ImGui::Text("DecodedInstruction reduction: %lld bytes (%.2f%%)", (int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction), 100.f * (int64_t)((int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction)) / (int64_t)sizeof(ZydisDecodedInstruction));
 			ImGui::Text("DecodedOperand reduction: %lld bytes (%.2f%%)", (int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand), 100.f * (int64_t)((int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand)) / (int64_t)sizeof(ZydisDecodedOperand));
 			ImGui::Text("Total memory reduction (per line): %lld bytes (%.2f%%)", (int64_t)(sizeof(DecodedOperand) + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) + sizeof(ZydisDecodedInstruction)), 100.f * (int64_t)((sizeof(DecodedOperand) + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) + sizeof(ZydisDecodedInstruction))) / (int64_t)(sizeof(Line) - sizeof(DecodedInstruction) - sizeof(DecodedOperand) * 4 + sizeof(ZydisDecodedInstruction) + sizeof(ZydisDecodedOperand) * 4));
@@ -301,7 +300,7 @@ void DrawGUI() {
 		if (ImGui::BeginTabItem(ICON_CIRCLE_INFO " Version")) {
 			ImGui::SeparatorText("Version information");
 			ImGui::Text("YAP: " __YAP_VERSION__);
-			ImGui::Text("relib: " __RELIB_VERSION__);
+			ImGui::Text("ReLib: " __RELIB_VERSION__);
 			ImGui::Text("ImGui: " IMGUI_VERSION);
 			ImGui::Text("Zydis: %lld.%lld.%lld", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
 			ImGui::Text("Zycore: %lld.%lld.%lld", ZYCORE_VERSION_MAJOR(ZYCORE_VERSION), ZYCORE_VERSION_MINOR(ZYCORE_VERSION), ZYCORE_VERSION_PATCH(ZYCORE_VERSION));

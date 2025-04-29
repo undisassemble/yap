@@ -239,13 +239,13 @@ if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" OR wine_exec)
 	run_test(packer/5)
 	run_test(packer/6)
 	run_test(packer/7)
+	run_test(packer/all-release)
 	run_test(packer/all)
 
 	# Reassembler tests
 	run_test(reasm/0)
 	run_test(reasm/1)
 	run_test(reasm/2)
-	run_test(reasm/3)
 	run_test(reasm/all)
 
 	# Combo tests
@@ -253,6 +253,7 @@ if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" OR wine_exec)
 	run_test(combo/packer-reasm/1)
 	run_test(combo/packer-reasm/2)
 	run_test(combo/packer-reasm/3)
+	run_test(combo/packer-reasm/4)
 	run_test(combo/packer-reasm/all)
 	# run_test(combo/packer-reasm/partial_loading)
 endif()

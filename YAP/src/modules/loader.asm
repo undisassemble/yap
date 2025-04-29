@@ -71,8 +71,6 @@ SkipReloc:
 	desync_jnz
 
     ; Modules
-    ; TODO: Improve anti-vm
-    ; TODO: Improve anti-sandbox
 	%if Options.Packing.bMitigateSideloading
 		%include "modules/anti-sideloading.inc"
 	%endif
