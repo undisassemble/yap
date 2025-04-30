@@ -188,7 +188,7 @@ endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
 	# Create zip
 	install(FILES bin/Release/yap.dll SDK/yap.h DESTINATION "SDK")
-	install(FILES bin/Release/YAPClient.exe bin/Release/asmjit.dll bin/Release/imgui.dll bin/Release/zydis.dll bin/Release/glfw3.dll bin/Release/lzma.dll Installer/yap.bat DESTINATION "bin")
+	install(FILES bin/Release/YAPClient.exe bin/Release/relib.dll bin/Release/asmjit.dll bin/Release/imgui.dll bin/Release/Zydis.dll bin/Release/glfw3.dll bin/Release/lzma.dll Installer/yap.bat DESTINATION "bin")
 	install(FILES LICENSE DESTINATION ".")
 	set(CPACK_GENERATOR ZIP)
 	set(CPACK_PACKAGE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin/Release")

@@ -18,8 +18,9 @@ FOR /F "usebackq" %%A IN ('yap.bat') DO SET /a INSTALLSIZE=INSTALLSIZE+%%~zA
 FOR /F "usebackq" %%A IN ('yap.dll') DO SET /a INSTALLSIZE=INSTALLSIZE+%%~zA
 FOR /F "usebackq" %%A IN ('yap.h') DO SET /a INSTALLSIZE=INSTALLSIZE+%%~zA
 FOR /F "usebackq" %%A IN ('YAPClient.exe') DO SET /a INSTALLSIZE=INSTALLSIZE+%%~zA
-FOR /F "usebackq" %%A IN ('zydis.dll') DO SET /a INSTALLSIZE=INSTALLSIZE+%%~zA
+FOR /F "usebackq" %%A IN ('Zydis.dll') DO SET /a INSTALLSIZE=INSTALLSIZE+%%~zA
 FOR /F "usebackq" %%A IN ('lzma.dll') DO SET /a INSTALLSIZE=INSTALLSIZE+%%~zA
+FOR /F "usebackq" %%A IN ('relib.dll') DO SET /a INSTALLSIZE=INSTALLSIZE+%%~zA
 SET /a INSTALLSIZE=INSTALLSIZE/1000
 
 REM Build
