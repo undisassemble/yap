@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI definitions
  * @version 0.0.0
- * @date 2025-04-08
+ * @date 2025-05-01
  * @copyright MIT License
  */
 
@@ -20,11 +20,6 @@
  * @retval false Failure.
  */
 bool BeginGUI();
-
-/*!
- * @brief Applies the ImGui theme set in `Settings.Theme`.
- */
-void ApplyImGuiTheme();
 
 /*!
  * @brief Opens the file selection menu.

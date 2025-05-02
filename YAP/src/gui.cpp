@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-04-29
+ * @date 2025-05-02
  * @copyright MIT License
  */
 
@@ -13,7 +13,6 @@
 #include "gui.hpp"
 #include "font.hpp"
 #include "icons.hpp"
-#include "theme.hpp"
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <ctime>
@@ -68,7 +67,7 @@ bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _
 #ifdef _DEBUG
 void DebugWarning() {
 	ImGui::SameLine();
-	ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_WARNING]);
+	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
 	ImGui::Text(ICON_BUG);
 	ImGui::PopStyleColor();
 	ImGui::SetItemTooltip("This feature is experimental, use with caution!");
@@ -77,7 +76,7 @@ void DebugWarning() {
 
 void FeatureWarning(_In_ char* text = NULL) {
 	ImGui::SameLine();
-	ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_WARNING]);
+	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
 	ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
 	ImGui::PopStyleColor();
 	if (text) ImGui::SetItemTooltip("%s", text);
@@ -85,7 +84,7 @@ void FeatureWarning(_In_ char* text = NULL) {
 
 void FeatureInfo(_In_ char* text = NULL) {
 	ImGui::SameLine();
-	ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_INFO]);
+	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(152, 205, 253, 255));
 	ImGui::Text(ICON_CIRCLE_INFO);
 	ImGui::PopStyleColor();
 	if (text) ImGui::SetItemTooltip("%s", text);
@@ -107,21 +106,6 @@ void DrawGUI() {
 			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveProject(); }
 			if (!Data.Project[0]) ImGui::EndDisabled();
 			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("Settings")) {
-			if (ImGui::BeginMenu(ICON_PALETTE " Theme")) {
-#define ADD_MENU_THEME(name, icon, id) if (ImGui::MenuItem(name, icon, Settings.Theme == id)) { Settings.Theme = id; ApplyImGuiTheme(); SaveSettings(); }
-				ADD_MENU_THEME("Default Dark", ICON_MOON, 0);
-				ADD_MENU_THEME("Open Dark", ICON_MOON, 1);
-				ADD_MENU_THEME("Open Light", ICON_SUN, 2);
-				ADD_MENU_THEME("Catppuccin Latte", ICON_SUN, 3);
-				ADD_MENU_THEME("Catppuccin Frappé", ICON_MOON, 4);
-				ADD_MENU_THEME("Catppuccin Macchiato", ICON_MOON, 5);
-				ADD_MENU_THEME("Catppuccin Mocha", ICON_MOON, 6);
-#undef ADD_MENU_THEME
-				ImGui::EndMenu();
-			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
@@ -369,19 +353,19 @@ void DrawGUI() {
 		if (ImGui::BeginPopupModal(CurrentModal.pTitle, NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 			switch (CurrentModal.uType & MB_ICONMASK) {
 			case MB_ICONERROR:
-				ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_ERROR]);
+				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(228, 83, 83, 255));
 				ImGui::Text(ICON_CIRCLE_EXCLAMATION);
 				ImGui::PopStyleColor();
 				ImGui::SameLine();
 				break;
 			case MB_ICONINFORMATION:
-				ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_INFO]);
+				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(152, 205, 253, 255));
 				ImGui::Text(ICON_CIRCLE_INFO);
 				ImGui::PopStyleColor();
 				ImGui::SameLine();
 				break;
 			case MB_ICONWARNING:
-				ImGui::PushStyleColor(ImGuiCol_Text, Themes[Settings.Theme][THEME_COL_WARNING]);
+				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
 				ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
 				ImGui::PopStyleColor();
 				ImGui::SameLine();
@@ -520,7 +504,6 @@ bool BeginGUI() {
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags = ImGuiConfigFlags_NavEnableKeyboard;
 	io.IniFilename = NULL;
-	ApplyImGuiTheme();
 	io.Fonts->Clear();
 	io.FontDefault = NULL;
 	io.Fonts->AddFontFromMemoryCompressedTTF(font_compressed_data, font_compressed_size, 16.f);
@@ -530,6 +513,30 @@ bool BeginGUI() {
 	io.Fonts->AddFontFromMemoryCompressedTTF(icons_compressed_data, icons_compressed_size, 16.f, &config, range);
 	if (!io.Fonts->Build()) return false;
 	ImGuiStyle& style = ImGui::GetStyle();
+	style.Colors[ImGuiCol_WindowBg] = ImColor(25, 25, 25, 255);
+	style.Colors[ImGuiCol_PopupBg] = ImColor(20, 20, 20, 240);
+	style.Colors[ImGuiCol_FrameBg] = ImColor(40, 40, 40, 255);
+    style.Colors[ImGuiCol_FrameBgHovered] = ImColor(60, 60, 60, 255);
+    style.Colors[ImGuiCol_FrameBgActive] = ImColor(75, 75, 75, 255);
+	style.Colors[ImGuiCol_TitleBg] = ImColor(25, 25, 25, 255);
+    style.Colors[ImGuiCol_TitleBgActive] = ImColor(25, 25, 25, 255);
+	style.Colors[ImGuiCol_MenuBarBg] = ImColor(35, 35, 35, 255);
+	style.Colors[ImGuiCol_ScrollbarGrab] = ImColor(75, 75, 75, 255);
+    style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImColor(100, 100, 100, 255);
+    style.Colors[ImGuiCol_ScrollbarGrabActive] = ImColor(130, 130, 130, 255);
+    style.Colors[ImGuiCol_CheckMark] = ImColor(100, 100, 100, 255);
+    style.Colors[ImGuiCol_SliderGrab] = ImColor(75, 75, 75, 255);
+    style.Colors[ImGuiCol_SliderGrabActive] = ImColor(100, 100, 100, 255);
+    style.Colors[ImGuiCol_Button] = ImColor(40, 40, 40, 255);
+    style.Colors[ImGuiCol_ButtonHovered] = ImColor(60, 60, 60, 255);
+    style.Colors[ImGuiCol_ButtonActive] = ImColor(80, 80, 80, 255);
+	style.Colors[ImGuiCol_TabHovered] = ImColor(60, 60, 60, 255);
+    style.Colors[ImGuiCol_Tab] = ImColor(40, 40, 40, 255);
+    style.Colors[ImGuiCol_TabSelected] = ImColor(60, 60, 60, 255);
+    style.Colors[ImGuiCol_Header] = ImColor(40, 40, 40, 255);
+    style.Colors[ImGuiCol_HeaderHovered] = ImColor(60, 60, 60, 255);
+    style.Colors[ImGuiCol_HeaderActive] = ImColor(80, 80, 80, 255);
+	
 	style.WindowRounding = 10.0f;
 	style.WindowBorderSize = 0.0f;
 	style.FrameRounding = 5.0f;
@@ -638,11 +645,4 @@ int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
 	while (CurrentModal.pText) Sleep(100);
 	ReleaseMutex(hMutex);
 	return CurrentModal.uType;
-}
-
-void ApplyImGuiTheme() {
-	ImGuiStyle& style = ImGui::GetStyle();
-	for (int i = 0; i < ImGuiCol_COUNT; i++) {
-		style.Colors[i] = Themes[Settings.Theme][i];
-	}
 }

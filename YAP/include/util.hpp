@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2025-04-26
+ * @date 2025-05-01
  * @copyright MIT License
  */
 
@@ -190,11 +190,6 @@ struct Options_t {
 	} Debug;
 };
 
-struct Settings_t {
-	int Theme = 0;
-};
-
-extern Settings_t Settings;
 extern Options_t Options;
 #endif // UTIL_STRUCT_ONLY
 
@@ -212,8 +207,6 @@ int Modal(_In_ char* pText, _In_ char* pTitle = "Error", _In_ UINT uType = MB_OK
 
 bool LoadProject();
 bool SaveProject();
-void SaveSettings();
-void LoadSettings();
 
 template <typename T, typename __parent>
 T child_cast(__parent p) {

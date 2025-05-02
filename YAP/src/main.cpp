@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-04-29
+ * @date 2025-05-01
  * @copyright MIT License
  */
 
@@ -30,7 +30,6 @@ namespace Console {
 
 // Globals
 Options_t Options;
-Settings_t Settings;
 Data_t Data;
 HANDLE hLogFile = NULL;
 HANDLE hStdOut = NULL;
@@ -86,7 +85,6 @@ int main(int argc, char** argv) {
 			CloseHandle(pi.hThread);
 		}
 	}
-	LoadSettings();
 	
 	// Look for - commands
 	for (int i = 1; i < argc; i++) {

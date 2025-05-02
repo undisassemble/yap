@@ -3,65 +3,11 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2025-04-20
+ * @date 2025-05-01
  * @copyright MIT License
  */
 
 #include "util.hpp"
-
-void SaveSettings() {
-	// Get file
-	char path[MAX_PATH];
-	DWORD sz = MAX_PATH;
-	if (!QueryFullProcessImageNameA(GetCurrentProcess(), 0, path, &sz)) {
-		Modal("Failed to save settings", "Error", MB_OK | MB_ICONERROR);
-		LOG(Warning, MODULE_YAP, "Failed to save settings: %d (%s)\n", GetLastError(), path);
-		return;
-	}
-	if (!PathRemoveFileSpecA(path) || lstrlenA(path) > MAX_PATH - 12) {
-		Modal("Failed to save settings", "Error", MB_OK | MB_ICONERROR);
-		LOG(Warning, MODULE_YAP, "Failed to save settings (misc)\n");
-		return;
-	}
-	memcpy(&path[lstrlenA(path)], "\\yap.config", 12);
-
-	// Write settings
-	HANDLE hFile = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		Modal("Failed to save settings", "Error", MB_OK | MB_ICONERROR);
-		LOG(Warning, MODULE_YAP, "Failed to save settings: %d (%s)\n", GetLastError(), path);
-		return;
-	}
-	WriteFile(hFile, &Settings, sizeof(Settings_t), NULL, NULL);
-	CloseHandle(hFile);
-}
-
-void LoadSettings() {
-	// Get file
-	char path[MAX_PATH];
-	DWORD sz = MAX_PATH;
-	if (!QueryFullProcessImageNameA(GetCurrentProcess(), 0, path, &sz)) {
-		Modal("Failed to load settings", "Error", MB_OK | MB_ICONERROR);
-		LOG(Warning, MODULE_YAP, "Failed to load settings: %d (%s)\n", GetLastError(), path);
-		return;
-	}
-	if (!PathRemoveFileSpecA(path) || lstrlenA(path) > MAX_PATH - 12) {
-		Modal("Failed to load settings", "Error", MB_OK | MB_ICONERROR);
-		LOG(Warning, MODULE_YAP, "Failed to load settings (misc)\n");
-		return;
-	}
-	memcpy(&path[lstrlenA(path)], "\\yap.config", 12);
-
-	// Read settings
-	HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		Modal("Failed to load settings", "Error", MB_OK | MB_ICONERROR);
-		LOG(Warning, MODULE_YAP, "Failed to load settings: %d (%s)\n", GetLastError(), path);
-		return;
-	}
-	ReadFile(hFile, &Settings, sizeof(Settings_t), NULL, NULL);
-	CloseHandle(hFile);
-}
 
 bool SaveProject() {
 	if (!Data.Project[0]) return false;
