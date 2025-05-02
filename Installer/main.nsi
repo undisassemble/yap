@@ -54,7 +54,8 @@ Section
     SetOutPath "$INSTDIR\bin"
     File asmjit.dll
     File glfw3.dll
-    File zydis.dll
+    File Zydis.dll
+    File relib.dll
     File imgui.dll
     File lzma.dll
     File YAPClient.exe
