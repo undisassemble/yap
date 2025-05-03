@@ -109,7 +109,7 @@ void DrawGUI() {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
-			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Feature help")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/Features.md", NULL, NULL, 0); }
+			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Feature help")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/docs/features.md", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
 			ImGui::EndMenu();
@@ -125,7 +125,7 @@ void DrawGUI() {
 	if (!Data.bRunning) {
 		ImGui::BeginTabBar("#Tabs");
 
-		if (ImGui::BeginTabItem(ICON_BOX_ARCHIVE " Packing")) {
+		if (ImGui::BeginTabItem(ICON_BOX_ARCHIVE " Packer")) {
 			IMGUI_TOGGLE("Enable Packer", Options.Packing.bEnabled);
 			ImGui::SetItemTooltip("Wraps the original binary with a custom loader.");
 			ImGui::SameLine();
@@ -147,7 +147,7 @@ void DrawGUI() {
 			IMGUI_TOGGLE("DLL sideloading mitigations", Options.Packing.bMitigateSideloading);
 			ImGui::SetItemTooltip("Prioritizes DLLs in Windows directories, loading those first instead of DLLs placed in the local directory.");
 			ImGui::SameLine();
-			IMGUI_TOGGLE("Only load microsoft signed DLLs", Options.Packing.bOnlyLoadMicrosoft);
+			IMGUI_TOGGLE("Only load Microsoft signed DLLs", Options.Packing.bOnlyLoadMicrosoft);
 			ImGui::SetItemTooltip("Only allows DLLs that have been signed by Microsoft to be loaded.");
 			IMGUI_TOGGLE("Direct syscalls", Options.Packing.bDirectSyscalls);
 			ImGui::SetItemTooltip("Skips use of some windows API functions and instead makes calls directly to the kernel, can break with future Windows updates.");
@@ -177,7 +177,7 @@ void DrawGUI() {
 			DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::EndDisabled());
 			ImGui::Combo("Immitate packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
 			ImGui::SetItemTooltip("Changes some details about the packed binary to make it look like another packer.");
-			IMGUI_TOGGLE("Enable process masquerading", Options.Packing.bEnableMasquerade);
+			IMGUI_TOGGLE("Process masquerading", Options.Packing.bEnableMasquerade);
 			ImGui::SetItemTooltip("Makes the packed executable appear as a different process (NOT process hollowing).\nPlease note that the smaller the path the easier it is to use.");
 			ImGui::SameLine();
 			ImGui::SetNextItemWidth((float)width / 2);
@@ -212,8 +212,6 @@ void DrawGUI() {
 			ImGui::SetItemTooltip("Remove DOS stub from the PE.");
 			IMGUI_TOGGLE("Instruction substitution", Options.Reassembly.bSubstitution);
 			ImGui::SetItemTooltip("Replaces some existing instructions with other, more complicated alternatives.");
-			ImGui::InputScalar("Rebase image", ImGuiDataType_U64, &Options.Reassembly.Rebase, NULL, NULL, "%p", ImGuiInputTextFlags_CharsHexadecimal);
-			ImGui::SetItemTooltip("Changes images prefered base address. (0 to disable)");
 			ImGui::EndTabItem();
 		}
 
@@ -241,6 +239,11 @@ void DrawGUI() {
 				IMGUI_TOGGLE("Full-random section names", Options.Advanced.bTrueRandomSecNames);
 				ImGui::InputText("Section 1 name", Options.Advanced.Sec1Name, 9);
 				ImGui::InputText("Section 2 name", Options.Advanced.Sec2Name, 9);
+				ImGui::TreePop();
+			}
+			if (ImGui::TreeNode("Reassembler")) {
+				ImGui::InputScalar("Rebase image", ImGuiDataType_U64, &Options.Reassembly.Rebase, NULL, NULL, "%p", ImGuiInputTextFlags_CharsHexadecimal);
+				ImGui::SetItemTooltip("Changes images prefered base address. (0 to disable)");
 				ImGui::TreePop();
 			}
 			ImGui::EndTabItem();

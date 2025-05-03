@@ -2,10 +2,10 @@
  * @file yap.h
  * @author undisassemble
  * @brief SDK header
- * @details Two files are required to use the SDK: `yap.h` and `yap.dll`, make sure that `__YAP_VERSION__` matches the packer. You must link to `yap.dll` directly, so that it appears in the applications import directory. After protection, `yap.dll` is unlinked, meaning you don't need to (and shouldn't) distribute `yap.dll` along with your application. Because `yap.dll` is never actually loaded, you cannot find `yap.dll` with `GetModuleHandle` and cannot find SDK functions with `GetProcAddress`.
+ * @details Two files are required to use the SDK: `yap.h` and `yap.dll`, make sure that `__YAP_VERSION__` matches the packer. You must link to `yap.dll` directly, so that it appears in the applications import directory. After protection, `yap.dll` is unlinked, meaning you don't need to (and shouldn't) distribute `yap.dll` along with your application. You cannot use `GetModuleHandle`/`GetProcAddress` to resolve `yap.dll` imports.
  * @warning Do not rename `yap.dll`, renaming it prevents the SDK from being recognized.
  * @version 0.0.0
- * @date 2025-04-08
+ * @date 2025-05-02
  * @copyright MIT License
  */
 
@@ -50,8 +50,7 @@ extern "C" {
 __declspec(dllimport) bool __stdcall CheckForDebuggers();
 
 /*!
- * @brief Retrieves the base address of the running executable.
- * @note If using anti-dump, GetModuleHandle(NULL) will return NULL, use this instead.
+ * @brief Retrieves the base address of the running executable. If using anti-dump, GetModuleHandle(NULL) will return NULL, use this instead.
  * 
  * @return Handle to self.
  */

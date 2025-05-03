@@ -1,6 +1,7 @@
-MIT License
+The MIT License (MIT)
 
-Copyright (c) 2024-2025 undisassemble
+Copyright (c) 2014-2024 Florian Bernd
+Copyright (c) 2014-2024 Joel Höner
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
