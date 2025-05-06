@@ -173,7 +173,7 @@ struct Options_t {
 		uint64_t reserved : 27 = 0;
 		BYTE UPXVersionMajor = 5;
 		BYTE UPXVersionMinor = 0;
-		BYTE UPXVersionPatch = 0;
+		BYTE UPXVersionPatch = 1;
 		char Sec1Name[9] = { 0 };
 		char Sec2Name[9] = { 0 };
 	} Advanced;
