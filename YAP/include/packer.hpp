@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer definitions
  * @version 0.0.0
- * @date 2025-04-29
+ * @date 2025-05-09
  * @copyright MIT License
  * @bug Mutation causes DLL entry points to not be called
  * @todo Add (optional) Wine support
@@ -12,6 +12,8 @@
  * @todo Anti-patch
  * @todo Anti-sandbox
  * @todo Anti-VM
+ * @todo Bundling
+ * @todo Proxying
  */
 
 #pragma once

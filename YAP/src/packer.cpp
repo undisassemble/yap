@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-04-26
+ * @date 2025-05-09
  * @copyright MIT License
  */
 
@@ -169,7 +169,7 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 	#include "modules/decoder.inc"
 }
 
-Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal) {
+Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal, _In_ IMAGE_TLS_DIRECTORY64 oTLS) {
 	// Setup
 	Buffer buf = { 0 };
 	Environment environment;
@@ -904,6 +904,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	pPackedBinary->DosHeader.e_lfanew = sizeof(IMAGE_DOS_HEADER) + pPackedBinary->DosStub.u64Size;
 
 	// Save resources
+	IMAGE_TLS_DIRECTORY64 oTLS = pOriginal->ReadRVA<IMAGE_TLS_DIRECTORY64>(pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].VirtualAddress);
 	Buffer resources = { 0 };
 	if (Options.Packing.bDontCompressRsrc && pOriginal->NTHeaders.OptionalHeader.DataDirectory[2].Size && pOriginal->NTHeaders.OptionalHeader.DataDirectory[2].VirtualAddress) {
 		IMAGE_DATA_DIRECTORY rsrc = pOriginal->NTHeaders.OptionalHeader.DataDirectory[2];
@@ -1048,36 +1049,51 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	int nTLSEntries = 0;
 	if (ShellcodeData.bUsingTLSCallbacks) {
 		// Gen num of TLS
+		Buffer TLSBuffer = { 0 };
 		Data.sTask = "Generating TLS data";
-		int nFalseEntries = 0;
 		nTLSEntries = 1;
-		if (Options.Packing.bAntiDebug) {
-			nFalseEntries = 3 + rand() % 5;
-			nTLSEntries = nFalseEntries + 1;
-		}
+		if (Options.Packing.bAntiDebug) nTLSEntries += 3 + rand() % 5;
 
+		// Setup
 		pNT->OptionalHeader.DataDirectory[9].Size = sizeof(IMAGE_TLS_DIRECTORY64);
 		pNT->OptionalHeader.DataDirectory[9].VirtualAddress = SecHeader.VirtualAddress + shell.u64Size;
-		ShellcodeData.BaseAddress = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_TLS_DIRECTORY64) + sizeof(uint64_t) * (nTLSEntries + 1);
-		Buffer TLSCode = GenerateTLSShellcode(pPackedBinary, pOriginal);
+		TLSBuffer.Allocate(sizeof(uint64_t) * (nTLSEntries + 1) + sizeof(IMAGE_TLS_DIRECTORY64));
+		ShellcodeData.BaseAddress = SecHeader.VirtualAddress + shell.u64Size + TLSBuffer.u64Size;
+		TLSDataDir.AddressOfIndex = ShellcodeData.BaseAddress + pNT->OptionalHeader.ImageBase;
+		Buffer TLSCode = GenerateTLSShellcode(pPackedBinary, pOriginal, oTLS);
 		if (!TLSCode.u64Size || !TLSCode.pBytes) {
 			LOG(Failed, MODULE_PACKER, "Failed to generate TLS shellcode!\n");
 			return false;
 		}
+		TLSBuffer.Merge(TLSCode);
 		TLSDataDir.AddressOfCallBacks = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_TLS_DIRECTORY64) + pPackedBinary->NTHeaders.OptionalHeader.ImageBase;
 		TLSDataDir.AddressOfIndex = TLSDataDir.StartAddressOfRawData = TLSDataDir.AddressOfCallBacks + sizeof(uint64_t) * nTLSEntries;
 		TLSDataDir.EndAddressOfRawData = TLSDataDir.StartAddressOfRawData + sizeof(uint64_t) * nTLSEntries;
-		shell.Allocate(shell.u64Size + sizeof(uint64_t) * (nTLSEntries + 1) + sizeof(IMAGE_TLS_DIRECTORY64) + TLSCode.u64Size);
-		memcpy(shell.pBytes + shell.u64Size - (sizeof(uint64_t) * (nFalseEntries + 2) + sizeof(IMAGE_TLS_DIRECTORY64) + TLSCode.u64Size), &TLSDataDir, sizeof(IMAGE_TLS_DIRECTORY64));
-		memcpy(shell.pBytes + shell.u64Size - TLSCode.u64Size, TLSCode.pBytes, TLSCode.u64Size);
-		uint64_t* pEntries = reinterpret_cast<uint64_t*>(shell.pBytes + shell.u64Size - (sizeof(uint64_t) * (nTLSEntries + 1) + TLSCode.u64Size));
-		pEntries[1 + nFalseEntries] = 0;
-		pEntries[0] = SecHeader.VirtualAddress + shell.u64Size - TLSCode.u64Size + pPackedBinary->NTHeaders.OptionalHeader.ImageBase;
+		
+		// Set TLS callbacks
+		uint64_t* pEntries = reinterpret_cast<uint64_t*>(TLSBuffer.pBytes + TLSBuffer.u64Size - (sizeof(uint64_t) * (nTLSEntries + 1) + TLSCode.u64Size));
+		pEntries[nTLSEntries] = 0;
+		pEntries[0] = ShellcodeData.BaseAddress + pPackedBinary->NTHeaders.OptionalHeader.ImageBase + sizeof(DWORD);
 		for (int i = 1; i < nTLSEntries; i++) {
 			pEntries[i] = pPackedBinary->NTHeaders.OptionalHeader.ImageBase + SecHeader.VirtualAddress + shell.u64Size + resources.u64Size + pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].Size + 0x10000 + rand();
 		}
 
-		TLSCode.Release();
+		// TLS raw data
+		if (pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].VirtualAddress) {
+			QWORD SizeOfData = oTLS.EndAddressOfRawData - oTLS.StartAddressOfRawData;
+			TLSDataDir.SizeOfZeroFill = oTLS.SizeOfZeroFill;
+			TLSDataDir.StartAddressOfRawData = pNT->OptionalHeader.ImageBase + shell.u64Size + TLSBuffer.u64Size;
+			TLSDataDir.EndAddressOfRawData = TLSDataDir.StartAddressOfRawData + SizeOfData;
+			TLSBuffer.Allocate(TLSBuffer.u64Size + SizeOfData);
+			pOriginal->ReadRVA(oTLS.StartAddressOfRawData - pOriginal->NTHeaders.OptionalHeader.ImageBase, TLSBuffer.pBytes + TLSBuffer.u64Size - (SizeOfData), SizeOfData);
+		} else {
+			TLSDataDir.StartAddressOfRawData = TLSDataDir.AddressOfIndex;
+			TLSDataDir.EndAddressOfRawData = TLSDataDir.StartAddressOfRawData + sizeof(DWORD);
+		}
+
+		// Finalize
+		memcpy(TLSBuffer.pBytes, &TLSDataDir, sizeof(IMAGE_TLS_DIRECTORY64));
+		shell.Merge(TLSBuffer);
 	}
 
 	// Relocations

@@ -1,11 +1,22 @@
 %define ASSEMBLER a.
 
+index:
+	dd 0
+
     ; Check if called for process start
     desync
 	desync_mov rax
 	cmp rdx, 1
 	strict
 	je _do
+
+	; Copy index
+	%if oTLS.AddressOfIndex
+		mov rax, oTLS.AddressOfIndex
+		add rax, [reloc]
+		mov r10d, [index]
+		mov [rax], r10d
+	%endif
 
 	; If it's not, call packed binaries TLS callbacks (if unpacked)
 	%if TLSCallbacks.Size()
@@ -63,6 +74,12 @@ _do:
 	lea rax, [reloc]
 	sub rax, [rax]
 	mov [reloc], rax
+	%if oTLS.AddressOfIndex
+		mov r10, oTLS.AddressOfIndex
+		add rax, r10
+		mov r10d, [index]
+		mov [rax], r10d
+	%endif
 	%if Options.Packing.bAntiDebug
 		mov rax, 0
 		desync
