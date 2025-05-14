@@ -3,8 +3,10 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-05-02
+ * @date 2025-05-14
  * @copyright MIT License
+ * 
+ * @todo Feature search
  */
 
 #include "imgui.h"

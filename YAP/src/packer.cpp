@@ -3,8 +3,18 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-05-09
+ * @date 2025-05-14
  * @copyright MIT License
+ * 
+ * @bug Mutation causes DLL entry points to not be called
+ * @todo Add (optional) Wine support
+ * @todo Fix partial loading
+ * @todo Export protection
+ * @todo Anti-patch
+ * @todo Anti-sandbox
+ * @todo Anti-VM
+ * @todo Bundling
+ * @todo Proxying
  */
 
 #include "packer.hpp"
