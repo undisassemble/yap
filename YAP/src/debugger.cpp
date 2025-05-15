@@ -29,6 +29,7 @@ void AddressToSymbol(_In_ QWORD Address, _Out_ char* buf, _In_ size_t buf_sz);
 void GenerateModuleList();
 CONTEXT GenerateRegisterList(_In_ DWORD dwThreadId);
 void GenerateStackTrace(_In_ CONTEXT context);
+void AddressToOffset(_In_ QWORD Address, _Out_ char* buf, _In_ size_t buf_sz);
 
 void LaunchAsDebugger() {
 	// Open log file
@@ -68,6 +69,7 @@ void LaunchAsDebugger() {
 				context = GenerateRegisterList(event.dwThreadId);
 				GenerateModuleList();
 				GenerateStackTrace(context);
+				MessageBoxA(NULL, "A crash has occurred, and exception info has been saved to except.txt", "YAP has crashed", MB_OK | MB_ICONERROR);
 				break;
 			}
 
@@ -158,18 +160,29 @@ void GenerateStackTrace(_In_ CONTEXT context) {
 		frame.AddrStack.Mode = AddrModeFlat;
 		frame.AddrFrame.Offset = context.Rbp;
 		frame.AddrFrame.Mode = AddrModeFlat;
-		char buf[MAX_PATH] = { 0 };
+		char buf1[MAX_PATH] = { 0 };
+		char buf2[MAX_PATH] = { 0 };
 		for (int i = 0; i < MAX_STACK_DEPTH; i++) {
 			if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, hParent, hThread, &frame, &context, NULL, NULL, NULL, NULL)) break;
 			
-			AddressToSymbol(frame.AddrPC.Offset, buf, MAX_PATH);
-			LOG(Info, MODULE_YAP, "Returns to 0x%p (%s)\n", frame.AddrPC.Offset, buf);
+			AddressToOffset(frame.AddrPC.Offset, buf1, MAX_PATH);
+			AddressToSymbol(frame.AddrPC.Offset, buf2, MAX_PATH);
+			LOG(Info, MODULE_YAP, "Returns to %s (%s)\n", buf1, buf2);
 
 			if (i == MAX_STACK_DEPTH - 1) {
 				LOG(Info, MODULE_YAP, "Max stack depth reached: %d entries\n", MAX_STACK_DEPTH);
 			}
 		}
 	}
+}
+
+void AddressToOffset(_In_ QWORD Address, _Out_ char* buf, _In_ size_t buf_sz) {
+	for (int i = 0; i < Modules.Size(); i++) {
+        if (Address >= (QWORD)Modules[i].modBaseAddr && Address < (QWORD)Modules[i].modBaseAddr + Modules[i].modBaseSize) {
+            snprintf(buf, buf_sz, "%s + 0x%08llx", Modules[i].szModule, Address - reinterpret_cast<QWORD>(Modules[i].modBaseAddr));
+            return;
+        }
+    }
 }
 
 void AddressToSymbol(_In_ QWORD Address, _Out_ char* buf, _In_ size_t buf_sz) {
@@ -192,12 +205,7 @@ void AddressToSymbol(_In_ QWORD Address, _Out_ char* buf, _In_ size_t buf_sz) {
     }
 
     // If that fails, just do offset from module
-    for (int i = 0; i < Modules.Size(); i++) {
-        if (Address >= (QWORD)Modules[i].modBaseAddr && Address < (QWORD)Modules[i].modBaseAddr + Modules[i].modBaseSize) {
-            snprintf(buf, buf_sz, "%s + 0x%08llx", Modules[i].szModule, Address - reinterpret_cast<QWORD>(Modules[i].modBaseAddr));
-            return;
-        }
-    }
+    AddressToOffset(Address, buf, buf_sz);
 }
 
 void LogExceptionRecord(_In_ EXCEPTION_RECORD* pExceptionRecord) {
