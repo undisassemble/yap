@@ -10,7 +10,6 @@ EXTRACT_ALL            = YES
 EXCLUDE                = YAP/include/font.hpp
 EXCLUDE               += YAP/include/icons.hpp
 EXCLUDE               += YAP/include/theme.hpp
-HTML_EXTRA_STYLESHEET  = docs/doxygen-awesome.css docs/doxygen-awesome-sidebar-only.css
 GENERATE_TREEVIEW      = YES
 DISABLE_INDEX          = YES
 FULL_SIDEBAR           = NO
