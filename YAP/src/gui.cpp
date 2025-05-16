@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-05-14
+ * @date 2025-05-16
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -290,6 +290,7 @@ void DrawGUI() {
 			ImGui::SeparatorText("Version information");
 			ImGui::Text("YAP: " __YAP_VERSION__);
 			ImGui::Text("ReLib: " __RELIB_VERSION__);
+			ImGui::Text("LZMA: 24.07");
 			ImGui::Text("ImGui: " IMGUI_VERSION);
 			ImGui::Text("Zydis: %lld.%lld.%lld", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
 			ImGui::Text("Zycore: %lld.%lld.%lld", ZYCORE_VERSION_MAJOR(ZYCORE_VERSION), ZYCORE_VERSION_MINOR(ZYCORE_VERSION), ZYCORE_VERSION_PATCH(ZYCORE_VERSION));

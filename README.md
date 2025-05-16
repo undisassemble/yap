@@ -27,7 +27,7 @@ Reassembler
 
 A more in-depth list of features can be found [here](docs/features.md).
 
-SDK documentation can be found [here](https://undisassemble.dev/yap/docs/yap_8h.html)
+SDK documentation can be found [here](https://undisassemble.dev/yap/docs/yap_8h.html).
 
 
 ## Building
@@ -43,17 +43,13 @@ cmake --build .
 
 `CMAKE_BUILD_TYPE` can be either `Release` or `Debug` (default).
 
-### Building the installer
-
-The installer build scripts are only produced for `Release` builds. On Windows run `bin/Release/build.bat`, on Linux run `bin/Release/build.sh`.
-
 
 ## Other
 
 - [Main page](https://undisassemble.dev/yap)
 - [GitHub](https://github.com/undisassemble/yap)
 - [Features](docs/features.md)
-- [Documentation](https://undisassemble.dev/yap/docs)
+- [SDK Documentation](https://undisassemble.dev/yap/docs/yap_8h.html)
 
 
 ## License

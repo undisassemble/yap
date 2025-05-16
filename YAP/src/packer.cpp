@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-05-14
+ * @date 2025-05-16
  * @copyright MIT License
  * 
  * @bug Mutation causes DLL entry points to not be called
@@ -19,8 +19,8 @@
 
 #include "packer.hpp"
 #include "assembler.hpp"
-#include "lzma/Aes.h"
-#include "lzma/Sha256.h"
+#include "Aes.h"
+#include "Sha256.h"
 #include "util.hpp"
 
 BYTE PartialUnpackingHook[] = {

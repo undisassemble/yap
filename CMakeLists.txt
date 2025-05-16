@@ -63,34 +63,14 @@ endif()
 # Definitions
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	add_compile_definitions(_DEBUG)
-	add_compile_definitions(ASMJIT_BUILD_DEBUG)
 else()
 	add_compile_definitions(NDEBUG)
-	add_compile_definitions(ASMJIT_BUILD_RELEASE)
 endif()
 add_compile_definitions(_CONSOLE)
-add_compile_definitions(ASMJIT_NO_AARCH64)
-add_compile_definitions(ASMJIT_NO_ABI_NAMESPACE)
-add_compile_definitions(ASMJIT_NO_DEPRECATED)
-add_compile_definitions(_GLFW_WIN32)
 
 
 
 ##### DEPENDENCIES #####
-include_directories(
-	"YAP/include"
-	"YAP/dependencies"
-	"YAP/dependencies/lzma"
-	"YAP/dependencies/imgui"
-	"YAP/dependencies/imgui/backends"
-	"YAP/dependencies/relib/include"
-	"YAP/dependencies/relib/dependencies/asmjit/src"
-	"YAP/dependencies/relib/dependencies/zydis/include"
-	"YAP/dependencies/relib/dependencies/zydis/src"
-	"YAP/dependencies/relib/dependencies/zydis/dependencies/zycore/include"
-	"YAP/dependencies/relib/dependencies/zydis/dependencies/zycore/src"
-	"YAP/dependencies/glfw/include"
-)
 
 # glfw3
 file(GLOB SOURCES_GLFW
@@ -99,10 +79,12 @@ file(GLOB SOURCES_GLFW
 	"YAP/meta/glfw3.rc"
 )
 add_library(glfw3 SHARED ${SOURCES_GLFW})
+target_include_directories(glfw3 AFTER PUBLIC "YAP/dependencies/glfw/include")
 target_link_options(glfw3 PUBLIC -mwindows)
+target_compile_definitions(glfw3 PUBLIC _GLFW_WIN32)
 set_target_properties(glfw3 PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
-	add_custom_command(TARGET glfw3 POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:glfw3>)
+	add_custom_command(TARGET glfw3 POST_BUILD COMMAND objcopy --only-keep-debug $<TARGET_FILE:glfw3> "bin/${CMAKE_BUILD_TYPE}/glfw3.dbg" COMMAND ${CMAKE_STRIP} $<TARGET_FILE:glfw3>)
 endif()
 
 # imgui
@@ -113,11 +95,12 @@ file(GLOB SOURCES_IMGUI
 	"YAP/meta/imgui.rc"
 )
 add_library(imgui SHARED ${SOURCES_IMGUI})
+target_include_directories(imgui AFTER PUBLIC "YAP/dependencies/imgui" "YAP/dependencies/imgui/backends")
 target_link_options(imgui PUBLIC -mwindows)
 target_link_libraries(imgui glfw3)
 set_target_properties(imgui PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
-	add_custom_command(TARGET imgui POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:imgui>)
+	add_custom_command(TARGET imgui POST_BUILD COMMAND objcopy --only-keep-debug $<TARGET_FILE:imgui> "bin/${CMAKE_BUILD_TYPE}/imgui.dbg" COMMAND ${CMAKE_STRIP} $<TARGET_FILE:imgui>)
 endif()
 
 # lzma
@@ -126,10 +109,11 @@ file(GLOB SOURCES_LZMA
 	"YAP/meta/lzma.rc"
 )
 add_library(lzma SHARED ${SOURCES_LZMA})
+target_include_directories(lzma AFTER PUBLIC "YAP/dependencies/lzma")
 target_link_options(lzma PUBLIC -mwindows)
 set_target_properties(lzma PROPERTIES SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
-	add_custom_command(TARGET lzma POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:lzma>)
+	add_custom_command(TARGET lzma POST_BUILD COMMAND objcopy --only-keep-debug $<TARGET_FILE:lzma> "bin/${CMAKE_BUILD_TYPE}/lzma.dbg" COMMAND ${CMAKE_STRIP} $<TARGET_FILE:lzma>)
 endif()
 
 # relib
@@ -141,16 +125,14 @@ add_subdirectory("YAP/dependencies/relib")
 # yap.dll
 add_library(yap SHARED "SDK/yap_sdk.cpp" "SDK/yap.rc")
 target_link_options(yap PUBLIC -mwindows)
-set_target_properties(yap PROPERTIES PREFIX "")
-set_target_properties(yap PROPERTIES SUFFIX ".dll")
+set_target_properties(yap PROPERTIES PREFIX "" SUFFIX ".dll")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_custom_command(TARGET yap POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:yap>)
 endif()
 
 # Generate includes
 file(GLOB SOURCES_ASM "YAP/src/modules/*.asm")
-add_custom_command(OUTPUT "YAP/include/modules/anti-dump.inc" MAIN_DEPENDENCY ${CMAKE_CURRENT_BINARY_DIR}/generate_asm.py  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/generate_asm.py DEPENDS ${SOURCES_ASM})
-add_custom_target(Generated ALL DEPENDS "YAP/include/modules/anti-dump.inc")
+add_custom_target(Generated ${Python3_EXECUTABLE} "${CMAKE_CURRENT_BINARY_DIR}/generate_asm.py" DEPENDS ${SOURCES_ASM})
 
 # YAPClient.exe
 file(GLOB SOURCES
@@ -159,50 +141,47 @@ file(GLOB SOURCES
 )
 add_executable(YAPClient WIN32 ${SOURCES})
 add_dependencies(YAPClient Generated)
+target_include_directories(YAPClient PRIVATE "YAP/include")
 target_link_options(YAPClient PUBLIC -mwindows)
-target_link_libraries(YAPClient d3d11)
-target_link_libraries(YAPClient ntdll)
-target_link_libraries(YAPClient shlwapi)
-target_link_libraries(YAPClient dbghelp)
-target_link_libraries(YAPClient d3dcompiler)
-target_link_libraries(YAPClient dwmapi)
-target_link_libraries(YAPClient opengl32)
-target_link_libraries(YAPClient imgui)
-target_link_libraries(YAPClient lzma)
-target_link_libraries(YAPClient relib)
-set_target_properties(YAPClient PROPERTIES PREFIX "")
-set_target_properties(YAPClient PROPERTIES SUFFIX ".exe")
+target_compile_definitions(YAPClient PUBLIC _GLFW_WIN32)
+target_link_libraries(YAPClient d3d11 ntdll shlwapi dbghelp d3dcompiler dwmapi opengl32 imgui lzma relib)
+set_target_properties(YAPClient PROPERTIES PREFIX "" SUFFIX ".exe")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
-	add_custom_command(TARGET YAPClient POST_BUILD COMMAND objcopy --only-keep-debug $<TARGET_FILE:YAPClient> "bin/${CMAKE_BUILD_TYPE}/YAPClient.dbg")
-	add_custom_command(TARGET YAPClient POST_BUILD COMMAND ${CMAKE_STRIP} $<TARGET_FILE:YAPClient>)
+	add_custom_command(TARGET YAPClient POST_BUILD COMMAND objcopy --only-keep-debug $<TARGET_FILE:YAPClient> "bin/${CMAKE_BUILD_TYPE}/YAPClient.dbg" COMMAND ${CMAKE_STRIP} $<TARGET_FILE:YAPClient>)
 endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND ENABLE_DUMPING)
 	message(STATUS "Enabled reasm dumps")
 	target_compile_definitions(YAPClient PUBLIC ENABLE_DUMPING)
 endif()
 
-##### INSTALLER #####
+##### EXTRA #####
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
-	# Create zip
-	install(FILES bin/Release/yap.dll SDK/yap.h DESTINATION "SDK")
-	install(FILES bin/Release/YAPClient.exe bin/Release/relib.dll bin/Release/asmjit.dll bin/Release/imgui.dll bin/Release/Zydis.dll bin/Release/glfw3.dll bin/Release/lzma.dll Installer/yap.bat DESTINATION "bin")
-	install(FILES LICENSE DESTINATION ".")
-	set(CPACK_GENERATOR ZIP)
-	set(CPACK_PACKAGE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin/Release")
-	include(CPack)
-
 	# Create installer
 	find_program(NSIS_PATH makensis)
-	if (NOT NSIS_PATH)
-		message(WARNING "makensis command not found, skipping installer.")
-	else()
+	if (NSIS_PATH)
+		message(STATUS "Will build installer")
 		configure_file("SDK/yap.h.in" "bin/Release/yap.h")
 		file(COPY "Installer/main.nsi" DESTINATION "bin/Release")
 		if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
 			configure_file("Installer/build.bat" "bin/Release/build.bat")
+			set(INSTALLER_SCRIPT "build.bat")
 		else()
 			configure_file("Installer/build.sh" "bin/Release/build.sh")
+			set(INSTALLER_SCRIPT "./build.sh")
 		endif()
+		add_custom_target(installer ALL ${INSTALLER_SCRIPT} DEPENDS "Installer/main.nsi" BYPRODUCTS "${INSTALLER_SCRIPT}" WORKING_DIRECTORY "bin/Release")
+	else()
+		message(STATUS "Could not find NSIS, skipping installer")
+	endif()
+
+	# Docs
+	find_program(DOXYGEN_PATH doxygen)
+	if (DOXYGEN_PATH)
+		message(STATUS "Will generate docs")
+		file(GLOB DOX_SOURCES "YAP/include/*.hpp")
+		add_custom_target(docs ALL ${DOXYGEN_PATH} DEPENDS ${DOX_SOURCES} DEPENDS ${DOX_SOURCES})
+	else()
+		message(WARNING "Could not find Doxygen, skipping docs")
 	endif()
 endif()
 
@@ -211,8 +190,7 @@ if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" OR wine_exec)
 	# Build test executable
 	add_executable(test_executable WIN32 tests/test.cpp)
 	target_link_options(test_executable PUBLIC -mconsole)
-	set_target_properties(test_executable PROPERTIES PREFIX "")
-	set_target_properties(test_executable PROPERTIES SUFFIX ".exe")
+	set_target_properties(test_executable PROPERTIES PREFIX "" SUFFIX ".exe")
 
 	# Test function
 	function(run_test yaproj)

@@ -322,7 +322,6 @@ def main():
     for fname in os.listdir(IN_DIR):
         if not fname.lower().endswith(".asm"):
             continue
-        print(f"Parsing {fname}")
 
         # Clear vars
         NeededLabels = []

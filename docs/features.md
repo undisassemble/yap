@@ -73,36 +73,62 @@ Checks for the presence of debuggers before unpacking the application.
 
 ### Immitate packer
 
+Causes some tools like [Detect It Easy]() to think it uses a different packer. Available options are: Themida, WinLicense, UPX, MPRESS, Enigma, and ExeStealth. ExeStealth is not available when `Delayed entry point` is enabled.
+
 ### Process masquerading
+
+Makes some elements of the process appear as if it was a different process. Also hides launch arguments.
 
 ### Mark critical :soon:
 
 ### Leave a message
 
+Puts your message in the packed executable, so it shows up under `strings` and other RE tools.
+
 ### SDK
+
+Provides access to some functions provided by the packer.
+
 
 ## Reassembler
 
+Disassembles the original application and assembles it using the packers obfuscator.
+
 ### Mutation level
+
+Same as packer mutation level setting, except this is disabled by setting it to 0.
 
 ### Remove useless data
 
 ### Strip debug symbols
 
+Removes symbol and debugging information, similar to the `strip` command.
+
 ### Strip DOS stub
+
+Removes the DOS stub from the binary, which is almost useless.
 
 ### Instruction substitution
 
 ### SDK
+
+The SDK can be used to modify reassembler settings during protection. This can be useful when setting certain code regions to protect instead of the entire binary.
+
+> [!IMPORTANT]
+> Because of compiler optimizations and how YAP assembles the binary, it's possible that macros used do not appear in the same order as they appear in source code.
 
 
 ## Advanced
 
 ### UPX version
 
+Set the version of UPX that appears when the packers immitate setting is set to UPX.
+
 ### Fake symbol table
 
 ### Mutate
+
+Enables packer mutation.
 
 ### Semi-random section names
 
