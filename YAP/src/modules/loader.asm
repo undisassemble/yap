@@ -119,10 +119,10 @@ decompressloop:
 	strict
 	jne decompressloop
 	lea rcx, [InternalShell]
-	mov rdx, CompressedInternal.u64Size
+	mov rdx, CompressedInternal.Size()
 	mov r8, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset + pOriginal->NTHeaders.OptionalHeader.SizeOfImage
 	add r8, [Reloc]
-	mov r9, InternalShellcode.u64Size
+	mov r9, InternalShellcode.Size()
 	call unpack
 	
 	; Relocation stuff

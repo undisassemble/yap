@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Debugger functions
  * @version 0.0.0
- * @date 2025-04-26
+ * @date 2025-05-23
  * @copyright MIT License
  */
 
@@ -69,7 +69,7 @@ void LaunchAsDebugger() {
 				context = GenerateRegisterList(event.dwThreadId);
 				GenerateModuleList();
 				GenerateStackTrace(context);
-				MessageBoxA(NULL, "A crash has occurred, and exception info has been saved to except.txt", "YAP has crashed", MB_OK | MB_ICONERROR);
+				MessageBoxA(NULL, "A crash has occurred, check yap.log.txt and except.txt for more details.\n\nIf possible, consider sending yap.log.txt and except.txt to contact@undisassemble.dev or opening a GitHub issue to have this (hopefully) fixed.", "YAP has crashed", MB_OK | MB_ICONERROR);
 				break;
 			}
 

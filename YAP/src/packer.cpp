@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-05-16
+ * @date 2025-05-23
  * @copyright MIT License
  * 
  * @bug Mutation causes DLL entry points to not be called
@@ -91,8 +91,8 @@ SRes PackingProgress(ICompressProgressPtr p, UInt64 inSize, UInt64 outSize) {
 }
 
 Buffer PackSection(_In_ Buffer SectionData) {
-	Buffer data = { 0 };
-	data.Allocate(SectionData.u64Size * 1.1 + 0x4000);
+	Buffer data;
+	data.Allocate(SectionData.Size() * 1.1 + 0x4000);
 
 	// Gen algorithm
 	if (!DecoderProc.Size()) {
@@ -125,8 +125,8 @@ Buffer PackSection(_In_ Buffer SectionData) {
 	alloc.Alloc = Alloc;
 	alloc.Free = Free;
 	size_t propssz = LZMA_PROPS_SIZE;
-	uint64_t OldSize = data.u64Size;
-	SRes res = LzmaEncode(data.pBytes, &OldSize, SectionData.pBytes, SectionData.u64Size, &props, ShellcodeData.UnpackData.EncodedProp, &propssz, 0, &progress, &alloc, &alloc);
+	uint64_t OldSize = data.Size();
+	SRes res = LzmaEncode(data.Data(), &OldSize, SectionData.Data(), SectionData.Size(), &props, ShellcodeData.UnpackData.EncodedProp, &propssz, 0, &progress, &alloc, &alloc);
 	if (res != SZ_OK) {
 		LOG(Failed, MODULE_PACKER, "Failed to compress data (%d)\n", res);
 		data.Release();
@@ -137,25 +137,25 @@ Buffer PackSection(_In_ Buffer SectionData) {
 	// Encode (inverse cause yeah)
 	BYTE key = DecoderProc[0].value;
 	BYTE nextkey = 0;
-	for (int i = 0; i < data.u64Size; i++) {
-		nextkey = key + data.pBytes[i];
-		nextkey ^= data.pBytes[i];
+	for (int i = 0; i < data.Size(); i++) {
+		nextkey = key + data.Data()[i];
+		nextkey ^= data.Data()[i];
 		for (int j = DecoderProc.Size() - 1; j > 0; j--) {
 			switch (DecoderProc[j].Mnemonic) {
 			case DI_XOR:
-				data.pBytes[i] ^= DecoderProc[j].value ? DecoderProc[j].value : key;
+				data.Data()[i] ^= DecoderProc[j].value ? DecoderProc[j].value : key;
 				break;
 			case DI_NOT:
-				data.pBytes[i] = ~data.pBytes[i];
+				data.Data()[i] = ~data.Data()[i];
 				break;
 			case DI_NEG:
-				data.pBytes[i] = ~data.pBytes[i] + 1;
+				data.Data()[i] = ~data.Data()[i] + 1;
 				break;
 			case DI_ADD:
-				data.pBytes[i] -= DecoderProc[j].value ? DecoderProc[j].value : key;
+				data.Data()[i] -= DecoderProc[j].value ? DecoderProc[j].value : key;
 				break;
 			case DI_SUB:
-				data.pBytes[i] += DecoderProc[j].value ? DecoderProc[j].value : key;
+				data.Data()[i] += DecoderProc[j].value ? DecoderProc[j].value : key;
 			}
 		}
 		key = nextkey;
@@ -181,7 +181,7 @@ void GenerateUnpackingAlgorithm(_In_ ProtectedAssembler* pA, _In_ Label Entry) {
 
 Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal, _In_ IMAGE_TLS_DIRECTORY64 oTLS) {
 	// Setup
-	Buffer buf = { 0 };
+	Buffer buf;
 	Environment environment;
 	environment.setArch(Arch::kX64);
 	CodeHolder holder;
@@ -207,14 +207,14 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal, _In_ IMA
 		return buf;
 	}
 	buf.Allocate(holder.textSection()->buffer().size());
-	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
+	memcpy(buf.Data(), holder.textSection()->buffer().data(), buf.Size());
 	LOG(Success, MODULE_PACKER, "Generated TLS shellcode\n");
 	return buf;
 }
 
 Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ Buffer InternalShellcode) {
 	// Setup asmjit
-	Buffer buf = { 0 };
+	Buffer buf;
 	Environment environment;
 	environment.setArch(Arch::kX64);
 	CodeHolder holder;
@@ -249,26 +249,26 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	DWORD NumPacked = 0;
 	Data.sTask = "Compressing";
 	uint64_t DecompressKey = rand64();
-	compressing = InternalShellcode.u64Size;
+	compressing = InternalShellcode.Size();
 	Buffer CompressedInternal = PackSection(InternalShellcode);
-	if (!CompressedInternal.pBytes || !CompressedInternal.u64Size) return buf;
+	if (!CompressedInternal.Data() || !CompressedInternal.Size()) return buf;
 	for (WORD i = 0, n = pOriginal->SectionHeaders.Size(); i < n; i++) {
 		Data.fTotalProgress = (float)(i + 1) / (float)(n + 1);
 		if (!pOriginal->SectionHeaders[i].Misc.VirtualSize || !pOriginal->SectionHeaders[i].SizeOfRawData) continue;
 		
 		// Compress data
-		compressing = pOriginal->SectionData[i].u64Size;
+		compressing = pOriginal->SectionData[i].Size();
 		Buffer compressed = PackSection(pOriginal->SectionData[i]);
 		compressing = 0;
-		if (!compressed.pBytes || !compressed.u64Size) return buf;
-		LOG(Info, MODULE_PACKER, "Packed section %.8s (%lld)\n", pOriginal->SectionHeaders[i].Name, (int64_t)compressed.u64Size - pOriginal->SectionHeaders[i].SizeOfRawData);
-		if (compressed.u64Size > _UI32_MAX) {
+		if (!compressed.Data() || !compressed.Size()) return buf;
+		LOG(Info, MODULE_PACKER, "Packed section %.8s (%lld)\n", pOriginal->SectionHeaders[i].Name, (int64_t)compressed.Size() - pOriginal->SectionHeaders[i].SizeOfRawData);
+		if (compressed.Size() > _UI32_MAX) {
 			LOG(Failed, MODULE_PACKER, "Packed section size was too large\n");
-			LOG(Info, MODULE_PACKER, "Size: %p bytes\n", compressed.u64Size);
+			LOG(Info, MODULE_PACKER, "Size: %p bytes\n", compressed.Size());
 			LOG(Info, MODULE_PACKER, "Max size: %p bytes\n", _UI32_MAX);
 			return buf;
 		}
-		Copied.OverwriteSection(i, compressed.pBytes, compressed.u64Size);
+		Copied.OverwriteSection(i, compressed);
 		NumPacked++;
 	}
 	Data.sTask = "Generating loader";
@@ -296,7 +296,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	for (WORD i = 0, n = pOriginal->NTHeaders.FileHeader.NumberOfSections; i < n; i++) {
 		if (!pOriginal->SectionHeaders[i].Misc.VirtualSize || !pOriginal->SectionHeaders[i].SizeOfRawData) continue;
 		Buffer buf = Copied.SectionData[i];
-		for (int j = 0; j < buf.u64Size; j++) a.db(buf.pBytes[j]);
+		for (int j = 0; j < buf.Size(); j++) a.db(buf.Data()[j]);
 	}
 	size_t szOffSzShell = 0;
 	if (Options.Packing.bAntiDump) {
@@ -305,7 +305,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 		a.dq(0);
 	}
 	a.bind(InternalShell);
-	a.embed(CompressedInternal.pBytes, CompressedInternal.u64Size);
+	a.embed(CompressedInternal.Data(), CompressedInternal.Size());
 	
 	a.bind(CompressedSizes);
 	for (int i = 0; i < Copied.NTHeaders.FileHeader.NumberOfSections; i++) {
@@ -342,8 +342,8 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	ShellcodeData.Sha256_FinalOff = ShellcodeData.BaseAddress + holder.labelOffsetFromBase(Sha256_Final);
 	LOG(Info, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	buf.Allocate(holder.textSection()->buffer().size());
-	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
-	if (Options.Packing.bAntiDump) *reinterpret_cast<QWORD*>(buf.pBytes + szOffSzShell) = buf.u64Size;
+	memcpy(buf.Data(), holder.textSection()->buffer().data(), buf.Size());
+	if (Options.Packing.bAntiDump) *reinterpret_cast<QWORD*>(buf.Data() + szOffSzShell) = buf.Size();
 	CompressedInternal.Release();
 	LOG(Success, MODULE_PACKER, "Generated loader shellcode\n");
 	return buf;
@@ -351,7 +351,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 
 Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	// Setup asmjit
-	Buffer buf = { 0 };
+	Buffer buf;
 	Environment environment;
 	environment.setArch(Arch::kX64);
 	CodeHolder holder;
@@ -427,7 +427,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	// Handle original PE's imports
 	Label InternalRelOff;
 	Vector<IMAGE_IMPORT_DESCRIPTOR> Imports = pOriginal->GetImportedDLLs();
-	if (!Imports.nItems || !Imports.raw.pBytes || !Imports.raw.u64Size) {
+	if (!Imports.Size() || !Imports.Data()) {
 		if (Options.Packing.EncodingCounts <= 1) LOG(Warning, MODULE_PACKER, "No imports were found, assuming there are no imported DLLs.\n");
 		Label skip = a.newLabel();
 		a.jmp(skip);
@@ -641,7 +641,14 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 				j++;
 			}
 		}
-		ZeroMemory(Imports.raw.pBytes, Imports.raw.u64Size);
+
+		// Clear import directory
+		Imports.Release();
+		Buffer zero;
+		zero.Allocate(pOriginal->NTHeaders.OptionalHeader.DataDirectory[1].Size);
+		ZeroMemory(zero.Data(), zero.Size());
+		pOriginal->WriteRVA(pOriginal->NTHeaders.OptionalHeader.DataDirectory[1].VirtualAddress, zero.Data(), zero.Size());
+		zero.Release();
 
 		#include "modules/importer.inc"
 	}
@@ -682,10 +689,11 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			a.jnz(loop);
 		}
 
-		Buffer zero = { 0 };
+		// Clear relocation directory
+		Buffer zero;
 		zero.Allocate(pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].Size);
-		ZeroMemory(zero.pBytes, zero.u64Size);
-		pOriginal->WriteRVA(pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].VirtualAddress, zero.pBytes, zero.u64Size);
+		ZeroMemory(zero.Data(), zero.Size());
+		pOriginal->WriteRVA(pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].VirtualAddress, zero.Data(), zero.Size());
 		zero.Release();
 		pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].VirtualAddress = pOriginal->NTHeaders.OptionalHeader.DataDirectory[5].Size = 0;
 	}
@@ -726,10 +734,11 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			pCallbacks[i] = 0;
 		}
 
-		Buffer zero = { 0 };
+		// Clear TLS dir
+		Buffer zero;
 		zero.Allocate(pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].Size);
-		ZeroMemory(zero.pBytes, zero.u64Size);
-		pOriginal->WriteRVA(pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].VirtualAddress, zero.pBytes, zero.u64Size);
+		ZeroMemory(zero.Data(), zero.Size());
+		pOriginal->WriteRVA(pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].VirtualAddress, zero.Data(), zero.Size());
 		zero.Release();
 		pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].VirtualAddress = pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].Size = 0;
 	}
@@ -800,19 +809,19 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			DWORD ID = 0;
 			int count = 0;
 			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
-				Buffer buf = { 0 };
+				Buffer buf;
 				buf.Allocate(FunctionRanges[i].dwSize);
-				pOriginal->ReadRVA(FunctionRanges[i].dwStart, buf.pBytes, buf.u64Size);
+				pOriginal->ReadRVA(FunctionRanges[i].dwStart, buf.Data(), buf.Size());
 				FunctionBodies.Push(PackSection(buf));
-				ZeroMemory(buf.pBytes, buf.u64Size);
+				ZeroMemory(buf.Data(), buf.Size());
 				*reinterpret_cast<DWORD*>(PartialUnpackingHook + 2) = ID;
 				ID += FunctionRanges[i].Entries.Size();
 				for (int j = 0; j < FunctionRanges[i].Entries.Size(); j++) {
-					memcpy_s(buf.pBytes + FunctionRanges[i].Entries[j] - FunctionRanges[i].dwStart, buf.u64Size - (FunctionRanges[i].Entries[j] - FunctionRanges[i].dwStart), PartialUnpackingHook, sizeof(PartialUnpackingHook));
+					memcpy_s(buf.Data() + FunctionRanges[i].Entries[j] - FunctionRanges[i].dwStart, buf.Size() - (FunctionRanges[i].Entries[j] - FunctionRanges[i].dwStart), PartialUnpackingHook, sizeof(PartialUnpackingHook));
 				}
-				pOriginal->WriteRVA(FunctionRanges[i].dwStart, buf.pBytes, buf.u64Size);
+				pOriginal->WriteRVA(FunctionRanges[i].dwStart, buf.Data(), buf.Size());
 				buf.Release();
-				a.dq(FunctionBodies[FunctionBodies.Size() - 1].u64Size, FunctionRanges[i].Entries.Size());
+				a.dq(FunctionBodies[FunctionBodies.Size() - 1].Size(), FunctionRanges[i].Entries.Size());
 				count += FunctionRanges[i].Entries.Size();
 			}
 
@@ -820,7 +829,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 
 			a.bind(Compressed);
 			for (int i = 0; i < FunctionBodies.Size(); i++) {
-				a.embed(FunctionBodies[i].pBytes, FunctionBodies[i].u64Size);
+				a.embed(FunctionBodies[i].Data(), FunctionBodies[i].Size());
 				FunctionBodies[i].Release();
 			}
 			FunctionBodies.Release();
@@ -847,7 +856,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	}
 
 	buf.Allocate(holder.textSection()->buffer().size());
-	memcpy(buf.pBytes, holder.textSection()->buffer().data(), buf.u64Size);
+	memcpy(buf.Data(), holder.textSection()->buffer().data(), buf.Size());
 	LOG(Success, MODULE_PACKER, "Generated internal shellcode\n");
 	return buf;
 }
@@ -908,24 +917,20 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	}
 
 	// Setup DOS header & stub (e_lfanew is managed by PE)
-	pPackedBinary->DosStub.Allocate(pOriginal->DosStub.u64Size);
-	memcpy(pPackedBinary->DosStub.pBytes, pOriginal->DosStub.pBytes, pOriginal->DosStub.u64Size);
+	pPackedBinary->DosStub.Allocate(pOriginal->DosStub.Size());
+	memcpy(pPackedBinary->DosStub.Data(), pOriginal->DosStub.Data(), pOriginal->DosStub.Size());
 	pPackedBinary->DosHeader.e_magic = IMAGE_DOS_SIGNATURE;
-	pPackedBinary->DosHeader.e_lfanew = sizeof(IMAGE_DOS_HEADER) + pPackedBinary->DosStub.u64Size;
+	pPackedBinary->DosHeader.e_lfanew = sizeof(IMAGE_DOS_HEADER) + pPackedBinary->DosStub.Size();
 
 	// Save resources
 	IMAGE_TLS_DIRECTORY64 oTLS = pOriginal->ReadRVA<IMAGE_TLS_DIRECTORY64>(pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].VirtualAddress);
-	Buffer resources = { 0 };
+	Buffer resources;
 	if (Options.Packing.bDontCompressRsrc && pOriginal->NTHeaders.OptionalHeader.DataDirectory[2].Size && pOriginal->NTHeaders.OptionalHeader.DataDirectory[2].VirtualAddress) {
 		IMAGE_DATA_DIRECTORY rsrc = pOriginal->NTHeaders.OptionalHeader.DataDirectory[2];
-		IMAGE_SECTION_HEADER Header = pOriginal->SectionHeaders[pOriginal->FindSectionByRVA(rsrc.VirtualAddress)];
-		Buffer raw = pOriginal->SectionData[pOriginal->FindSectionByRVA(rsrc.VirtualAddress)];
-		if (!raw.pBytes || !raw.u64Size || !Header.PointerToRawData) {
+		resources.Allocate(rsrc.Size);
+		if (!pOriginal->ReadRVA(rsrc.VirtualAddress, resources.Data(), resources.Size())) {
 			LOG(Warning, MODULE_PACKER, "A resource section was present, but resources could not be read! (0x%p)\n", pOriginal->NTHeaders.OptionalHeader.ImageBase + rsrc.VirtualAddress);
-		} else {
-			resources.Allocate(rsrc.Size);
-			memcpy(resources.pBytes, raw.pBytes + rsrc.VirtualAddress - Header.VirtualAddress, resources.u64Size);
-			ZeroMemory(raw.pBytes + rsrc.VirtualAddress - Header.VirtualAddress, resources.u64Size);
+			resources.Release();
 		}
 	}
 
@@ -980,8 +985,8 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	ShellcodeData.EntryOff = 0x30 + (rand() & 0xCF);
 	Data.sTask = "Generating internal shellcode";
 	Buffer Internal = GenerateInternalShellcode(pOriginal, pPackedBinary);
-	if (!Internal.u64Size || !Internal.pBytes) return false;
-	SecHeader.Misc.VirtualSize = Internal.u64Size + pOriginal->NTHeaders.OptionalHeader.SizeOfImage - RVAOfFirst;
+	if (!Internal.Size() || !Internal.Data()) return false;
+	SecHeader.Misc.VirtualSize = Internal.Size() + pOriginal->NTHeaders.OptionalHeader.SizeOfImage - RVAOfFirst;
 	switch (Options.Packing.Immitate) {
 	case Themida:
 		memcpy(SecHeader.Name, ".themida", 8);
@@ -1009,7 +1014,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 			memcpy(SecHeader.Name, Options.Advanced.Sec1Name, 8);
 		}
 	}
-	pPackedBinary->InsertSection(0, NULL, SecHeader);
+	pPackedBinary->InsertSection(0, SecHeader);
 	SecHeader.VirtualAddress += SecHeader.Misc.VirtualSize;
 	SecHeader.VirtualAddress += (SecHeader.VirtualAddress % 0x1000) ? 0x1000 - (SecHeader.VirtualAddress % 0x1000) : 0;
 	ShellcodeData.BaseAddress = SecHeader.VirtualAddress;
@@ -1048,61 +1053,61 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	if (Options.Packing.bAntiPatch) {
 		CSha256 sha = { 0 };
 		Sha256_Init(&sha);
-		Sha256_Update(&sha, shell.pBytes, shell.u64Size);
+		Sha256_Update(&sha, shell.Data(), shell.Size());
 		Sha256_Final(&sha, (Byte*)&ShellcodeData.AntiPatchData.LoaderHash);
 	}
 	Internal.Release();
-	if (!shell.pBytes || !shell.u64Size) return false;
+	if (!shell.Data() || !shell.Size()) return false;
 
 	// TLS callback
 	IMAGE_TLS_DIRECTORY64 TLSDataDir = { 0 };
 	int nTLSEntries = 0;
 	if (ShellcodeData.bUsingTLSCallbacks) {
 		// Gen num of TLS
-		Buffer TLSBuffer = { 0 };
+		Buffer TLSBuffer;
 		Data.sTask = "Generating TLS data";
 		nTLSEntries = 1;
 		if (Options.Packing.bAntiDebug) nTLSEntries += 3 + rand() % 5;
 
 		// Setup
 		pNT->OptionalHeader.DataDirectory[9].Size = sizeof(IMAGE_TLS_DIRECTORY64);
-		pNT->OptionalHeader.DataDirectory[9].VirtualAddress = SecHeader.VirtualAddress + shell.u64Size;
+		pNT->OptionalHeader.DataDirectory[9].VirtualAddress = SecHeader.VirtualAddress + shell.Size();
 		TLSBuffer.Allocate(sizeof(uint64_t) * (nTLSEntries + 1) + sizeof(IMAGE_TLS_DIRECTORY64));
-		ShellcodeData.BaseAddress = SecHeader.VirtualAddress + shell.u64Size + TLSBuffer.u64Size;
+		ShellcodeData.BaseAddress = SecHeader.VirtualAddress + shell.Size() + TLSBuffer.Size();
 		TLSDataDir.AddressOfIndex = ShellcodeData.BaseAddress + pNT->OptionalHeader.ImageBase;
 		Buffer TLSCode = GenerateTLSShellcode(pPackedBinary, pOriginal, oTLS);
-		if (!TLSCode.u64Size || !TLSCode.pBytes) {
+		if (!TLSCode.Size() || !TLSCode.Data()) {
 			LOG(Failed, MODULE_PACKER, "Failed to generate TLS shellcode!\n");
 			return false;
 		}
 		TLSBuffer.Merge(TLSCode);
-		TLSDataDir.AddressOfCallBacks = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_TLS_DIRECTORY64) + pPackedBinary->NTHeaders.OptionalHeader.ImageBase;
+		TLSDataDir.AddressOfCallBacks = SecHeader.VirtualAddress + shell.Size() + sizeof(IMAGE_TLS_DIRECTORY64) + pPackedBinary->NTHeaders.OptionalHeader.ImageBase;
 		TLSDataDir.AddressOfIndex = TLSDataDir.StartAddressOfRawData = TLSDataDir.AddressOfCallBacks + sizeof(uint64_t) * nTLSEntries;
 		TLSDataDir.EndAddressOfRawData = TLSDataDir.StartAddressOfRawData + sizeof(uint64_t) * nTLSEntries;
 		
 		// Set TLS callbacks
-		uint64_t* pEntries = reinterpret_cast<uint64_t*>(TLSBuffer.pBytes + TLSBuffer.u64Size - (sizeof(uint64_t) * (nTLSEntries + 1) + TLSCode.u64Size));
+		uint64_t* pEntries = reinterpret_cast<uint64_t*>(TLSBuffer.Data() + TLSBuffer.Size() - (sizeof(uint64_t) * (nTLSEntries + 1) + TLSCode.Size()));
 		pEntries[nTLSEntries] = 0;
 		pEntries[0] = ShellcodeData.BaseAddress + pPackedBinary->NTHeaders.OptionalHeader.ImageBase + sizeof(DWORD);
 		for (int i = 1; i < nTLSEntries; i++) {
-			pEntries[i] = pPackedBinary->NTHeaders.OptionalHeader.ImageBase + SecHeader.VirtualAddress + shell.u64Size + resources.u64Size + pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].Size + 0x10000 + rand();
+			pEntries[i] = pPackedBinary->NTHeaders.OptionalHeader.ImageBase + SecHeader.VirtualAddress + shell.Size() + resources.Size() + pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].Size + 0x10000 + rand();
 		}
 
 		// TLS raw data
 		if (pOriginal->NTHeaders.OptionalHeader.DataDirectory[9].VirtualAddress) {
 			QWORD SizeOfData = oTLS.EndAddressOfRawData - oTLS.StartAddressOfRawData;
 			TLSDataDir.SizeOfZeroFill = oTLS.SizeOfZeroFill;
-			TLSDataDir.StartAddressOfRawData = pNT->OptionalHeader.ImageBase + shell.u64Size + TLSBuffer.u64Size;
+			TLSDataDir.StartAddressOfRawData = pNT->OptionalHeader.ImageBase + shell.Size() + TLSBuffer.Size();
 			TLSDataDir.EndAddressOfRawData = TLSDataDir.StartAddressOfRawData + SizeOfData;
-			TLSBuffer.Allocate(TLSBuffer.u64Size + SizeOfData);
-			pOriginal->ReadRVA(oTLS.StartAddressOfRawData - pOriginal->NTHeaders.OptionalHeader.ImageBase, TLSBuffer.pBytes + TLSBuffer.u64Size - (SizeOfData), SizeOfData);
+			TLSBuffer.Allocate(TLSBuffer.Size() + SizeOfData);
+			pOriginal->ReadRVA(oTLS.StartAddressOfRawData - pOriginal->NTHeaders.OptionalHeader.ImageBase, TLSBuffer.Data() + TLSBuffer.Size() - (SizeOfData), SizeOfData);
 		} else {
 			TLSDataDir.StartAddressOfRawData = TLSDataDir.AddressOfIndex;
 			TLSDataDir.EndAddressOfRawData = TLSDataDir.StartAddressOfRawData + sizeof(DWORD);
 		}
 
 		// Finalize
-		memcpy(TLSBuffer.pBytes, &TLSDataDir, sizeof(IMAGE_TLS_DIRECTORY64));
+		memcpy(TLSBuffer.Data(), &TLSDataDir, sizeof(IMAGE_TLS_DIRECTORY64));
 		shell.Merge(TLSBuffer);
 	}
 
@@ -1122,8 +1127,8 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 			}
 		}
 		Buffer reloc = GenerateRelocSection(Relocations);
-		pNT->OptionalHeader.DataDirectory[5].Size = reloc.u64Size;
-		pNT->OptionalHeader.DataDirectory[5].VirtualAddress = SecHeader.VirtualAddress + shell.u64Size;
+		pNT->OptionalHeader.DataDirectory[5].Size = reloc.Size();
+		pNT->OptionalHeader.DataDirectory[5].VirtualAddress = SecHeader.VirtualAddress + shell.Size();
 		shell.Merge(reloc);
 		Relocations.Release();
 #ifdef _DEBUG
@@ -1131,9 +1136,9 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 #endif
 
 	// Resources
-	if (Options.Packing.bDontCompressRsrc && resources.pBytes && resources.u64Size) {
-		pPackedBinary->NTHeaders.OptionalHeader.DataDirectory[2].Size = resources.u64Size;
-		pPackedBinary->NTHeaders.OptionalHeader.DataDirectory[2].VirtualAddress = SecHeader.VirtualAddress + shell.u64Size;
+	if (Options.Packing.bDontCompressRsrc && resources.Data() && resources.Size()) {
+		pPackedBinary->NTHeaders.OptionalHeader.DataDirectory[2].Size = resources.Size();
+		pPackedBinary->NTHeaders.OptionalHeader.DataDirectory[2].VirtualAddress = SecHeader.VirtualAddress + shell.Size();
 
 		// Translate addresses
 		Vector<DWORD> Offsets;
@@ -1141,14 +1146,14 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		IMAGE_RESOURCE_DIRECTORY* pDir;
 		IMAGE_RESOURCE_DIRECTORY_ENTRY* pEntry;
 		do {
-			pDir = reinterpret_cast<IMAGE_RESOURCE_DIRECTORY*>(resources.pBytes + Offsets.Pop());
+			pDir = reinterpret_cast<IMAGE_RESOURCE_DIRECTORY*>(resources.Data() + Offsets.Pop());
 			pEntry = reinterpret_cast<IMAGE_RESOURCE_DIRECTORY_ENTRY*>(reinterpret_cast<BYTE*>(pDir) + sizeof(IMAGE_RESOURCE_DIRECTORY));
 			pDir->TimeDateStamp = 0;
 			for (int i = 0; i < pDir->NumberOfNamedEntries + pDir->NumberOfIdEntries; i++) {
 				if (pEntry[i].DataIsDirectory) {
 					Offsets.Push(pEntry[i].OffsetToDirectory);
 				} else {
-					IMAGE_RESOURCE_DATA_ENTRY* pResource = reinterpret_cast<IMAGE_RESOURCE_DATA_ENTRY*>(resources.pBytes + pEntry[i].OffsetToData);
+					IMAGE_RESOURCE_DATA_ENTRY* pResource = reinterpret_cast<IMAGE_RESOURCE_DATA_ENTRY*>(resources.Data() + pEntry[i].OffsetToData);
 					pResource->OffsetToData += pPackedBinary->NTHeaders.OptionalHeader.DataDirectory[2].VirtualAddress - pOriginal->NTHeaders.OptionalHeader.DataDirectory[2].VirtualAddress;
 				}
 			}
@@ -1163,43 +1168,43 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		IMAGE_EXPORT_DIRECTORY OriginalExports = pOriginal->ReadRVA<IMAGE_EXPORT_DIRECTORY>(pOriginal->NTHeaders.OptionalHeader.DataDirectory[0].VirtualAddress);
 		Vector<DWORD> exports = pOriginal->GetExportedSymbolRVAs();
 		Vector<char*> names = pOriginal->GetExportedSymbolNames();
-		pNT->OptionalHeader.DataDirectory[0].VirtualAddress = SecHeader.VirtualAddress + shell.u64Size;
+		pNT->OptionalHeader.DataDirectory[0].VirtualAddress = SecHeader.VirtualAddress + shell.Size();
 
 		Exports.Base = OriginalExports.Base;
 		Exports.NumberOfFunctions = exports.Size();
 		Exports.NumberOfNames = names.Size();
-		Exports.AddressOfFunctions = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_EXPORT_DIRECTORY);
-		Exports.AddressOfNames = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_EXPORT_DIRECTORY) + sizeof(DWORD) * Exports.NumberOfFunctions;
-		Exports.AddressOfNameOrdinals = SecHeader.VirtualAddress + shell.u64Size + sizeof(IMAGE_EXPORT_DIRECTORY) + sizeof(DWORD) * (Exports.NumberOfFunctions + Exports.NumberOfNames);
+		Exports.AddressOfFunctions = SecHeader.VirtualAddress + shell.Size() + sizeof(IMAGE_EXPORT_DIRECTORY);
+		Exports.AddressOfNames = SecHeader.VirtualAddress + shell.Size() + sizeof(IMAGE_EXPORT_DIRECTORY) + sizeof(DWORD) * Exports.NumberOfFunctions;
+		Exports.AddressOfNameOrdinals = SecHeader.VirtualAddress + shell.Size() + sizeof(IMAGE_EXPORT_DIRECTORY) + sizeof(DWORD) * (Exports.NumberOfFunctions + Exports.NumberOfNames);
 		pNT->OptionalHeader.DataDirectory[0].Size = sizeof(IMAGE_EXPORT_DIRECTORY) + sizeof(DWORD) * (Exports.NumberOfFunctions + Exports.NumberOfNames) + sizeof(WORD) * Exports.NumberOfNames;
-		shell.Allocate(shell.u64Size + sizeof(IMAGE_EXPORT_DIRECTORY));
-		memcpy(shell.pBytes + shell.u64Size - sizeof(IMAGE_EXPORT_DIRECTORY), &Exports, sizeof(IMAGE_EXPORT_DIRECTORY));
+		shell.Allocate(shell.Size() + sizeof(IMAGE_EXPORT_DIRECTORY));
+		memcpy(shell.Data() + shell.Size() - sizeof(IMAGE_EXPORT_DIRECTORY), &Exports, sizeof(IMAGE_EXPORT_DIRECTORY));
 
 		// Export RVAs
-		shell.Allocate(shell.u64Size + exports.Size() * sizeof(DWORD));
+		shell.Allocate(shell.Size() + exports.Size() * sizeof(DWORD));
 		for (int i = 0; i < exports.Size(); i++) {
-			*reinterpret_cast<DWORD*>(shell.pBytes + shell.u64Size - sizeof(DWORD) * (exports.Size() - i)) = exports[i] + ShellcodeData.BaseOffset;
+			*reinterpret_cast<DWORD*>(shell.Data() + shell.Size() - sizeof(DWORD) * (exports.Size() - i)) = exports[i] + ShellcodeData.BaseOffset;
 		}
 
 		// Export names
-		shell.Allocate(shell.u64Size + names.Size() * sizeof(DWORD));
+		shell.Allocate(shell.Size() + names.Size() * sizeof(DWORD));
 		DWORD rva = Exports.AddressOfNameOrdinals + sizeof(WORD) * names.Size();
 		for (int i = 0; i < names.Size(); i++) {
-			*reinterpret_cast<DWORD*>(shell.pBytes + shell.u64Size - sizeof(DWORD) * (names.Size() - i)) = rva;
+			*reinterpret_cast<DWORD*>(shell.Data() + shell.Size() - sizeof(DWORD) * (names.Size() - i)) = rva;
 			rva += lstrlenA(names[i]) + 1;
 		}
 
 		// Export ordinals
-		shell.Allocate(shell.u64Size + names.Size() * sizeof(WORD));
+		shell.Allocate(shell.Size() + names.Size() * sizeof(WORD));
 		for (WORD i = 0; i < names.Size(); i++) {
-			*reinterpret_cast<WORD*>(shell.pBytes + shell.u64Size - sizeof(WORD) * (names.Size() - i)) = i;
+			*reinterpret_cast<WORD*>(shell.Data() + shell.Size() - sizeof(WORD) * (names.Size() - i)) = i;
 		}
 
 		// Export names
 		for (int i = 0; i < names.Size(); i++) {
 			int len = lstrlenA(names[i]) + 1;
-			shell.Allocate(shell.u64Size + len);
-			memcpy(shell.pBytes + shell.u64Size - len, names[i], len);
+			shell.Allocate(shell.Size() + len);
+			memcpy(shell.Data() + shell.Size() - len, names[i], len);
 			pNT->OptionalHeader.DataDirectory[0].Size += len;
 		}
 		names.Release();
@@ -1208,9 +1213,9 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	// Modify section
 	SecHeader.PointerToRawData = pNT->OptionalHeader.SizeOfHeaders;
 	SecHeader.PointerToRawData += (SecHeader.PointerToRawData % 0x200) ? 0x200 - (SecHeader.PointerToRawData % 0x200) : 0;
-	SecHeader.SizeOfRawData = SecHeader.Misc.VirtualSize = shell.u64Size;
-	pPackedBinary->InsertSection(pNT->FileHeader.NumberOfSections, shell.pBytes, SecHeader);
-	pNT->OptionalHeader.SizeOfImage = SecHeader.VirtualAddress + shell.u64Size;
+	SecHeader.SizeOfRawData = SecHeader.Misc.VirtualSize = shell.Size();
+	pPackedBinary->InsertSection(pNT->FileHeader.NumberOfSections, SecHeader, &shell);
+	pNT->OptionalHeader.SizeOfImage = SecHeader.VirtualAddress + shell.Size();
 	pNT->OptionalHeader.SizeOfImage += (pNT->OptionalHeader.SizeOfImage % 0x1000) ? 0x1000 - (pNT->OptionalHeader.SizeOfImage % 0x1000) : 0;
 	if (Options.Packing.bDelayedEntry) pPackedBinary->NTHeaders.OptionalHeader.AddressOfEntryPoint = pPackedBinary->SectionHeaders[0].VirtualAddress;
 
@@ -1232,7 +1237,7 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 		Sha256Digest Digest = { 0 };
 		Sha256_Init(&hash);
 		Sha256_Update(&hash, (Byte*)&pPackedBinary->DosHeader, sizeof(IMAGE_DOS_HEADER));
-		Sha256_Update(&hash, pPackedBinary->DosStub.pBytes, pPackedBinary->DosStub.u64Size);
+		Sha256_Update(&hash, pPackedBinary->DosStub.Data(), pPackedBinary->DosStub.Size());
 		Sha256_Update(&hash, (Byte*)&pPackedBinary->NTHeaders, sizeof(IMAGE_NT_HEADERS64));
 		Sha256_Final(&hash, (Byte*)&Digest);
 		pPackedBinary->WriteRVA<Sha256Digest>(pPackedBinary->GetTLSCallbacks()[0] - pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.AntiPatchData.dwOffHeaderSum, Digest);
