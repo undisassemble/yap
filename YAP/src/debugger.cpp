@@ -9,7 +9,6 @@
 
 #include "util.hpp"
 #include "debugger.hpp"
-#include <minwinbase.h>
 #include <tlhelp32.h>
 #include <winternl.h>
 #include <dbghelp.h>
@@ -69,7 +68,7 @@ void LaunchAsDebugger() {
 				context = GenerateRegisterList(event.dwThreadId);
 				GenerateModuleList();
 				GenerateStackTrace(context);
-				MessageBoxA(NULL, "A crash has occurred, check yap.log.txt and except.txt for more details.\n\nIf possible, consider sending yap.log.txt and except.txt to contact@undisassemble.dev or opening a GitHub issue to have this (hopefully) fixed.", "YAP has crashed", MB_OK | MB_ICONERROR);
+				if (event.u.ExitProcess.dwExitCode) MessageBoxA(NULL, "A crash has occurred, check yap.log.txt and except.txt for more details.\n\nIf possible, consider sending yap.log.txt and except.txt to contact@undisassemble.dev or opening a GitHub issue to have this (hopefully) fixed.", "YAP has crashed", MB_OK | MB_ICONERROR);
 				break;
 			}
 
