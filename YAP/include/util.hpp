@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2025-05-01
+ * @date 2025-05-25
  * @copyright MIT License
  */
 
@@ -33,6 +33,7 @@
 #define MODULE_VM "VM"
 #define MODULE_PACKER "Packer"
 #define MODULE_REASSEMBLER "ReAsm"
+#define MODULE_RELIB "ReLib"
 
 /*!
  * @brief Logging prefixes

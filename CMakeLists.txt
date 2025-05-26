@@ -173,16 +173,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 	else()
 		message(STATUS "Could not find NSIS, skipping installer")
 	endif()
-
-	# Docs
-	find_program(DOXYGEN_PATH doxygen)
-	if (DOXYGEN_PATH)
-		message(STATUS "Will generate docs")
-		file(GLOB DOX_SOURCES "YAP/include/*.hpp")
-		add_custom_target(docs ALL ${DOXYGEN_PATH} COMMAND ${Python3_EXECUTABLE} docs/convert.py DEPENDS ${DOX_SOURCES} DEPENDS ${DOX_SOURCES})
-	else()
-		message(WARNING "Could not find Doxygen, skipping docs")
-	endif()
 endif()
 
 ##### TESTS #####

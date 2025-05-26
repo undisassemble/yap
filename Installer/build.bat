@@ -28,4 +28,3 @@ ECHO Building installer
 makensis /DINSTALLSIZE=!INSTALLSIZE! /DVERSION="@PROJECT_VERSION@" /V1 "main.nsi"
 
 endlocal
-pause

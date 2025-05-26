@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-05-01
+ * @date 2025-05-25
  * @copyright MIT License
  */
 
@@ -39,19 +39,19 @@ Asm* pAssembly = NULL;
 void ReLibLogError(const char* message, ...) {
 	va_list args;
 	va_start(args, message);
-	vLOG(Failed, MODULE_REASSEMBLER, message, args);
+	vLOG(Failed, MODULE_RELIB, message, args);
 	va_end(args);
 }
 void ReLibLogWarn(const char* message, ...) {
 	va_list args;
 	va_start(args, message);
-	vLOG(Warning, MODULE_REASSEMBLER, message, args);
+	vLOG(Warning, MODULE_RELIB, message, args);
 	va_end(args);
 }
 void ReLibLog(const char* message, ...) {
 	va_list args;
 	va_start(args, message);
-	vLOG(Info, MODULE_REASSEMBLER, message, args);
+	vLOG(Info, MODULE_RELIB, message, args);
 	va_end(args);
 }
 
@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--help")) {
 			Console::SetupConsole();
-			Console::help("YAP");
+			Console::help(argv[0]);
 			return 0;
 		} else if (!strcmp(argv[i], "--version")) {
 			Console::SetupConsole();
