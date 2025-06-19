@@ -21,10 +21,9 @@ Mem_alloc:
 	mov edx, 0
 	mov rcx, PEB
 	mov rcx, [rcx + 0x30]
-	push rsi
-	push rbx
+	sub rsp, 0x20
 	call [ptr_HeapAlloc]
-	add rsp, 0x10
+	add rsp, 0x20
 	ret
 
 ; Free
@@ -35,10 +34,9 @@ Mem_free:
 	mov edx, 0
 	mov rcx, PEB
 	mov rcx, [rcx + 0x30]
-	push rsi
-	push rbx
+	sub rsp, 0x20
 	call [ptr_HeapFree]
-	add rsp, 0x10
+	add rsp, 0x20
 	ret
 
 NTD:

@@ -232,10 +232,10 @@ ShellcodeData.Labels.GetProcAddress:
     push rbp
     mov r12d, 0
     mov r8d, [rcx + 0x3C]
+    mov ebp, [rcx + r8 + 0x8C]
     mov r8d, [rcx + r8 + 0x88]
     mov esi, r8d
     add rsi, rcx
-    mov ebp, [rcx + r8 + 0x8C]
     add rbp, rsi
     mov r9d, [rcx + r8 + 0x18]
     mov r10d, [rcx + r8 + 0x20]

@@ -5,7 +5,7 @@
  * @version 0.0.0
  * @date 2025-05-23
  * @copyright MIT License
- * 
+ *
  * @bug Mutation causes DLL entry points to not be called
  * @todo Add (optional) Wine support
  * @todo Fix partial loading
@@ -15,6 +15,9 @@
  * @todo Anti-VM
  * @todo Bundling
  * @todo Proxying
+ * @todo Manual mapped DLLs
+ * @todo Add MessageBox errors for things like missing dlls or other errors
+ * @todo Check to make sure shadow space is allocated correctly
  */
 
 #include "packer.hpp"
