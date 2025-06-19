@@ -32,7 +32,6 @@ cmake --build .
 
 - [Main page](https://undisassemble.dev/yap)
 - [GitHub](https://github.com/undisassemble/yap)
-- [Features](docs/features.md)
 - [SDK Documentation](https://undisassemble.dev/yap/docs/yap_8h.html)
 
 
