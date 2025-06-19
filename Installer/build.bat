@@ -7,7 +7,7 @@ ECHO Preparing to build installer
 
 REM Copy required files
 COPY /B /V "..\..\Installer\yap.bat" "yap.bat"
-COPY /B /V "..\..\LICENSE" "LICENSE"
+COPY /B /V "..\..\Installer\LICENSES" "LICENSE"
 
 REM Calculate installed size
 FOR /F "usebackq" %%A IN ('asmjit.dll') DO SET /a INSTALLSIZE=INSTALLSIZE+%%~zA

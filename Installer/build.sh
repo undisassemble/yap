@@ -6,7 +6,7 @@ INSTALLSIZE=0
 # Prep
 echo "Preparing to build installer"
 cp "../../Installer/yap.bat" "."
-cp "../../LICENSE" "."
+cp "../../Installer/LICENSES" "LICENSE"
 INSTALLSIZE=$(($INSTALLSIZE + $(stat --printf="%s" "asmjit.dll")))
 INSTALLSIZE=$(($INSTALLSIZE + $(stat --printf="%s" "glfw3.dll")))
 INSTALLSIZE=$(($INSTALLSIZE + $(stat --printf="%s" "imgui.dll")))
