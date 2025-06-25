@@ -517,7 +517,6 @@ bool BeginGUI() {
 	config.MergeMode = true;
 	config.GlyphMinAdvanceX = 16.f;
 	io.Fonts->AddFontFromMemoryCompressedTTF(icons_compressed_data, icons_compressed_size, 16.f, &config, range);
-	if (!io.Fonts->Build()) return false;
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.Colors[ImGuiCol_WindowBg] = ImColor(25, 25, 25, 255);
 	style.Colors[ImGuiCol_PopupBg] = ImColor(20, 20, 20, 240);
