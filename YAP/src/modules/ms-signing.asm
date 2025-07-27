@@ -8,24 +8,9 @@
     test rax, rax
     strict
     jz ret
-    %if Options.Advanced.bMutateAssembly
-        strict
-        jnz skippolicy
-    %else
-        jmp skippolicy
-    %endif
-
-    align AlignMode::kCode, alignof(PROCESS_MITIGATION_POLICY)
-
-policy:
-    embed &_policy, sizeof(PROCESS_MITIGATION_POLICY)
-    align AlignMode::kZero, alignof(PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY)
-    embed &sig_policy, sizeof(PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY)
-
-skippolicy:
     mov edx, 52
     lea r8, [policy]
-    mov r9d, holder.labelOffset(skippolicy) - holder.labelOffset(policy)
+    mov r9d, holder.labelOffset(NTD) - holder.labelOffset(policy)
     %if Options.Packing.bDirectSyscalls
         mov r10, 0xFFFFFFFFFFFFFFFF
         mov ecx, [rax]

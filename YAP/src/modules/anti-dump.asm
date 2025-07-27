@@ -1,14 +1,5 @@
 %define ASSEMBLER a.
-
-    jmp skip
-
-    align AlignMode::kCode, alignof(DWORD)
-KRN:
-    embed &Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest)
-VRT:
-    embed &Sha256Str("VirtualProtect"), sizeof(Sha256Digest)
     
-skip:
     mov rax, PEB
     mov qword [rax + 0x10], 0
     lea rcx, [KRN]
@@ -29,7 +20,7 @@ skip:
     mov edx, [rdx + offsetof(IMAGE_NT_HEADERS64, OptionalHeader.SizeOfHeaders)]
     push rdx
     push rcx
-    lea r9, [KRN]
+    lea r9, [TMP]
     mov rsi, rax
     sub rsp, 0x18
     mov r8, rsp

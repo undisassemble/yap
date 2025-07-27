@@ -1,16 +1,5 @@
 %define ASSEMBLER a.
 
-    jmp skipdata
-
-    align AlignMode::kCode, alignof(CONTEXT)
-Context:
-    embed &context, sizeof(CONTEXT)
-NTD:
-    embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
-GCT:
-    embed &Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest)
-
-skipdata:
     lea rcx, [NTD]
     call ShellcodeData.Labels.GetModuleHandleW
     mov rcx, rax

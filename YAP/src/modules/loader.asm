@@ -13,6 +13,53 @@
 message:
 		embed Options.Packing.Message, lstrlenA(Options.Packing.Message) + 1
 	%endif
+
+	%if Options.Packing.bAntiDebug
+    	align AlignMode::kZero, alignof(CONTEXT)
+Context:
+		; RAW_C CONTEXT context = { 0 };
+		; RAW_C context.ContextFlags = CONTEXT_ALL;
+    	embed &context, sizeof(CONTEXT)
+GCT:
+    	embed &Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest)
+	%endif
+
+	%if Options.Packing.bAntiDump
+    	align AlignMode::kZero, alignof(DWORD)
+TMP:
+		dd 0
+VRT:
+    	embed &Sha256Str("VirtualProtect"), sizeof(Sha256Digest)
+	%endif
+
+	%if Options.Packing.bMitigateSideloading
+DIR:
+   		embed &Sha256Str("SetDllDirectoryA"), sizeof(Sha256Digest)
+SSP:
+   		embed &Sha256Str("SetSearchPathMode"), sizeof(Sha256Digest)
+ZRO:
+		db 0
+	%endif
+
+	%if Options.Packing.bOnlyLoadMicrosoft
+		align AlignMode::kCode, alignof(PROCESS_MITIGATION_POLICY)
+		; RAW_C PROCESS_MITIGATION_POLICY _policy = ProcessSignaturePolicy;
+		; RAW_C PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY sig_policy = { 0 };
+		; RAW_C sig_policy.MicrosoftSignedOnly = 1;
+policy:
+		embed &_policy, sizeof(PROCESS_MITIGATION_POLICY)
+		align AlignMode::kZero, alignof(PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY)
+		embed &sig_policy, sizeof(PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY)
+	%endif
+
+NTD:
+	embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
+Reloc:
+	dq ShellcodeData.BaseAddress + a.offset() + pPackedBinary->NTHeaders.OptionalHeader.ImageBase
+KRN:
+   	embed &Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest)
+SIP:
+	embed &Sha256Str("ZwSetInformationProcess"), sizeof(Sha256Digest)
 	align AlignMode::kZero, alignof(CSha256)
 ; GLOBAL
 hash:
@@ -21,6 +68,7 @@ hash:
 ; GLOBAL
 digest:
 	embed &_digest, sizeof(_digest)
+
 ret:
 	add rsp, 0x40
 	garbage
@@ -51,17 +99,6 @@ _entry:
 	desync_mov rdx
 	
 	; Get base offset
-	jmp SkipReloc
-Reloc:
-	dq ShellcodeData.BaseAddress + a.offset() + pPackedBinary->NTHeaders.OptionalHeader.ImageBase
-	%if Options.Packing.bOnlyLoadMicrosoft
-NTD:
-		embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
-SIP:
-		embed &Sha256Str("ZwSetInformationProcess"), sizeof(Sha256Digest)
-	%endif
-	garbage
-SkipReloc:
 	lea rax, [Reloc]
 	sub rax, [rax]
 	mov [Reloc], rax
@@ -75,14 +112,9 @@ SkipReloc:
 		%include "modules/anti-sideloading.inc"
 	%endif
 	%if Options.Packing.bOnlyLoadMicrosoft
-		; RAW_C PROCESS_MITIGATION_POLICY _policy = ProcessSignaturePolicy;
-		; RAW_C PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY sig_policy = { 0 };
-		; RAW_C sig_policy.MicrosoftSignedOnly = 1;
 		%include "modules/ms-signing.inc"
 	%endif
 	%if Options.Packing.bAntiDebug
-		; RAW_C CONTEXT context = { 0 };
-		; RAW_C context.ContextFlags = CONTEXT_ALL;
 		%include "modules/anti-debug-main.inc"
 	%endif
 	%if Options.Packing.bAntiVM
@@ -140,6 +172,8 @@ decompressloop:
 	desync
 	mov rax, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset + pOriginal->NTHeaders.OptionalHeader.SizeOfImage
 	add rax, rcx
+
+	; Call internal
 	%if Options.Packing.bAntiDump
 		lea rcx, [rip]
 		sub rcx, a.offset()
