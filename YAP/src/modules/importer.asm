@@ -1,7 +1,15 @@
 %define ASSEMBLER a.
 
+FL_LDER:
+    embed "Failed to initialize", 21
+MS_DLL:
+    embed "Failed to load DLL", 19
+IMP_NM:
+    embed "Failed to get address of imported function", 43
+
 ; GLOBAL
 skip:
+    lea rsi, [FL_LDER]
     lea rax, [InternalRelOff]
     sub rax, [rax]
     mov [InternalRelOff], rax
@@ -9,13 +17,17 @@ skip:
     call ShellcodeData.Labels.GetModuleHandleW
     test rax, rax
     strict
-    jz ret
+    cmovz rcx, rsi
+    strict
+    jz ShellcodeData.Labels.FatalError
     mov rcx, rax
     lea rdx, [LLA]
     call ShellcodeData.Labels.GetProcAddress
     test rax, rax
     strict
-    jz ret
+    cmovz rcx, rsi
+    strict
+    jz ShellcodeData.Labels.FatalError
     mov rsi, rax
     lea rdi, [import_offsets]
     %if Options.Packing.bHideIAT
@@ -53,9 +65,10 @@ do_item:
         or rcx, r8
     %endif
     call ShellcodeData.Labels.GetProcAddress
+    lea rcx, [IMP_NM]
     test rax, rax
     strict
-    jz ret
+    jz ShellcodeData.Labels.FatalError
 
 skiptest:
     %if !Options.Packing.bHideIAT
@@ -112,6 +125,10 @@ do_lib:
     sub rsp, 0x20
     call rsi
     add rsp, 0x20
+    lea rcx, [MS_DLL]
+    test rax, rax
+    strict
+    jz ShellcodeData.Labels.FatalError
     pop rcx
     add rsp, rcx
     mov r14, rax

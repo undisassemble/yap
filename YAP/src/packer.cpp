@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-08-17
+ * @date 2025-08-18
  * @copyright MIT License
  *
  * @bug Mutation causes DLL entry points to not be called
@@ -376,6 +376,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	ShellcodeData.Labels.GetProcAddressByOrdinal = a.newLabel();
 	ShellcodeData.Labels.GetProcAddress = a.newLabel();
 	ShellcodeData.Labels.RtlZeroMemory = a.newLabel();
+	ShellcodeData.Labels.FatalError = a.newLabel();
 
 	// PEB memory thingy (gs:[0x60])
 	Mem PEB = ptr(0x60);

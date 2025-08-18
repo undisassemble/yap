@@ -69,7 +69,7 @@ PT:
     dq rand64()
     dq rand64()
 MSGBX:
-    embed &Sha256Str("MessageBoxA"), sizeof(Sha256Digest) 
+    embed &Sha256Str("MessageBoxA"), sizeof(Sha256Digest)
 SIP:
 	embed &Sha256Str("ZwSetInformationProcess"), sizeof(Sha256Digest)
 	align AlignMode::kZero, alignof(CSha256)

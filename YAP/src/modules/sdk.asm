@@ -1,5 +1,15 @@
 %define ASSEMBLER a.
 
+    align AlignMode::kCode, alignof(LPCSTR)
+USR:
+    embed "USER32.dll", 11
+ERR:
+	embed "Error", 6
+MSGBX:
+    embed &Sha256Str("MessageBoxA"), sizeof(Sha256Digest)
+EXT:
+    embed &Sha256Str("ExitProcess"), sizeof(Sha256Digest)
+
 ; GetLastError
 %if ShellcodeData.RequestedFunctions.GetLastError.bRequested
 ; GLOBAL
@@ -27,6 +37,38 @@ ShellcodeData.RequestedFunctions.GetSelf.Func:
     add rax, [InternalRelOff]
     ret
 %endif
+
+; GLOBAL
+ShellcodeData.Labels.FatalError:
+    desync
+    mov rsi, rcx
+    lea rcx, [KRN]
+    call ShellcodeData.Labels.GetModuleHandleW
+    mov rbx, rax
+    mov rcx, rax ; Ignore failures here, if it crashes in this function theres not much that can be done
+    lea rdx, [LLA]
+    call ShellcodeData.Labels.GetProcAddress
+    lea rcx, [USR]
+    sub rsp, 0x20
+    call rax
+    add rsp, 0x20
+    mov rcx, rax
+    lea rdx, [MSGBX]
+    call ShellcodeData.Labels.GetProcAddress
+    mov rcx, 0
+    mov rdx, rsi
+    lea r8, [ERR]
+    mov r9, MB_OK | MB_ICONERROR
+    sub rsp, 0x20
+    call rax
+    add rsp, 0x20
+    mov rcx, rbx
+    lea rdx, [EXT]
+    call ShellcodeData.Labels.GetProcAddress
+    mov rcx, 1
+    sub rsp, 0x20
+    call rax
+    add rsp, 0x20
 
 ; GetModuleHandleW
 ; GLOBAL
