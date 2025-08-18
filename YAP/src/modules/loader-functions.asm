@@ -1,5 +1,52 @@
 %define ASSEMBLER a.
 
+
+LLA:
+    embed &Sha256Str("LoadLibraryA"), sizeof(Sha256Digest)
+    align AlignMode::kCode, 0x10
+MSGBX:
+    embed &Sha256Str("MessageBoxA"), sizeof(Sha256Digest) 
+ERR:
+	embed "Error", 6
+USR:
+    embed "USER32.dll", 11
+KRN:
+   	embed &Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest)
+EXT:
+    embed &Sha256Str("ExitProcess"), sizeof(Sha256Digest)
+
+; GLOBAL
+ShellcodeData.Labels.FatalError:
+    desync
+    mov rsi, rcx
+    lea rcx, [KRN]
+    call ShellcodeData.Labels.GetModuleHandleW
+    mov rbx, rax
+    mov rcx, rax ; Ignore failures here, if it crashes in this function theres not much that can be done
+    lea rdx, [LLA]
+    call ShellcodeData.Labels.GetProcAddress
+    lea rcx, [USR]
+    sub rsp, 0x20
+    call rax
+    add rsp, 0x20
+    mov rcx, rax
+    lea rdx, [MSGBX]
+    call ShellcodeData.Labels.GetProcAddress
+    mov rcx, 0
+    mov rdx, rsi
+    lea r8, [ERR]
+    mov r9, MB_OK | MB_ICONERROR
+    sub rsp, 0x20
+    call rax
+    add rsp, 0x20
+    mov rcx, rbx
+    lea rdx, [EXT]
+    call ShellcodeData.Labels.GetProcAddress
+    mov rcx, 1
+    sub rsp, 0x20
+    call rax
+    add rsp, 0x20
+
 ; GetModuleHandleW
 ; GLOBAL
 ShellcodeData.Labels.GetModuleHandleW:

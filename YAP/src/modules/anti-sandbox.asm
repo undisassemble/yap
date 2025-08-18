@@ -1,25 +1,6 @@
 %define ASSEMBLER a.
 
-    jmp _skip
-
-    align AlignMode::kCode, alignof(LPCSTR)
-USR:
-    embed "USER32.dll", 11
-GCP:
-    embed &Sha256Str("GetCursorPos"), sizeof(Sha256Digest)
-SLP:
-    embed &Sha256Str("Sleep"), sizeof(Sha256Digest)
-_KRN:
-    embed &Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest)
-LLA:
-    embed &Sha256Str("LoadLibraryA"), sizeof(Sha256Digest)
-    align AlignMode::kCode, 0x10
-PT:
-    dq rand64()
-    dq rand64()
-
-_skip:
-    lea rcx, [_KRN]
+    lea rcx, [KRN]
     call ShellcodeData.Labels.GetModuleHandleW
     test rax, rax
     strict
@@ -44,10 +25,9 @@ _skip:
     sub rsp, rcx
     push rcx
     lea rcx, [USR]
-    push rsi
-    push rbx
+    sub rsp, 0x20
     call rax
-    add rsp, 0x10
+    add rsp, 0x20
     pop rcx
     add rsp, rcx
     test rax, rax

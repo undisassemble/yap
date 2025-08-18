@@ -65,6 +65,7 @@ struct _ShellcodeData {
 		Label GetProcAddress;
 		Label RtlZeroMemory;
 		Label RelocDiff;
+		Label FatalError;
 	} Labels;
 
 	struct {

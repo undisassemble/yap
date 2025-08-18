@@ -58,6 +58,18 @@ Reloc:
 	dq ShellcodeData.BaseAddress + a.offset() + pPackedBinary->NTHeaders.OptionalHeader.ImageBase
 KRN:
    	embed &Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest)
+GCP:
+    embed &Sha256Str("GetCursorPos"), sizeof(Sha256Digest)
+SLP:
+    embed &Sha256Str("Sleep"), sizeof(Sha256Digest)
+LLA:
+    embed &Sha256Str("LoadLibraryA"), sizeof(Sha256Digest)
+    align AlignMode::kCode, 0x10
+PT:
+    dq rand64()
+    dq rand64()
+MSGBX:
+    embed &Sha256Str("MessageBoxA"), sizeof(Sha256Digest) 
 SIP:
 	embed &Sha256Str("ZwSetInformationProcess"), sizeof(Sha256Digest)
 	align AlignMode::kZero, alignof(CSha256)
@@ -73,6 +85,10 @@ ret:
 	add rsp, 0x40
 	garbage
 	ret
+
+    align AlignMode::kCode, alignof(LPCSTR)
+USR:
+    embed "USER32.dll", 11
 
 	; Entry point
 _entry:

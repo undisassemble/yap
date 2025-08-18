@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-05-23
+ * @date 2025-08-17
  * @copyright MIT License
  *
  * @bug Mutation causes DLL entry points to not be called
@@ -230,6 +230,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	ShellcodeData.Labels.GetModuleHandleW = a.newLabel();
 	ShellcodeData.Labels.GetProcAddress = a.newLabel();
 	ShellcodeData.Labels.RtlZeroMemory = a.newLabel();
+	ShellcodeData.Labels.FatalError = a.newLabel();
 	Mem PEB = ptr(0x60);
 	PEB.setSegment(gs);
 	CSha256 sha = { 0 };

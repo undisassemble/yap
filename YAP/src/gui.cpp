@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-05-16
+ * @date 2025-08-17
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -158,9 +158,9 @@ void DrawGUI() {
 			FeatureInfo("If enabled, you must use GetSelf() instead of GetModuleHandleA(NULL) to get the applications base address.");
 			IMGUI_TOGGLE("Anti-debug", Options.Packing.bAntiDebug);
 			ImGui::SetItemTooltip("Prevent debuggers from attaching to process.");
-			DEBUG_ONLY(IMGUI_TOGGLE("Anti-patch", Options.Packing.bAntiPatch));
-			DEBUG_ONLY(ImGui::SetItemTooltip("Verify signature of binary before loading.\n"));
-			DEBUG_ONLY(DebugWarning());
+			// DEBUG_ONLY(IMGUI_TOGGLE("Anti-patch", Options.Packing.bAntiPatch));
+			// DEBUG_ONLY(ImGui::SetItemTooltip("Verify signature of binary before loading.\n"));
+			// DEBUG_ONLY(DebugWarning());
 			DEBUG_ONLY(IMGUI_TOGGLE("Anti-VM", Options.Packing.bAntiVM));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a virtual machine."));
 			DEBUG_ONLY(ImGui::SameLine());
@@ -170,13 +170,13 @@ void DrawGUI() {
 			DEBUG_ONLY(IMGUI_TOGGLE("Anti-sandbox", Options.Packing.bAntiSandbox));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a sandboxed environment."));
 			DEBUG_ONLY(DebugWarning());
-			DEBUG_ONLY(if (Options.Packing.bDelayedEntry && Options.Packing.Immitate == ExeStealth) Options.Packing.Immitate = YAP);
-			DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::BeginDisabled());
-			DEBUG_ONLY(IMGUI_TOGGLE("Partial unpacking", Options.Packing.bPartialUnpacking));
-			DEBUG_ONLY(ImGui::SetItemTooltip(Options.Reassembly.bEnabled ? "Only allows one function to be loaded at a time, preventing the whole program from being dumped at once." : "Requires reassembler to be enabled"));
-			DEBUG_ONLY(FeatureWarning("This feature is not threadsafe, and only works on single threaded apps."));
-			DEBUG_ONLY(DebugWarning());
-			DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::EndDisabled());
+			// DEBUG_ONLY(if (Options.Packing.bDelayedEntry && Options.Packing.Immitate == ExeStealth) Options.Packing.Immitate = YAP);
+			// DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::BeginDisabled());
+			// DEBUG_ONLY(IMGUI_TOGGLE("Partial unpacking", Options.Packing.bPartialUnpacking));
+			// DEBUG_ONLY(ImGui::SetItemTooltip(Options.Reassembly.bEnabled ? "Only allows one function to be loaded at a time, preventing the whole program from being dumped at once." : "Requires reassembler to be enabled"));
+			// DEBUG_ONLY(FeatureWarning("This feature is not threadsafe, and only works on single threaded apps."));
+			// DEBUG_ONLY(DebugWarning());
+			// DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::EndDisabled());
 			ImGui::Combo("Immitate packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
 			ImGui::SetItemTooltip("Changes some details about the packed binary to make it look like another packer.");
 			IMGUI_TOGGLE("Process masquerading", Options.Packing.bEnableMasquerade);
