@@ -2,12 +2,17 @@
 
     lea rcx, [NTD]
     call ShellcodeData.Labels.GetModuleHandleW
+    lea rcx, [ADDRFL]
+    test rax, rax
+    strict
+    jz ShellcodeData.Labels.FatalError
     mov rcx, rax
     lea rdx, [GCT]
     call ShellcodeData.Labels.GetProcAddress
+    lea rcx, [ADDRFL]
     test rax, rax
     strict
-    jz ret
+    jz ShellcodeData.Labels.FatalError
     lea rdx, [Context]
     mov rsi, rdx
     %if Options.Packing.bDirectSyscalls
@@ -23,20 +28,21 @@
         call rax
     %endif
     mov rdx, rsi
+    lea rcx, [DBGFL]
     test rax, rax
     strict
-    jnz ret
+    jnz ShellcodeData.Labels.FatalError
     mov rax, [rdx + offsetof(CONTEXT, Dr7)]
     and rax, 0x20FF
     strict
-    jnz ret
+    jnz ShellcodeData.Labels.FatalError
     mov rax, [rdx + offsetof(CONTEXT, Dr6)]
     and rax, 0x18F
     strict
-    jnz ret
+    jnz ShellcodeData.Labels.FatalError
     mov rax, [rdx + offsetof(CONTEXT, Dr0)]
     or rax, [rdx + offsetof(CONTEXT, Dr1)]
     or rax, [rdx + offsetof(CONTEXT, Dr2)]
     or rax, [rdx + offsetof(CONTEXT, Dr3)]
     strict
-    jnz ret
+    jnz ShellcodeData.Labels.FatalError

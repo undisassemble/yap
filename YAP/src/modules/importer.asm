@@ -1,9 +1,12 @@
 %define ASSEMBLER a.
 
+    align AlignMode::kCode, alignof(LPCSTR)
 FL_LDER:
     embed "Failed to initialize", 21
+    align AlignMode::kCode, alignof(LPCSTR)
 MS_DLL:
     embed "Failed to load DLL", 19
+    align AlignMode::kCode, alignof(LPCSTR)
 IMP_NM:
     embed "Failed to get address of imported function", 43
 

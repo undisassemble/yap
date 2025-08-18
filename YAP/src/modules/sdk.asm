@@ -3,6 +3,7 @@
     align AlignMode::kCode, alignof(LPCSTR)
 USR:
     embed "USER32.dll", 11
+    align AlignMode::kCode, alignof(LPCSTR)
 ERR:
 	embed "Error", 6
 MSGBX:
