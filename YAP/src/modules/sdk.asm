@@ -519,9 +519,9 @@ GetProcAddress_lp:
     sub rsp, rcx
     push rcx
     mov rcx, rax
-    sub rsp, 0x40
+    sub rsp, 0x20
     call r12
-    add rsp, 0x40
+    add rsp, 0x20
     pop rcx
     add rsp, rcx
     pop r15

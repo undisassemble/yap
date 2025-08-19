@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-08-18
+ * @date 2025-08-19
  * @copyright MIT License
  *
  * @bug Mutation causes DLL entry points to not be called
@@ -17,7 +17,6 @@
  * @todo Proxying
  * @todo Manual mapped DLLs
  * @todo Add MessageBox errors for things like missing dlls or other errors
- * @todo Check to make sure shadow space is allocated correctly
  */
 
 #include "packer.hpp"

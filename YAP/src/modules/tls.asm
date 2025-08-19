@@ -45,7 +45,9 @@ isloaded:
 			mov rcx, [rsp]
 			mov rdx, [rsp + 0x08]
 			mov r8, [rsp + 0x10]
+			sub rsp, 0x20
 			call rax
+			add rsp, 0x20
 		; RAW_C }
 		; RAW_C TLSCallbacks.Release();
 		pop rcx
