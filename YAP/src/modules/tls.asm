@@ -212,7 +212,6 @@ hidethread:
 		mov rdx, 17
 		mov r8, 0
 		%if Options.Packing.bDirectSyscalls
-            mov r10, 0xFFFFFFFFFFFFFFFE
 			lea r9, [thingy]
 			mov ecx, [rax]
 			cmp ecx, 0xB8D18B4C
@@ -227,10 +226,16 @@ thingy:
 			mov r9, 0
 			syscall
 		%else
+            mov rcx, 0xFFFFFFFFFFFFFFFE
 			mov r9, 0
 			call rax
 		%endif
 		pop r8
 		add rsp, r8
-		ret
+		mov r8, 0
+		pop r9
+		test rax, rax
+		strict
+		cmovnz r9, r8
+		jmp r9
 	%endif
