@@ -204,35 +204,28 @@ hidethread:
 		mov rcx, rax
 		lea rdx, [STI]
 		call pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.GetProcAddressOff
-		mov r8, rsp
-		and r8, 0b1111
-		add r8, 8
-		sub rsp, r8
-		push r8
 		mov rdx, 17
 		mov r8, 0
+		mov r9, 0
+		sub rsp, 0x20
 		%if Options.Packing.bDirectSyscalls
-			lea r9, [thingy]
+			lea r10, [thingy]
 			mov ecx, [rax]
 			cmp ecx, 0xB8D18B4C
 			strict
 			mov rcx, 0
 			strict
-			cmovnz r9, rcx
-			jmp r9
+			cmovnz r10, rcx
+			jmp r10
 thingy:
-            mov rcx, 0xFFFFFFFFFFFFFFFE
+            mov r10, 0xFFFFFFFFFFFFFFFE
 			mov eax, [rax + 4]
-			mov r9, 0
 			syscall
 		%else
             mov rcx, 0xFFFFFFFFFFFFFFFE
-			mov r9, 0
 			call rax
 		%endif
-		pop r8
-		add rsp, r8
-		mov r8, 0
+		add rsp, 0x20
 		pop r9
 		test rax, rax
 		strict
