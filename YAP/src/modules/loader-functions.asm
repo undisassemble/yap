@@ -3,7 +3,6 @@
 
 LLA:
     embed &Sha256Str("LoadLibraryA"), sizeof(Sha256Digest)
-    align AlignMode::kCode, 0x10
 MSGBX:
     embed &Sha256Str("MessageBoxA"), sizeof(Sha256Digest) 
 ERR:

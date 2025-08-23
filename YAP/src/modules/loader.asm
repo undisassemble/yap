@@ -94,7 +94,7 @@ ADDRFL:
 	embed "Failed to get address of imported function", 43
 	align AlignMode::kCode, alignof(LPCSTR)
 DBGFL:
-	embed "Please close any debuggers before opening.", 43
+	embed "Please close any debuggers.", 28
 	align AlignMode::kCode, alignof(LPCSTR)
 
 	; Entry point

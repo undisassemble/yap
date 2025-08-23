@@ -558,6 +558,12 @@ NTD:
     embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
 GCT:
     embed &Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest)
+QSI:
+    embed &Sha256Str("NtQuerySystemInformation"), sizeof(Sha256Digest)
+    align AlignMode::kCode, alignof(SYSTEM_CODEINTEGRITY_INFORMATION)
+INTEG_OPT:
+    dd 8
+    dd 0
 
 ; GLOBAL
 ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
@@ -596,6 +602,7 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     lea rcx, [NTD]
     call ShellcodeData.Labels.GetModuleHandleW
     mov rcx, rax
+    mov rsi, rax
     lea rdx, [GCT]
     call ShellcodeData.Labels.GetProcAddress
     test rax, rax
@@ -615,7 +622,7 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
 CheckForDebuggers_hasid:
     %endif
     lea rdx, [Context]
-    mov rsi, rdx
+    sub rsp, 0x20
     %if Options.Packing.bDirectSyscalls
         mov r10, 0xFFFFFFFFFFFFFFFE
         syscall
@@ -623,10 +630,11 @@ CheckForDebuggers_hasid:
         mov rcx, 0xFFFFFFFFFFFFFFFE
         call rax
     %endif
-    mov rdx, rsi
+    add rsp, 0x20
     test rax, rax
     strict
     jnz CheckForDebuggers_ret
+    lea rdx, [Context]
     mov rax, [rdx + offsetof(CONTEXT, Dr7)]
     and rax, 0x20FF
     strict
@@ -639,8 +647,32 @@ CheckForDebuggers_hasid:
     or rax, [rdx + offsetof(CONTEXT, Dr1)]
     or rax, [rdx + offsetof(CONTEXT, Dr2)]
     or rax, [rdx + offsetof(CONTEXT, Dr3)]
+    strict
+    jnz CheckForDebuggers_ret
+
+    ; DSE check
+    mov rcx, rsi
+    lea rdx, [QSI]
+    call ShellcodeData.Labels.GetProcAddress
+    lea rdx, [INTEG_OPT]
+    mov r8, sizeof(SYSTEM_CODEINTEGRITY_INFORMATION)
+    mov r9, 0
+    %if Options.Packing.bDirectSyscalls
+        mov r10, 103
+        syscall
+    %else
+        mov rcx, 103
+        call rax
+    %endif
+    mov ecx, [INTEG_OPT + 4]
+    xor rcx, CODEINTEGRITY_OPTION_ENABLED
+    and rcx, CODEINTEGRITY_OPTION_ENABLED | CODEINTEGRITY_OPTION_TESTSIGN | CODEINTEGRITY_OPTION_DEBUGMODE_ENABLED
+    or rax, rcx
 CheckForDebuggers_ret:
     pop rsi
+    test rax, rax
+    strict
+    setnz al
     ret
 %endif
 
