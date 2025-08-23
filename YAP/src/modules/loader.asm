@@ -96,6 +96,16 @@ ADDRFL:
 DBGFL:
 	embed "Please close any debuggers.", 28
 	align AlignMode::kCode, alignof(LPCSTR)
+DSEFL:
+	embed "Please enable Driver Signature Enforcement and disable Test Signing.", 69
+%if Options.Packing.bAntiDebug
+QSI:
+    embed &Sha256Str("NtQuerySystemInformation"), sizeof(Sha256Digest)
+    align AlignMode::kCode, alignof(SYSTEM_CODEINTEGRITY_INFORMATION)
+INTEG_OPT:
+    dd 8
+    dd 0
+%endif
 
 	; Entry point
 _entry:
