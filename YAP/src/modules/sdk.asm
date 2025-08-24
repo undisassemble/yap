@@ -550,10 +550,6 @@ ShellcodeData.RequestedFunctions.GetTickCount64.Func:
     align AlignMode::kCode, alignof(CONTEXT)
 Context:
     embed &context, sizeof(CONTEXT)
-    %if Options.Packing.bDirectSyscalls
-ID:
-        dd 0
-    %endif
 NTD:
     embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
 GCT:
@@ -593,12 +589,6 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     jnz CheckForDebuggers_ret
 
     ; HWBP check
-    %if Options.Packing.bDirectSyscalls
-        mov eax, [ID]
-        test eax, eax
-        strict
-        jnz CheckForDebuggers_hasid
-    %endif
     lea rcx, [NTD]
     call ShellcodeData.Labels.GetModuleHandleW
     mov rcx, rax
@@ -608,23 +598,16 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     test rax, rax
     strict
     jz CheckForDebuggers_ret
-    %if Options.Packing.bDirectSyscalls
-        mov ecx, [rax]
-        cmp ecx, 0xB8D18B4C
-        strict
-        mov rcx, 1
-        strict
-        cmovnz rax, rcx
-        strict
-        jnz CheckForDebuggers_ret
-        mov eax, [rax + 4]
-        mov [ID], eax
-CheckForDebuggers_hasid:
-    %endif
     lea rdx, [Context]
     sub rsp, 0x20
     %if Options.Packing.bDirectSyscalls
         mov r10, 0xFFFFFFFFFFFFFFFE
+        mov ecx, [rax]
+        xchg rax, rcx
+        sub eax, 0xB8D18B4C
+        strict
+        jnz CheckForDebuggers_ret
+        mov eax, [rcx + 4]
         syscall
     %else
         mov rcx, 0xFFFFFFFFFFFFFFFE
@@ -659,6 +642,12 @@ CheckForDebuggers_hasid:
     mov r9, 0
     %if Options.Packing.bDirectSyscalls
         mov r10, 103
+        mov ecx, [rax]
+        xchg rax, rcx
+        sub eax, 0xB8D18B4C
+        strict
+        jnz CheckForDebuggers_ret
+        mov eax, [rcx + 4]
         syscall
     %else
         mov rcx, 103

@@ -17,12 +17,13 @@
     jz ShellcodeData.Labels.FatalError
     lea rdx, [Context]
     %if Options.Packing.bDirectSyscalls
-        mov r10, 0xFFFFFFFFFFFFFFFE
-        mov ecx, [rax]
-        cmp ecx, 0xB8D18B4C
+        mov r10d, [rax]
+        lea rcx, [DBGFL]
+        cmp r10d, 0xB8D18B4C
         strict
-        jnz ret
+        jnz ShellcodeData.Labels.FatalError
         mov eax, [rax + 4]
+        mov r10, 0xFFFFFFFFFFFFFFFE
         syscall
     %else
         mov rcx, 0xFFFFFFFFFFFFFFFE
@@ -60,6 +61,12 @@
     mov r8, sizeof(SYSTEM_CODEINTEGRITY_INFORMATION)
     mov r9, 0
     %if Options.Packing.bDirectSyscalls
+        mov r10d, [rax]
+        lea rcx, [DBGFL]
+        cmp r10d, 0xB8D18B4C
+        strict
+        jnz ShellcodeData.Labels.FatalError
+        mov eax, [rax + 4]
         mov r10, 103
         syscall
     %else
