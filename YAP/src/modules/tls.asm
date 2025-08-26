@@ -197,7 +197,7 @@ NTD:
 		embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
 STI:
 		embed &Sha256Str("NtSetInformationThread"), sizeof(Sha256Digest)
-; GLOBAL
+		
 hidethread:
 		lea rcx, [NTD]
 		call pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.GetModuleHandleWOff
@@ -215,8 +215,9 @@ hidethread:
 			strict
 			mov rcx, 0
 			strict
-			cmovnz r10, rcx
+			cmovne r10, rcx
 			jmp r10
+			garbage
 thingy:
             mov r10, 0xFFFFFFFFFFFFFFFE
 			mov eax, [rax + 4]

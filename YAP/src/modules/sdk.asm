@@ -560,12 +560,20 @@ QSI:
 INTEG_OPT:
     dd 8
     dd 0
+    align AlignMode::kCode, alignof(HANDLE)
+%if Options.Packing.bAntiDebug
+QIT:
+    embed &Sha256Str("NtQueryInformationThread"), sizeof(Sha256Digest)
+    align AlignMode::kCode, alignof(BOOL)
+STAT:
+    db 0
+%endif
 
 ; GLOBAL
 ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     push rsi
 
-    ; PEB check
+    ; -- PEB check --
     mov rcx, PEB
     mov rax, 0
     %if ShellcodeData.CarryData.bWasAntiDump
@@ -588,7 +596,7 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     strict
     jnz CheckForDebuggers_ret
 
-    ; HWBP check
+    ; -- HWBP check --
     lea rcx, [NTD]
     call ShellcodeData.Labels.GetModuleHandleW
     mov rcx, rax
@@ -633,7 +641,7 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     strict
     jnz CheckForDebuggers_ret
 
-    ; DSE check
+    ; -- DSE check --
     mov rcx, rsi
     lea rdx, [QSI]
     call ShellcodeData.Labels.GetProcAddress
@@ -657,6 +665,46 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     xor rcx, CODEINTEGRITY_OPTION_ENABLED
     and rcx, CODEINTEGRITY_OPTION_ENABLED | CODEINTEGRITY_OPTION_TESTSIGN | CODEINTEGRITY_OPTION_DEBUGMODE_ENABLED
     or rax, rcx
+    strict
+    jnz CheckForDebuggers_ret
+
+    ; -- Hidden thread check --
+%if Options.Packing.bAntiDebug
+    mov rcx, rsi
+    lea rdx, [QIT]
+    call ShellcodeData.Labels.GetProcAddress
+	mov rdx, 17
+    lea r8, [STAT]
+    mov r9, 1
+    push 0
+    push 0
+    sub rsp, 0x20
+    %if Options.Packing.bDirectSyscalls
+        mov r10, 0xFFFFFFFFFFFFFFFE
+        mov ecx, [rax]
+        xchg rax, rcx
+        sub eax, 0xB8D18B4C
+        strict
+        jnz CheckForDebuggers_ret
+        mov eax, [rcx + 4]
+        syscall
+    %else
+        mov rcx, 0xFFFFFFFFFFFFFFFE
+        call rax
+    %endif
+    add rsp, 0x30
+    mov rcx, 0
+    mov rdx, 0
+    mov r8, 1
+    mov cl, [STAT]
+    test cl, cl
+    strict
+    cmovnz rcx, rdx
+    strict
+    cmovz rcx, r8
+    or rax, rcx
+%endif
+
 CheckForDebuggers_ret:
     pop rsi
     test rax, rax

@@ -3,10 +3,11 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-08-19
+ * @date 2025-08-26
  * @copyright MIT License
  *
  * @bug Mutation causes DLL entry points to not be called
+ * @todo Check stack alignment pls
  * @todo Add (optional) Wine support
  * @todo Fix partial loading
  * @todo Export protection
@@ -196,8 +197,6 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal, _In_ IMA
 	Mem PEB = ptr(0x60);
 	PEB.setSegment(gs);
 
-	Label hidethread;
-	if (Options.Packing.bAntiDebug) hidethread = a.newLabel();
 	#include "modules/tls.inc"
 
 	// Return data
