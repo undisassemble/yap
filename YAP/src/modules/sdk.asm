@@ -6,6 +6,11 @@ USR:
     align AlignMode::kCode, alignof(LPCSTR)
 ERR:
 	embed "Error", 6
+    align AlignMode::kCode, alignof(LPCSTR)
+NTD:
+    embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
+HOOKFL:
+    embed "A hook was detected, please avoid hooking WINAPI functions!", 60
 MSGBX:
     embed &Sha256Str("MessageBoxA"), sizeof(Sha256Digest)
 EXT:
@@ -530,19 +535,6 @@ GetProcAddress_lp:
     pop r12
     jmp GetProcAddress_ret
 
-; GetTickCount64
-%if ShellcodeData.RequestedFunctions.GetTickCount64.bRequested
-; GLOBAL
-ShellcodeData.RequestedFunctions.GetTickCount64.Func:
-    mov ecx, [0x7FFE0004]
-    shl rcx, 0x20
-    mov rax, [0x7FFE0320]
-    shl rax, 8
-    mul rcx
-    mov rax, rdx
-    ret
-%endif
-
 ; CheckForDebuggers
 %if ShellcodeData.RequestedFunctions.CheckForDebuggers.bRequested
     ; RAW_C CONTEXT context = { 0 };
@@ -550,8 +542,6 @@ ShellcodeData.RequestedFunctions.GetTickCount64.Func:
     align AlignMode::kCode, alignof(CONTEXT)
 Context:
     embed &context, sizeof(CONTEXT)
-NTD:
-    embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
 GCT:
     embed &Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest)
 QSI:
@@ -718,6 +708,233 @@ CheckForDebuggers_ret:
 ; GLOBAL
 ShellcodeData.RequestedFunctions.GetCurrentThread.Func:
     mov rax, 0xFFFFFFFFFFFFFFFE
+    ret
+%endif
+
+; VirtualProtect(Ex)
+%if ShellcodeData.RequestedFunctions.VirtualProtect.bRequested || ShellcodeData.RequestedFunctions.VirtualProtectEx.bRequested
+PVM:
+    embed &Sha256Str("NtProtectVirtualMemory"), sizeof(Sha256Digest)
+PVM_ptr:
+    dq 0
+    align AlignMode::kCode, alignof(PVOID)
+PVM_param:
+    dq 0, 2
+
+%if ShellcodeData.RequestedFunctions.VirtualProtect.bRequested
+; GLOBAL
+ShellcodeData.RequestedFunctions.VirtualProtect.Func:
+%endif
+    push r9
+    mov r9, r8
+    mov r8, rdx
+    mov rdx, rcx
+    mov rcx, 0xFFFFFFFFFFFFFFFF
+%if ShellcodeData.RequestedFunctions.VirtualProtectEx.bRequested
+; GLOBAL
+ShellcodeData.RequestedFunctions.VirtualProtectEx.Func:
+%endif
+    mov rax, [PVM_ptr]
+    test rax, rax
+    strict
+    jne VirtualProtectEx_skip_find
+    push rcx
+    push rdx
+    push r8
+    push r9
+    lea rcx, [NTD]
+    call ShellcodeData.Labels.GetModuleHandleW
+    mov rcx, rax
+    lea rdx, [PVM]
+    call ShellcodeData.Labels.GetProcAddress
+    mov [PVM_ptr], rax
+    pop r9
+    pop r8
+    pop rdx
+    pop rcx
+VirtualProtectEx_skip_find:
+    mov [PVM_param], rdx
+    lea rdx, [PVM_param]
+    mov [rdx + 8], r8
+    mov r8, rdx
+    add r8, 8
+    pop r10
+    sub rsp, 0x08
+    push r10
+    sub rsp, 0x20
+    %if Options.Packing.bDirectSyscalls
+        mov r10, rcx
+        mov ecx, [rax]
+        xchg rax, rcx
+        push rcx
+        lea rcx, [HOOKFL]
+        sub eax, 0xB8D18B4C
+        strict
+        jnz ShellcodeData.Labels.FatalError
+        pop rax
+        mov eax, [rax + 4]
+        syscall
+    %else
+        call rax
+    %endif
+    add rsp, 0x30
+    mov rcx, 0
+    test rax, rax
+    strict
+    mov rax, 1
+    strict
+    cmovnz rax, rcx
+    ret
+%endif
+
+; VirtualQuery(Ex)
+%if ShellcodeData.RequestedFunctions.VirtualQuery.bRequested || ShellcodeData.RequestedFunctions.VirtualQueryEx.bRequested
+QVM:
+    embed &Sha256Str("NtQueryVirtualMemory"), sizeof(Sha256Digest)
+QVM_ptr:
+    dq 0
+
+%if ShellcodeData.RequestedFunctions.VirtualQuery.bRequested
+; GLOBAL
+ShellcodeData.RequestedFunctions.VirtualQuery.Func:
+%endif
+    mov r9, r8
+    mov r8, rdx
+    mov rdx, rcx
+    mov rcx, 0xFFFFFFFFFFFFFFFF
+%if ShellcodeData.RequestedFunctions.VirtualQueryEx.bRequested
+; GLOBAL
+ShellcodeData.RequestedFunctions.VirtualQueryEx.Func:
+%endif
+    mov rax, [QVM_ptr]
+    test rax, rax
+    strict
+    jne VirtualQueryEx_skip_find
+    push rcx
+    push rdx
+    push r8
+    push r9
+    lea rcx, [NTD]
+    call ShellcodeData.Labels.GetModuleHandleW
+    mov rcx, rax
+    lea rdx, [QVM]
+    call ShellcodeData.Labels.GetProcAddress
+    mov [QVM_ptr], rax
+    pop r9
+    pop r8
+    pop rdx
+    pop rcx
+VirtualQueryEx_skip_find:
+    push 0
+    push r9
+    mov r9, r8
+    mov r8, 0
+    sub rsp, 0x20
+    ; I don't know what the fuck is wrong with this syscall in particular, but I'm not dealing with this right now
+    ; For future reference: this is exactly the same as the other syscalls added in this commit, but for some reason this throws 0xC0000004 (STATUS_INFO_LENGTH_MISMATCH) when calling via syscall, despite having the same apparent parameters
+
+    ; %if Options.Packing.bDirectSyscalls
+    ;     mov r10, rcx
+    ;     mov ecx, [rax]
+    ;     xchg rax, rcx
+    ;     push rcx
+    ;     lea rcx, [HOOKFL]
+    ;     sub eax, 0xB8D18B4C
+    ;     strict
+    ;     jnz ShellcodeData.Labels.FatalError
+    ;     pop rax
+    ;     mov eax, [rax + 4]
+    ;     syscall
+    ; %else
+        call rax
+    ; %endif
+    add rsp, 0x30
+    mov rcx, 0
+    test rax, rax
+    strict
+    mov rax, 1
+    strict
+    cmovnz rax, rcx
+    ret
+%endif
+
+; VirtualFree(Ex)
+%if ShellcodeData.RequestedFunctions.VirtualFree.bRequested || ShellcodeData.RequestedFunctions.VirtualFreeEx.bRequested
+FVM:
+    embed &Sha256Str("NtFreeVirtualMemory"), sizeof(Sha256Digest)
+FVM_ptr:
+    dq 0
+    align AlignMode::kCode, alignof(PVOID)
+FVM_param:
+    dq 0, 2
+
+%if ShellcodeData.RequestedFunctions.VirtualFree.bRequested
+; GLOBAL
+ShellcodeData.RequestedFunctions.VirtualFree.Func:
+%endif
+    mov r9, r8
+    mov r8, rdx
+    mov rdx, rcx
+    mov rcx, 0xFFFFFFFFFFFFFFFF
+%if ShellcodeData.RequestedFunctions.VirtualFreeEx.bRequested
+; GLOBAL
+ShellcodeData.RequestedFunctions.VirtualFreeEx.Func:
+%endif
+    mov rax, [FVM_ptr]
+    test rax, rax
+    strict
+    jne VirtualFreeEx_skip_find
+    push rcx
+    push rdx
+    push r8
+    push r9
+    lea rcx, [NTD]
+    call ShellcodeData.Labels.GetModuleHandleW
+    mov rcx, rax
+    lea rdx, [FVM]
+    call ShellcodeData.Labels.GetProcAddress
+    mov [FVM_ptr], rax
+    pop r9
+    pop r8
+    pop rdx
+    pop rcx
+VirtualFreeEx_skip_find:
+    mov [FVM_param], rdx
+    lea rdx, [FVM_param]
+    mov [rdx + 8], r8
+    mov r8, rdx
+    add r8, 8
+    sub rsp, 0x20
+    %if Options.Packing.bDirectSyscalls
+        mov r10, rcx
+        mov ecx, [rax]
+        xchg rax, rcx
+        push rcx
+        lea rcx, [HOOKFL]
+        sub eax, 0xB8D18B4C
+        strict
+        jnz ShellcodeData.Labels.FatalError
+        pop rax
+        mov eax, [rax + 4]
+        syscall
+    %else
+        call rax
+    %endif
+    add rsp, 0x20
+    mov rcx, 0
+    test rax, rax
+    strict
+    mov rax, 1
+    strict
+    cmovnz rax, rcx
+    ret
+%endif
+
+; GetLargePageMinimum
+%if ShellcodeData.RequestedFunctions.GetLargePageMinimum.bRequested
+; GLOBAL
+ShellcodeData.RequestedFunctions.GetLargePageMinimum.Func:
+    mov eax, [0x7FFE0244]
     ret
 %endif
 

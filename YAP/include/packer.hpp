@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer definitions
  * @version 0.0.0
- * @date 2025-05-09
+ * @date 2025-08-27
  * @copyright MIT License
  */
 
@@ -85,11 +85,17 @@ struct _ShellcodeData {
 		RequestedFunction GetCurrentThreadId;
 		RequestedFunction GetCurrentProcessId;
 		RequestedFunction GetCurrentProcess;
-		RequestedFunction GetTickCount64;
 		RequestedFunction GetStdHandle;
 		RequestedFunction GetLastError;
 		RequestedFunction SetLastError;
 		RequestedFunction GetProcAddress;
+		RequestedFunction VirtualFree;
+		RequestedFunction VirtualFreeEx;
+		RequestedFunction VirtualProtect;
+		RequestedFunction VirtualProtectEx;
+		RequestedFunction GetLargePageMinimum;
+		RequestedFunction VirtualQuery;
+		RequestedFunction VirtualQueryEx;
 	} RequestedFunctions;
 
 	struct {

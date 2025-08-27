@@ -78,12 +78,6 @@ cmake --build .
 `CMAKE_BUILD_TYPE` can be either `Release` or `Debug` (default).
 
 
-## Other
-
-- [Main page](https://undisassemble.dev/yap)
-- [GitHub](https://github.com/undisassemble/yap)
-
-
 ## License
 
 Yet Another Packer is licensed under the MIT License. Third party licenses can be found in `docs/licenses`.

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-08-26
+ * @date 2025-08-27
  * @copyright MIT License
  *
  * @bug Mutation causes DLL entry points to not be called
@@ -606,11 +606,17 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 							CHECK_IMPORT(GetCurrentThreadId);
 							CHECK_IMPORT(GetCurrentProcessId);
 							CHECK_IMPORT(GetCurrentProcess);
-							CHECK_IMPORT(GetTickCount64);
 							CHECK_IMPORT(GetStdHandle);
 							CHECK_IMPORT(GetLastError);
 							CHECK_IMPORT(SetLastError);
 							CHECK_IMPORT(GetProcAddress);
+							CHECK_IMPORT(VirtualFree);
+							CHECK_IMPORT(VirtualFreeEx);
+							CHECK_IMPORT(VirtualProtect);
+							CHECK_IMPORT(VirtualProtectEx);
+							CHECK_IMPORT(GetLargePageMinimum);
+							CHECK_IMPORT(VirtualQuery);
+							CHECK_IMPORT(VirtualQueryEx);
 							if (pRequest) {
 								pRequest->bRequested = true;
 								pRequest->dwRVA = descriptor.FirstThunk + sizeof(uint64_t) * j;
@@ -709,11 +715,17 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	LOAD_IMPORT(GetCurrentThreadId);
 	LOAD_IMPORT(GetCurrentProcess);
 	LOAD_IMPORT(GetCurrentProcessId);
-	LOAD_IMPORT(GetTickCount64);
 	LOAD_IMPORT(GetStdHandle);
 	LOAD_IMPORT(GetLastError);
 	LOAD_IMPORT(SetLastError);
 	LOAD_IMPORT(GetProcAddress);
+	LOAD_IMPORT(VirtualFree);
+	LOAD_IMPORT(VirtualFreeEx);
+	LOAD_IMPORT(VirtualProtect);
+	LOAD_IMPORT(VirtualProtectEx);
+	LOAD_IMPORT(GetLargePageMinimum);
+	LOAD_IMPORT(VirtualQuery);
+	LOAD_IMPORT(VirtualQueryEx);
 #undef LOAD_IMPORT
 
 	// Mark as loaded
