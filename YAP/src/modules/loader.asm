@@ -1,12 +1,6 @@
 %define ASSEMBLER a.
 
-    %if Options.Advanced.bMutateAssembly
-		strict
-		jz _entry
-		garbage
-	%else
-		jmp _entry
-	%endif
+	jmp _entry
 
 	; Data
 	%if Options.Packing.Message[0]
