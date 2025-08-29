@@ -57,6 +57,7 @@ ShellcodeData.Labels.GetModuleHandleW:
     mov rax, [rax + offsetof(_PEB, Ldr)]
     mov rax, [rax + offsetof(_PEB_LDR_DATA, InMemoryOrderModuleList)]
     sub rax, 0x10
+    sub rsp, sizeof(CSha256) + sizeof(Sha256Digest)
 GetModuleHandleW_item:
     push r8
     push r9
@@ -64,10 +65,10 @@ GetModuleHandleW_item:
     push r11
     push rax
     push rcx
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
     mov rdx, sizeof(CSha256)
     call ShellcodeData.Labels.RtlZeroMemory
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
     call Sha256_Init
     pop rcx
     pop rax
@@ -101,14 +102,14 @@ GetModuleHandleW_strcmp_loop:
     push rcx
     mov rdx, r9
     mov r8, r10
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
     call Sha256_Update
-    lea rcx, [hash]
-    lea rdx, [digest]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
+    lea rdx, [rsp + 0x30]
     call Sha256_Final
     mov rax, 0
     pop rcx
-    lea r11, [digest]
+    lea r11, [rsp + 0x28]
     mov r10, [r11 + offsetof(Sha256Digest, high.high)]
     cmp r10, [rcx + offsetof(Sha256Digest, high.high)]
     strict
@@ -141,6 +142,7 @@ GetModuleHandleW_skip:
     pop rax
     strict
     jnz GetModuleHandleW_item
+    add rsp, sizeof(CSha256) + sizeof(Sha256Digest)
     mov rax, [rax + 0x30]
     ret
 GetModuleHandleW_bad:
@@ -149,6 +151,7 @@ GetModuleHandleW_bad:
             int3
         %endif
     %endif
+    add rsp, sizeof(CSha256) + sizeof(Sha256Digest)
     mov eax, 0
     ret
 GetModuleHandleW_ret_self:
@@ -177,6 +180,7 @@ ShellcodeData.Labels.GetProcAddress:
     add r10, rcx
     mov r11d, [rcx + r8 + 0x24]
     add r11, rcx
+    sub rsp, sizeof(CSha256) + sizeof(Sha256Digest)
 GetProcAddress_loop:
     push r8
     push r9
@@ -184,10 +188,10 @@ GetProcAddress_loop:
     push r11
     push rdx
     push rcx
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
     mov rdx, sizeof(CSha256)
     call ShellcodeData.Labels.RtlZeroMemory
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
     call Sha256_Init
     pop rcx
     pop rdx
@@ -218,14 +222,14 @@ GetProcAddress_found:
     push rcx
     mov rdx, r13
     mov r8, r14
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
     call Sha256_Update
-    lea rcx, [hash]
-    lea rdx, [digest]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
+    lea rdx, [rsp + 0x30]
     call Sha256_Final
     pop rcx
     pop rdx
-    lea r11, [digest]
+    lea r11, [rsp + 0x20]
     mov r10, [r11 + offsetof(Sha256Digest, high.high)]
     cmp r10, [rdx + offsetof(Sha256Digest, high.high)]
     strict
@@ -271,6 +275,7 @@ GetProcAddress_bad:
     %endif
     mov eax, 0
 GetProcAddress_ret:
+    add rsp, sizeof(Sha256Digest) + sizeof(CSha256)
     pop rbx
     pop r14
     pop r13

@@ -67,13 +67,6 @@ MSGBX:
 SIP:
 	embed &Sha256Str("ZwSetInformationProcess"), sizeof(Sha256Digest)
 	align AlignMode::kZero, alignof(CSha256)
-; GLOBAL
-hash:
-	embed &sha, sizeof(CSha256)
-	align AlignMode::kZero, alignof(Sha256Digest)
-; GLOBAL
-digest:
-	embed &_digest, sizeof(_digest)
 
 ret:
 	add rsp, 0x40

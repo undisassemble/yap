@@ -3,10 +3,9 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-08-27
+ * @date 2025-08-28
  * @copyright MIT License
  *
- * @bug Mutation causes DLL entry points to not be called
  * @todo Check stack alignment pls
  * @todo Add (optional) Wine support
  * @todo Fix partial loading
@@ -243,8 +242,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	Label CompressedSizes = a.newLabel();
 	Label DecompressedSizes = a.newLabel();
 	Label VirtualAddrs = a.newLabel();
-	Label hash = a.newLabel();
-	Label digest = a.newLabel();
 
 	// Compress
 	PE Copied(pOriginal);
@@ -389,21 +386,6 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	}
 	a.add(rsp, 0x48);
 	a.garbage();
-
-	// Hashing data
-	Label skiphash = a.newLabel();
-	a.jmp(skiphash);
-	Label hash = a.newLabel();
-	CSha256 sha = { 0 };
-	a.align(AlignMode::kZero, alignof(CSha256));
-	a.bind(hash);
-	a.embed(&sha, sizeof(CSha256));
-	Label digest = a.newLabel();
-	Sha256Digest _digest = { 0 };
-	a.align(AlignMode::kZero, alignof(Sha256Digest));
-	a.bind(digest);
-	a.embed(&_digest, sizeof(_digest));
-	a.bind(skiphash);
 
 	// Critical marking
 	if (Options.Packing.bMarkCritical) {

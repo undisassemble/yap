@@ -87,6 +87,7 @@ ShellcodeData.Labels.GetModuleHandleW:
     mov rax, [rax + offsetof(_PEB, Ldr)]
     mov rax, [rax + offsetof(_PEB_LDR_DATA, InMemoryOrderModuleList)]
     sub rax, 0x10
+    sub rsp, sizeof(Sha256Digest) + sizeof(CSha256)
 GetModuleHandleW_item:
     push r8
     push r9
@@ -94,10 +95,10 @@ GetModuleHandleW_item:
     push r11
     push rax
     push rcx
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
     mov rdx, sizeof(CSha256)
     call ShellcodeData.Labels.RtlZeroMemory
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
     call Sha256_Init
     pop rcx
     pop rax
@@ -131,14 +132,14 @@ GetModuleHandleW_strcmp_loop:
     push rcx
     mov rdx, r9
     mov r8, r10
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
     call Sha256_Update
-    lea rcx, [hash]
-    lea rdx, [digest]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x30)]
+    lea rdx, [rsp + 0x30]
     call Sha256_Final
     mov rax, 0
     pop rcx
-    lea r11, [digest]
+    lea r11, [rsp + 0x28]
     mov r10, [r11 + offsetof(Sha256Digest, high.high)]
     cmp r10, [rcx + offsetof(Sha256Digest, high.high)]
     strict
@@ -171,6 +172,7 @@ GetModuleHandleW_skip:
     pop rax
     strict
     jnz GetModuleHandleW_item
+    add rsp, sizeof(CSha256) + sizeof(Sha256Digest)
     mov rax, [rax + 0x30]
     ret
 GetModuleHandleW_bad:
@@ -179,6 +181,7 @@ GetModuleHandleW_bad:
             int3
         %endif
     %endif
+    add rsp, sizeof(CSha256) + sizeof(Sha256Digest)
     mov eax, 0
     ret
 GetModuleHandleW_ret_self:
@@ -225,17 +228,15 @@ ShellcodeData.RequestedFunctions.GetStdHandle.Func:
 
 ; GetProcAddress (emulated)
 %if ShellcodeData.RequestedFunctions.GetProcAddress.bRequested
-sum:
-    db 0, sizeof(Sha256Digest)
-
 ; GLOBAL
 ShellcodeData.RequestedFunctions.GetProcAddress.Func:
+    sub rsp, sizeof(CSha256) + sizeof(Sha256Digest)
     push rcx
     push rdx
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x10)]
     mov rdx, sizeof(CSha256)
     call ShellcodeData.Labels.RtlZeroMemory
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x10)]
     call Sha256_Init
     mov r8, 0
     dec r8
@@ -245,39 +246,39 @@ GetProcAddress_EMU_strlen_loop:
     cmp byte [rdx + r8], 0
     strict
     jnz GetProcAddress_EMU_strlen_loop
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x08)]
     call Sha256_Update
-    lea rcx, [hash]
-    lea rdx, [sum]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x08)]
+    lea rdx, [rsp + 0x08]
     call Sha256_Final
     pop rcx
-    lea rdx, [sum]
-    jmp ShellcodeData.Labels.GetProcAddress
+    mov rdx, rsp
+    call ShellcodeData.Labels.GetProcAddress
+    add rsp, sizeof(CSha256) + sizeof(Sha256Digest)
+    ret
 %endif
 
 ; GetProcAddress
-%if Options.Packing.bHideIAT
-shit:
-    db 0
-%endif
 ; GLOBAL
 ShellcodeData.Labels.GetProcAddress:
     desync
+    sub rsp, sizeof(CSha256) + sizeof(Sha256Digest)
+    push r12
+    push r13
+    push r14
+    push r15
+    push rbx
+    push rsi
+    push rbp
     %if Options.Packing.bHideIAT
         mov r8, 1
         ror r8, 1
         and r8, rcx
         strict
-        setnz [shit]
+        setnz r15b
         not r8
         and rcx, r8
     %endif
-    push r12
-    push r13
-    push r14
-    push rbx
-    push rsi
-    push rbp
     mov r12d, 0
     mov r8d, [rcx + 0x3C]
     mov ebp, [rcx + r8 + 0x8C]
@@ -297,10 +298,10 @@ GetProcAddress_loop:
     push r11
     push rdx
     push rcx
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x68)]
     mov rdx, sizeof(CSha256)
     call ShellcodeData.Labels.RtlZeroMemory
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x68)]
     call Sha256_Init
     pop rcx
     pop rdx
@@ -331,14 +332,14 @@ GetProcAddress_found:
     push rcx
     mov rdx, r13
     mov r8, r14
-    lea rcx, [hash]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x68)]
     call Sha256_Update
-    lea rcx, [hash]
-    lea rdx, [digest]
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x68)]
+    lea rdx, [rsp + 0x68]
     call Sha256_Final
     pop rcx
     pop rdx
-    lea r11, [digest]
+    lea r11, [rsp + 0x58]
     mov r10, [r11 + offsetof(Sha256Digest, high.high)]
     cmp r10, [rdx + offsetof(Sha256Digest, high.high)]
     strict
@@ -389,7 +390,7 @@ GetProcAddress_bad:
 GetProcAddress_ret:
     %if Options.Packing.bHideIAT
         ; Verify need to check
-        cmp byte [shit], 0
+        cmp r15b, 0
         strict
         jz GetProcAddress_dontcheck
         test rax, rax
@@ -446,9 +447,11 @@ GetProcAddress_dontcheck:
     pop rbp
     pop rsi
     pop rbx
+    pop r15
     pop r14
     pop r13
     pop r12
+    add rsp, sizeof(CSha256) + sizeof(Sha256Digest)
     ret
    
 GPA:
@@ -457,8 +460,6 @@ KRN:
     embed &Sha256WStr(L"KERNEL32.DLL"), sizeof(Sha256Digest)
 LLA:
     embed &Sha256Str("LoadLibraryA"), sizeof(Sha256Digest)
-blank:
-    db 0, 64
 
 GetProcAddress_check_in_e:
     cmp rax, rbp
@@ -482,7 +483,7 @@ GetProcAddress_check_in_e:
     push rcx
     lea rdx, [GPA]
     %if Options.Packing.bHideIAT
-        mov sil, [shit]
+        mov sil, r15b
     %endif
     call ShellcodeData.Labels.GetProcAddress
     mov r12, rax
@@ -490,11 +491,12 @@ GetProcAddress_check_in_e:
     lea rdx, [LLA]
     call ShellcodeData.Labels.GetProcAddress
     %if Options.Packing.bHideIAT
-        mov [shit], sil
+        mov r15b, sil
     %endif
     mov r13, rax
     pop rax
-    lea r14, [blank]
+    sub rsp, 64
+    mov r14, rsp
 GetProcAddress_lp:
     mov cl, [rax]
     mov [r14], cl
@@ -506,29 +508,16 @@ GetProcAddress_lp:
     inc rax
     push rax
     mov byte [r14], 0
-    mov rcx, rsp
-    and rcx, 0b1111
-    add rcx, 8
-    sub rsp, rcx
-    push rcx
-    lea rcx, [blank]
-    sub rsp, 0x20
+    lea rcx, [rsp + 0x08]
+    sub rsp, 0x28
     call r13
-    add rsp, 0x20
-    pop rcx
-    add rsp, rcx
+    add rsp, 0x28
     pop rdx
-    mov rcx, rsp
-    and rcx, 0b1111
-    add rcx, 8
-    sub rsp, rcx
-    push rcx
     mov rcx, rax
     sub rsp, 0x20
     call r12
     add rsp, 0x20
-    pop rcx
-    add rsp, rcx
+    add rsp, 64
     pop r15
     pop r14
     pop r13
