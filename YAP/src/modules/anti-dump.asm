@@ -1,7 +1,6 @@
 %define ASSEMBLER a.
     
-    mov rax, PEB
-    mov qword [rax + 0x10], 0
+    ; Get imports
     lea rcx, [KRN]
     call ShellcodeData.Labels.GetModuleHandleW
     test rax, rax
@@ -13,28 +12,28 @@
     test rax, rax
     strict
     jz ret
+    
+    ; Set header protection +r
     mov rcx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase
     add rcx, [Reloc]
     mov edx, [rcx + offsetof(IMAGE_DOS_HEADER, e_lfanew)]
     add rdx, rcx
     mov edx, [rdx + offsetof(IMAGE_NT_HEADERS64, OptionalHeader.SizeOfHeaders)]
-    push rdx
-    push rcx
     lea r9, [TMP]
     mov rsi, rax
-    sub rsp, 0x18
-    mov r8, rsp
-    and r8, 0b1111
-    add r8, 8
-    sub rsp, r8
-    push r8
     mov r8, 0x40
     sub rsp, 0x20
     call rax
     add rsp, 0x20
-    pop r8
-    add rsp, r8
-    add rsp, 0x18
-    pop rcx
-    pop rdx
+
+    ; Clear section headers
+    mov rcx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase
+    add rcx, [Reloc]
+    mov edx, [rcx + offsetof(IMAGE_DOS_HEADER, e_lfanew)]
+    add rcx, rdx
+    mov rdx, 0
+    mov dx, [rcx + offsetof(IMAGE_NT_HEADERS64, FileHeader.SizeOfOptionalHeader)]
+    add rcx, rdx
+    mov rdx, sizeof(IMAGE_SECTION_HEADER) * 2
+    sub rcx, rdx
     call ShellcodeData.Labels.RtlZeroMemory

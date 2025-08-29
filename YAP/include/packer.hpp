@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer definitions
  * @version 0.0.0
- * @date 2025-08-27
+ * @date 2025-08-29
  * @copyright MIT License
  */
 
@@ -97,10 +97,6 @@ struct _ShellcodeData {
 		RequestedFunction VirtualQuery;
 		RequestedFunction VirtualQueryEx;
 	} RequestedFunctions;
-
-	struct {
-		bool bWasAntiDump : 1 = false;
-	} CarryData;
 
 	struct {
 		Sha256Digest LoaderHash;

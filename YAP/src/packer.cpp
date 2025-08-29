@@ -6,6 +6,8 @@
  * @date 2025-08-29
  * @copyright MIT License
  *
+ * @todo Improve anti-debug
+ * @todo Improve anti-dump
  * @todo Make everything use vars on the stack, except stuff that never changes.
  * @todo Check stack alignment pls
  * @todo Add (optional) Wine support
@@ -238,7 +240,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	Label Sha256_Update = a.newLabel();
 	Label Sha256_Final = a.newLabel();
 	Label CompressedSections = a.newLabel();
-	Label szshell = a.newLabel();
 	Label InternalShell = a.newLabel();
 	Label CompressedSizes = a.newLabel();
 	Label DecompressedSizes = a.newLabel();
@@ -298,12 +299,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 		Buffer buf = Copied.SectionData[i];
 		for (int j = 0; j < buf.Size(); j++) a.db(buf.Data()[j]);
 	}
-	size_t szOffSzShell = 0;
-	if (Options.Packing.bAntiDump) {
-		a.bind(szshell);
-		szOffSzShell = a.offset();
-		a.dq(0);
-	}
 	a.bind(InternalShell);
 	a.embed(CompressedInternal.Data(), CompressedInternal.Size());
 	
@@ -343,7 +338,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	LOG(Info, MODULE_PACKER, "Loader code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	buf.Allocate(holder.textSection()->buffer().size());
 	memcpy(buf.Data(), holder.textSection()->buffer().data(), buf.Size());
-	if (Options.Packing.bAntiDump) *reinterpret_cast<QWORD*>(buf.Data() + szOffSzShell) = buf.Size();
 	CompressedInternal.Release();
 	LOG(Success, MODULE_PACKER, "Generated loader shellcode\n");
 	return buf;
@@ -874,10 +868,6 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	Data.sTask = "Preparing";
 	srand(GetTickCount64());
 
-	if (Options.Packing.bAntiDump) {
-		ShellcodeData.CarryData.bWasAntiDump = true;
-	}
-
 	if (Options.Packing.EncodingCounts > 1) {
 #ifdef _DEBUG
 		if (Options.Debug.bDisableRelocations) {
@@ -1244,9 +1234,6 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	// Finalize
 	if (Options.Packing.EncodingCounts > 1) {
 		delete pOriginal;
-	}
-	if (Options.Packing.bAntiDump) {
-		ShellcodeData.CarryData.bWasAntiDump = false;
 	}
 	pPackedBinary->Status = Normal;
 	Data.State = Idle;

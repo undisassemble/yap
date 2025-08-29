@@ -3,6 +3,8 @@
 	jmp _entry
 
 	; Data
+NTD:
+	embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
 	%if Options.Packing.Message[0]
 message:
 		embed Options.Packing.Message, lstrlenA(Options.Packing.Message) + 1
@@ -46,8 +48,6 @@ policy:
 		embed &sig_policy, sizeof(PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY)
 	%endif
 
-NTD:
-	embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
 Reloc:
 	dq ShellcodeData.BaseAddress + a.offset() + pPackedBinary->NTHeaders.OptionalHeader.ImageBase
 KRN:
@@ -197,7 +197,9 @@ decompressloop:
 	%if Options.Packing.bAntiDump
 		lea rcx, [rip]
 		sub rcx, a.offset()
-		mov rdx, [szshell]
+		lea rdx, [end]
+		lea r8, [NTD]
+		sub rdx, r8
 	%endif
 	%ifdef _DEBUG
 		%if Options.Debug.bGenerateBreakpoints
@@ -207,3 +209,4 @@ decompressloop:
     %endif
 	call rax
 	garbage
+end:

@@ -543,16 +543,6 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     ; -- PEB check --
     mov r10, PEB
     mov rax, 0
-    %if ShellcodeData.CarryData.bWasAntiDump
-        or al, [r10 + 0x10]
-        or al, [r10 + 0x11]
-        or al, [r10 + 0x12]
-        or al, [r10 + 0x13]
-        or al, [r10 + 0x14]
-        or al, [r10 + 0x15]
-        or al, [r10 + 0x16]
-        or al, [r10 + 0x17]
-    %endif
     or al, [r10 + 0x02]
     mov rdx, 0xBC
     mov r9, 0x70
