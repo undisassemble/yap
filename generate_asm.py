@@ -152,7 +152,7 @@ def parse_mem(operand: str) -> str:
 
         # Other stuff
         try:
-            if element.startswith("offsetof") or element.startswith("sizeof"):
+            if "offsetof" in element or "sizeof" in element:
                 noff = element
             else:
                 noff = int(element, 0)
