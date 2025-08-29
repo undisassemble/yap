@@ -551,25 +551,24 @@ STAT:
 ; GLOBAL
 ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     push rsi
-    push rcx
 
     ; -- PEB check --
-    mov rcx, PEB
+    mov r10, PEB
     mov rax, 0
     %if ShellcodeData.CarryData.bWasAntiDump
-        or al, [rcx + 0x10]
-        or al, [rcx + 0x11]
-        or al, [rcx + 0x12]
-        or al, [rcx + 0x13]
-        or al, [rcx + 0x14]
-        or al, [rcx + 0x15]
-        or al, [rcx + 0x16]
-        or al, [rcx + 0x17]
+        or al, [r10 + 0x10]
+        or al, [r10 + 0x11]
+        or al, [r10 + 0x12]
+        or al, [r10 + 0x13]
+        or al, [r10 + 0x14]
+        or al, [r10 + 0x15]
+        or al, [r10 + 0x16]
+        or al, [r10 + 0x17]
     %endif
-    or al, [rcx + 0x02]
+    or al, [r10 + 0x02]
     mov rdx, 0xBC
     mov r9, 0x70
-    mov r8d, [rcx + rdx]
+    mov r8d, [r10 + rdx]
     and r8, r9
     or al, r8b
     or al, [0x7FFE02D4]
@@ -577,10 +576,11 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     jnz CheckForDebuggers_ret
 
     ; Get ntdll and check if HWBP check was requested
+    mov rsi, rcx
     lea rcx, [NTD]
     call ShellcodeData.Labels.GetModuleHandleW
+    mov rcx, rsi
     mov rsi, rax
-    pop rcx
     test cl, cl
     strict
     jz CheckForDebuggers_SkipHWBP
@@ -652,11 +652,11 @@ CheckForDebuggers_SkipHWBP:
     xor rcx, CODEINTEGRITY_OPTION_ENABLED
     and rcx, CODEINTEGRITY_OPTION_ENABLED | CODEINTEGRITY_OPTION_TESTSIGN | CODEINTEGRITY_OPTION_DEBUGMODE_ENABLED
     or rax, rcx
-    strict
-    jnz CheckForDebuggers_ret
 
     ; -- Hidden thread check --
 %if Options.Packing.bAntiDebug
+    strict
+    jnz CheckForDebuggers_ret
     mov rcx, rsi
     lea rdx, [QIT]
     call ShellcodeData.Labels.GetProcAddress

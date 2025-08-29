@@ -6,6 +6,7 @@
  * @date 2025-08-28
  * @copyright MIT License
  *
+ * @todo Make everything use vars on the stack, except stuff that never changes.
  * @todo Check stack alignment pls
  * @todo Add (optional) Wine support
  * @todo Fix partial loading
