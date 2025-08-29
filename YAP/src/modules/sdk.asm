@@ -562,6 +562,7 @@ STAT:
 ; GLOBAL
 ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     push rsi
+    push rcx
 
     ; -- PEB check --
     mov rcx, PEB
@@ -586,11 +587,17 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     strict
     jnz CheckForDebuggers_ret
 
-    ; -- HWBP check --
+    ; Get ntdll and check if HWBP check was requested
     lea rcx, [NTD]
     call ShellcodeData.Labels.GetModuleHandleW
-    mov rcx, rax
     mov rsi, rax
+    pop rcx
+    test cl, cl
+    strict
+    jz CheckForDebuggers_SkipHWBP
+
+    ; -- HWBP check --
+    mov rcx, rax
     lea rdx, [GCT]
     call ShellcodeData.Labels.GetProcAddress
     test rax, rax
@@ -630,6 +637,7 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     or rax, [rdx + offsetof(CONTEXT, Dr3)]
     strict
     jnz CheckForDebuggers_ret
+CheckForDebuggers_SkipHWBP:
 
     ; -- DSE check --
     mov rcx, rsi

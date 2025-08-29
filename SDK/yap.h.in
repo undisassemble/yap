@@ -5,7 +5,7 @@
  * @details Two files are required to use the SDK: `yap.h` and `yap.dll`, make sure that `__YAP_VERSION__` matches the packer. You must link to `yap.dll` directly, so that it appears in the applications import directory. After protection, `yap.dll` is unlinked, meaning you don't need to (and shouldn't) distribute `yap.dll` along with your application. You cannot use `GetModuleHandle`/`GetProcAddress` to resolve `yap.dll` imports.
  * @warning Do not rename `yap.dll`, renaming it prevents the SDK from being recognized.
  * @version 0.0.0
- * @date 2025-05-02
+ * @date 2025-08-28
  * @copyright MIT License
  */
 
@@ -43,11 +43,13 @@ extern "C" {
  * @brief Check for attached debuggers.
  * @details It is highly recommended that you use this in your main thread, as no protective threads are spawned by the packer.
  * @note Only the main thread of the application can check for hardware breakpoints.
+ * 
+ * @param [in] bIsMainThread Whether or not to perform the HWBP check, only should be used when called by the main thread.
  *
  * @retval true Debugger present.
  * @retval false No debugger present.
  */
-__declspec(dllimport) bool __stdcall CheckForDebuggers();
+__declspec(dllimport) bool __stdcall CheckForDebuggers(_In_ bool bIsMainThread = false);
 
 /*!
  * @brief Retrieves the base address of the running executable. If using anti-dump, GetModuleHandle(NULL) will return NULL, use this instead.
