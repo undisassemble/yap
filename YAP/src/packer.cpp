@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-08-28
+ * @date 2025-08-29
  * @copyright MIT License
  *
  * @todo Make everything use vars on the stack, except stuff that never changes.
@@ -1244,6 +1244,9 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	// Finalize
 	if (Options.Packing.EncodingCounts > 1) {
 		delete pOriginal;
+	}
+	if (Options.Packing.bAntiDump) {
+		ShellcodeData.CarryData.bWasAntiDump = false;
 	}
 	pPackedBinary->Status = Normal;
 	Data.State = Idle;
