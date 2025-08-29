@@ -526,30 +526,18 @@ GetProcAddress_lp:
 
 ; CheckForDebuggers
 %if ShellcodeData.RequestedFunctions.CheckForDebuggers.bRequested
-    ; RAW_C CONTEXT context = { 0 };
-    ; RAW_C context.ContextFlags = CONTEXT_ALL;
-    align AlignMode::kCode, alignof(CONTEXT)
-Context:
-    embed &context, sizeof(CONTEXT)
 GCT:
     embed &Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest)
 QSI:
     embed &Sha256Str("NtQuerySystemInformation"), sizeof(Sha256Digest)
-    align AlignMode::kCode, alignof(SYSTEM_CODEINTEGRITY_INFORMATION)
-INTEG_OPT:
-    dd 8
-    dd 0
-    align AlignMode::kCode, alignof(HANDLE)
 %if Options.Packing.bAntiDebug
 QIT:
     embed &Sha256Str("NtQueryInformationThread"), sizeof(Sha256Digest)
-    align AlignMode::kCode, alignof(BOOL)
-STAT:
-    db 0
 %endif
 
 ; GLOBAL
 ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
+    sub rsp, sizeof(CONTEXT) + 0x10
     push rsi
 
     ; -- PEB check --
@@ -592,7 +580,8 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     test rax, rax
     strict
     jz CheckForDebuggers_ret
-    lea rdx, [Context]
+    mov dword [rsp + (offsetof(CONTEXT, ContextFlags) + 0x10)], CONTEXT_ALL
+    lea rdx, [rsp + 0x10]
     sub rsp, 0x20
     %if Options.Packing.bDirectSyscalls
         mov r10, 0xFFFFFFFFFFFFFFFE
@@ -611,7 +600,7 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     test rax, rax
     strict
     jnz CheckForDebuggers_ret
-    lea rdx, [Context]
+    lea rdx, [rsp + 0x10]
     mov rax, [rdx + offsetof(CONTEXT, Dr7)]
     and rax, 0x20FF
     strict
@@ -632,9 +621,12 @@ CheckForDebuggers_SkipHWBP:
     mov rcx, rsi
     lea rdx, [QSI]
     call ShellcodeData.Labels.GetProcAddress
-    lea rdx, [INTEG_OPT]
+    lea rdx, [rsp + 0x10]
+    mov dword [rdx], 8
+    mov dword [rdx + 4], 0
     mov r8, sizeof(SYSTEM_CODEINTEGRITY_INFORMATION)
     mov r9, 0
+    sub rsp, 0x20
     %if Options.Packing.bDirectSyscalls
         mov r10, 103
         mov ecx, [rax]
@@ -648,7 +640,8 @@ CheckForDebuggers_SkipHWBP:
         mov rcx, 103
         call rax
     %endif
-    mov ecx, [INTEG_OPT + 4]
+    add rsp, 0x20
+    mov ecx, [rsp + 0x14]
     xor rcx, CODEINTEGRITY_OPTION_ENABLED
     and rcx, CODEINTEGRITY_OPTION_ENABLED | CODEINTEGRITY_OPTION_TESTSIGN | CODEINTEGRITY_OPTION_DEBUGMODE_ENABLED
     or rax, rcx
@@ -661,7 +654,7 @@ CheckForDebuggers_SkipHWBP:
     lea rdx, [QIT]
     call ShellcodeData.Labels.GetProcAddress
 	mov rdx, 17
-    lea r8, [STAT]
+    lea r8, [rsp + 0x10]
     mov r9, 1
     push 0
     push 0
@@ -683,7 +676,7 @@ CheckForDebuggers_SkipHWBP:
     mov rcx, 0
     mov rdx, 0
     mov r8, 1
-    mov cl, [STAT]
+    mov cl, [rsp + 0x10]
     test cl, cl
     strict
     cmovnz rcx, rdx
@@ -694,6 +687,7 @@ CheckForDebuggers_SkipHWBP:
 
 CheckForDebuggers_ret:
     pop rsi
+    add rsp, sizeof(CONTEXT) + 0x10
     test rax, rax
     strict
     setnz al
