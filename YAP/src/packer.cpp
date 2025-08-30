@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-08-29
+ * @date 2025-08-30
  * @copyright MIT License
  *
  * @todo Improve anti-debug
@@ -767,7 +767,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	// Segment unpacker
 	Label Unpack;
 	if (Options.Packing.bPartialUnpacking) {
-		Vector<FunctionRange> FunctionRanges = pOriginal->GetDisassembledFunctionRanges();
+		Vector<FunctionRange> FunctionRanges = pOriginal->GetFunctionRanges();
 		if (FunctionRanges.Size()) {
 			// Data
 			Vector<Buffer> FunctionBodies;
@@ -781,19 +781,17 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			Label PointerArray = a.newLabel();
 			a.bind(PointerArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
-				a.dq(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset + FunctionRanges[i].dwStart, FunctionRanges[i].Entries.Size());
+				a.dq(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset + FunctionRanges[i].dwStart);
 			}
 			Label SizeArray = a.newLabel();
 			a.bind(SizeArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
-				a.dd(FunctionRanges[i].dwSize, FunctionRanges[i].Entries.Size());
+				a.dd(FunctionRanges[i].dwSize);
 			}
 			Label EntryArray = a.newLabel();
 			a.bind(EntryArray);
 			for (int i = 0; i < FunctionRanges.Size(); i++) {
-				for (int j = 0; j < FunctionRanges[i].Entries.Size(); j++) {
-					a.dq(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset + FunctionRanges[i].Entries[j]);
-				}
+				a.dq(pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset + FunctionRanges[i].dwEntry);
 			}
 			Label CompressedSizes = a.newLabel();
 			a.bind(CompressedSizes);
@@ -807,14 +805,12 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 				FunctionBodies.Push(PackSection(buf));
 				ZeroMemory(buf.Data(), buf.Size());
 				*reinterpret_cast<DWORD*>(PartialUnpackingHook + 2) = ID;
-				ID += FunctionRanges[i].Entries.Size();
-				for (int j = 0; j < FunctionRanges[i].Entries.Size(); j++) {
-					memcpy_s(buf.Data() + FunctionRanges[i].Entries[j] - FunctionRanges[i].dwStart, buf.Size() - (FunctionRanges[i].Entries[j] - FunctionRanges[i].dwStart), PartialUnpackingHook, sizeof(PartialUnpackingHook));
-				}
+				ID++;
+				memcpy_s(buf.Data() + FunctionRanges[i].dwEntry - FunctionRanges[i].dwStart, buf.Size() - (FunctionRanges[i].dwEntry - FunctionRanges[i].dwStart), PartialUnpackingHook, sizeof(PartialUnpackingHook));
 				pOriginal->WriteRVA(FunctionRanges[i].dwStart, buf.Data(), buf.Size());
 				buf.Release();
-				a.dq(FunctionBodies[FunctionBodies.Size() - 1].Size(), FunctionRanges[i].Entries.Size());
-				count += FunctionRanges[i].Entries.Size();
+				a.dq(FunctionBodies[FunctionBodies.Size() - 1].Size());
+				count++;
 			}
 
 			#include "modules/segment-unpacker.inc"

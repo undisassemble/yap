@@ -132,10 +132,8 @@ dothingy:
 
     ; Write function address
     ; RAW_C for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
-        ; RAW_C for (int j = 0; j < FunctionRanges[i].Entries.Size(); j++) {
-            ; RAW_C pOriginal->WriteRVA<uint64_t>(FunctionRanges[i].Entries[j] + 8, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + holder.labelOffsetFromBase(LoadSegment) + ShellcodeData.BaseAddress);
-            ; RAW_C ShellcodeData.Relocations.Relocations.Push(ShellcodeData.BaseOffset + FunctionRanges[i].Entries[j] + 8);
-        ; RAW_C }
+        ; RAW_C pOriginal->WriteRVA<uint64_t>(FunctionRanges[i].dwEntry + 8, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + holder.labelOffsetFromBase(LoadSegment) + ShellcodeData.BaseAddress);
+        ; RAW_C ShellcodeData.Relocations.Relocations.Push(ShellcodeData.BaseOffset + FunctionRanges[i].dwEntry + 8);
     ; RAW_C }
 
 UnloadSegment:

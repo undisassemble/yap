@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-05-25
+ * @date 2025-08-30
  * @copyright MIT License
  */
 
@@ -156,12 +156,13 @@ DWORD WINAPI Begin(void* args) {
 			goto th_exit;
 		}
 		Data.State = Idle;
+		pAssembly->FindFunctions();
 
 		// Dump disassembly
 #ifdef _DEBUG
 #ifdef ENABLE_DUMPING
 		if (Options.Debug.bDumpAsm) {
-			HANDLE hDumped = CreateFile("YAP.dump.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			HANDLE hDumped = CreateFile("yap.dump.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];
 			ZydisFormatter Formatter;
 			ZydisFormatterInit(&Formatter, ZYDIS_FORMATTER_STYLE_INTEL);
@@ -203,14 +204,11 @@ DWORD WINAPI Begin(void* args) {
 
 		HANDLE hDumped = NULL;
 		if (Options.Debug.bDumpFunctions) {
-			hDumped = CreateFile("YAP.functions.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			hDumped = CreateFile("yap.functions.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];
-			for (int i = 0; i < pAssembly->GetDisassembledFunctionRanges().Size(); i++) {
-				WriteFile(hDumped, "------------\n", 13, NULL, NULL);
-				for (int j = 0; j < pAssembly->GetDisassembledFunctionRanges()[i].Entries.Size(); j++) {
-					int n = snprintf(buf, 512, "%08lx: %08lx -> %08lx\n", pAssembly->GetDisassembledFunctionRanges()[i].Entries[j], pAssembly->GetDisassembledFunctionRanges()[i].dwStart, pAssembly->GetDisassembledFunctionRanges()[i].dwStart + pAssembly->GetDisassembledFunctionRanges()[i].dwSize);
-					WriteFile(hDumped, buf, n, NULL, NULL);
-				}
+			for (int i = 0; i < pAssembly->GetFunctionRanges().Size(); i++) {
+				int n = snprintf(buf, 512, "%08lx: %08lx -> %08lx\n", pAssembly->GetFunctionRanges()[i].dwEntry, pAssembly->GetFunctionRanges()[i].dwStart, pAssembly->GetFunctionRanges()[i].dwStart + pAssembly->GetFunctionRanges()[i].dwSize);
+				WriteFile(hDumped, buf, n, NULL, NULL);
 			}
 		}
 #endif
@@ -245,21 +243,6 @@ DWORD WINAPI Begin(void* args) {
 			goto th_exit;
 		}
 		Data.State = Idle;
-
-#ifdef _DEBUG
-		if (Options.Debug.bDumpFunctions) {
-			WriteFile(hDumped, "\n\n\n", 3, NULL, NULL);
-			char buf[512];
-			for (int i = 0; i < pAssembly->GetDisassembledFunctionRanges().Size(); i++) {
-				WriteFile(hDumped, "------------\n", 13, NULL, NULL);
-				for (int j = 0; j < pAssembly->GetDisassembledFunctionRanges()[i].Entries.Size(); j++) {
-					int n = snprintf(buf, 512, "%08lx: %08lx -> %08lx\n", pAssembly->GetDisassembledFunctionRanges()[i].Entries[j], pAssembly->GetDisassembledFunctionRanges()[i].dwStart, pAssembly->GetDisassembledFunctionRanges()[i].dwStart + pAssembly->GetDisassembledFunctionRanges()[i].dwSize);
-					WriteFile(hDumped, buf, n, NULL, NULL);
-				}
-			}
-			CloseHandle(hDumped);
-		}
-#endif
 
 		// Modify again
 		if (Options.Reassembly.bStripDOSStub) {
