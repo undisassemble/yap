@@ -13,8 +13,8 @@ HOOKFL:
     embed "A hook was detected, please avoid hooking WINAPI functions!", 60
 MSGBX:
     embed &Sha256Str("MessageBoxA"), sizeof(Sha256Digest)
-EXT:
-    embed &Sha256Str("ExitProcess"), sizeof(Sha256Digest)
+TP:
+    embed &Sha256Str("NtTerminateProcess"), sizeof(Sha256Digest)
 
 ; GetLastError
 %if ShellcodeData.RequestedFunctions.GetLastError.bRequested
@@ -61,20 +61,37 @@ ShellcodeData.Labels.FatalError:
     mov rcx, rax
     lea rdx, [MSGBX]
     call ShellcodeData.Labels.GetProcAddress
+    mov rbp, rax
+    lea rcx, [NTD]
+    call ShellcodeData.Labels.GetModuleHandleW
+    mov rcx, rax
+    lea rdx, [TP]
+    call ShellcodeData.Labels.GetProcAddress
+    mov rbx, rax
+    sub rsp, 0x20
+    %if Options.Packing.bDirectSyscalls
+        mov r10, 0
+        mov eax, [rbx + 4]
+        syscall
+    %else
+        mov rcx, 0
+        call rbx
+    %endif
+    add rsp, 0x20
     mov rcx, 0
     mov rdx, rsi
     lea r8, [ERR]
     mov r9, MB_OK | MB_ICONERROR
     sub rsp, 0x20
-    call rax
-    add rsp, 0x20
-    mov rcx, rbx
-    lea rdx, [EXT]
-    call ShellcodeData.Labels.GetProcAddress
-    mov rcx, 1
-    sub rsp, 0x20
-    call rax
-    add rsp, 0x20
+    call rbp
+    %if Options.Packing.bDirectSyscalls
+        mov r10, 0xFFFFFFFFFFFFFFFF
+        mov eax, [rbx + 4]
+        syscall
+    %else
+        mov rcx, 0xFFFFFFFFFFFFFFFF
+        call rbx
+    %endif
 
 ; GetModuleHandleW
 ; GLOBAL
