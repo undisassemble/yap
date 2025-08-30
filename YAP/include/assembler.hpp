@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler definitions
  * @version 0.0.0
- * @date 2025-04-26
+ * @date 2025-08-29
  * @copyright MIT License
  */
 
@@ -167,14 +167,15 @@ public:
 	void strict() { bStrict = true; }
 
 	/*!
-	 * @brief Resolve memory and push to top of stack.
+	 * @brief Resolves memory address and pushes to top of stack.
+	 * @note Doesn't actually dereference anything, just returns the address.
 	 * @todo Make this work with labels and with RIP.
 	 * 
 	 * @param [in] o0 Memory operand to resolve.
 	 * @retval true Success.
 	 * @retval false Failure, treat as if resolve wasn't used.
 	 */
-	bool resolve(Mem o0);
+	bool resolve(_In_ Mem o0);
 
 	Error db(uint8_t o0, size_t o1 = 1) { block(); return Assembler::db(o0, o1); }
 	Error dw(uint16_t o0, size_t o1 = 1) { block(); return Assembler::dw(o0, o1); }

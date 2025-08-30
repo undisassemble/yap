@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler functions
  * @version 0.0.0
- * @date 2025-04-26
+ * @date 2025-08-29
  * @copyright MIT License
  */
 
@@ -21,7 +21,7 @@ void AsmJitErrorHandler::handleError(_In_ Error error, _In_ const char* message,
 	bFailed = true;
 }
 
-bool ProtectedAssembler::resolve(Mem o0) {
+bool ProtectedAssembler::resolve(_In_ Mem o0) {
 	// Check compatibility
 	if ((o0.hasBaseLabel() && !code()->isLabelBound(o0.baseId()) && !bAdvancedResolve) ||
 		(o0.hasBaseReg() && o0.baseReg().isGpd() && child_cast<Gpd>(o0.baseReg()) == esp) ||
@@ -144,13 +144,10 @@ int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {
 
 		// Random push
 		if (rand() & 1) {
-			for (int j = 0, m = 5; j < m; j++) {
-				temp = randreg();
-				stack.Push(temp);
-				ret++;
-				push((rand() & 1) ? 0 : rand());
-				break;
-			}
+			temp = randreg();
+			stack.Push(temp);
+			ret++;
+			push((rand() & 1) ? 0 : rand());
 		}
 
 		// Random math again
