@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer definitions
  * @version 0.0.0
- * @date 2025-08-29
+ * @date 2025-08-31
  * @copyright MIT License
  */
 
@@ -76,6 +76,7 @@ struct _ShellcodeData {
 		// SDK
 		int iIndex = -1;
 		RequestedFunction CheckForDebuggers;
+		RequestedFunction ShowErrorAndExit;
 		RequestedFunction GetSelf;
 
 		// Emulated

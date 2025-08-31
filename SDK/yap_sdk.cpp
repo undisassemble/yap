@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief SDK dll
  * @version 0.0.0
- * @date 2025-08-28
+ * @date 2025-08-31
  * @copyright MIT License
  */
 
@@ -23,4 +23,5 @@ BOOL WINAPI DllMain(_In_ HINSTANCE hInstDll, _In_ DWORD dwReason, _In_ LPVOID pR
 #define YAP_EXPORT(type) extern "C" __declspec(dllexport) type __stdcall
 
 YAP_EXPORT(bool) CheckForDebuggers(bool p0) { return false; }
+YAP_EXPORT(void) ShowErrorAndExit(const char* p0) {} 
 YAP_EXPORT(HMODULE) GetSelf() { return NULL; }

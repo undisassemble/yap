@@ -45,6 +45,10 @@ ShellcodeData.RequestedFunctions.GetSelf.Func:
     ret
 %endif
 
+%if ShellcodeData.RequestedFunctions.ShowErrorAndExit.bRequested
+; GLOBAL
+ShellcodeData.RequestedFunctions.ShowErrorAndExit.Func:
+%endif
 ; GLOBAL
 ShellcodeData.Labels.FatalError:
     desync

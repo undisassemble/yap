@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-08-30
+ * @date 2025-08-31
  * @copyright MIT License
  *
  * @todo Improve anti-debug
@@ -608,6 +608,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 						
 						// Get request name
 						if (!lstrcmpA(name, "CheckForDebuggers")) pRequest = &ShellcodeData.RequestedFunctions.CheckForDebuggers;
+						CHECK_IMPORT(ShowErrorAndExit);
 						CHECK_IMPORT(GetSelf);
 						else LOG(Warning, MODULE_PACKER, "Unrecognized SDK import: \'%s\'\n", name);
 
@@ -687,6 +688,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	// Load SDK
 #define LOAD_IMPORT(name) if (ShellcodeData.RequestedFunctions.name.bRequested) { a.lea(rax, ptr(ShellcodeData.RequestedFunctions.name.Func)); a.mov(rcx, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseOffset + ShellcodeData.RequestedFunctions.name.dwRVA); a.add(rcx, ptr(InternalRelOff)); a.mov(qword_ptr(rcx), rax); }
 	LOAD_IMPORT(CheckForDebuggers);
+	LOAD_IMPORT(ShowErrorAndExit);
 	LOAD_IMPORT(GetSelf);
 	LOAD_IMPORT(GetCurrentThread);
 	LOAD_IMPORT(GetCurrentThreadId);
