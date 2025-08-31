@@ -19,6 +19,10 @@ TP:
 ; GLOBAL
 ShellcodeData.Labels.FatalError:
     desync
+    mov rsi, rsp
+    and rsi, 0x0F
+    add rsp, 0x10
+    sub rsp, rsi
     mov rsi, rcx
     lea rcx, [KRN]
     call ShellcodeData.Labels.GetModuleHandleW

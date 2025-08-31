@@ -9,6 +9,7 @@ ERR:
     align AlignMode::kCode, alignof(LPCSTR)
 NTD:
     embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
+    align AlignMode::kCode, alignof(LPCSTR)
 HOOKFL:
     embed "A hook was detected, please avoid hooking WINAPI functions!", 60
 MSGBX:
@@ -47,6 +48,10 @@ ShellcodeData.RequestedFunctions.GetSelf.Func:
 ; GLOBAL
 ShellcodeData.Labels.FatalError:
     desync
+    mov rsi, rsp
+    and rsi, 0x0F
+    add rsp, 0x10
+    sub rsp, rsi
     mov rsi, rcx
     lea rcx, [KRN]
     call ShellcodeData.Labels.GetModuleHandleW
