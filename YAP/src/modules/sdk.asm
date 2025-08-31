@@ -556,11 +556,42 @@ QSI:
 QIT:
     embed &Sha256Str("NtQueryInformationThread"), sizeof(Sha256Digest)
 %endif
+GNP:
+    embed &Sha256Str("NtGetNextProcess"), sizeof(Sha256Digest)
+NTCLOSE:
+    embed &Sha256Str("NtClose"), sizeof(Sha256Digest)
+QIP:
+    embed &Sha256Str("NtQueryInformationProcess"), sizeof(Sha256Digest)
+%define DEBUG_PROC_BLACKLIST_LEN 21
+DEBUG_PROC_BLACKLIST:
+	embed &Sha256WStr(L"x96dbg.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"x64dbg.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"x64dbg-unsigned.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"x32dbg.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"x32dbg-unsigned.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"TitanHideGUI.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"ida.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"cutter.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"rizin.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"rz-asm.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"rz-ax.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"rz-bin.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"rz-diff.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"rz-find.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"rz-gg.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"rz-hash.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"rz-run.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"rz-sign.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"binaryninja.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"dbgsrv.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"DbgX.Shell.exe"), sizeof(Sha256Digest)
 
 ; GLOBAL
 ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     sub rsp, sizeof(CONTEXT) + 0x10
     push rsi
+    push rbx
+    push rbp
 
     ; -- PEB check --
     mov r10, PEB
@@ -695,9 +726,196 @@ CheckForDebuggers_SkipHWBP:
     strict
     cmovz rcx, r8
     or rax, rcx
+    strict
+    jnz CheckForDebuggers_ret
 %endif
 
+    ; -- Proc list check --
+    mov rcx, rsi
+    lea rdx, [NTCLOSE]
+    call ShellcodeData.Labels.GetProcAddress
+    mov rbp, rax
+    mov rcx, rsi
+    lea rdx, [QIP]
+    call ShellcodeData.Labels.GetProcAddress
+    mov rbx, rax
+    mov rcx, rsi
+    lea rdx, [GNP]
+    call ShellcodeData.Labels.GetProcAddress
+    mov rsi, rax
+    test rbp, rbp
+    strict
+    jz CheckForDebuggers_ret
+    test rbx, rbx
+    strict
+    jz CheckForDebuggers_ret
+    test rsi, rsi
+    strict
+    jz CheckForDebuggers_ret
+
+    ; Convert funs to syscall ids
+    %if Options.Packing.bDirectSyscalls
+        mov eax, [rbp]
+        add eax, [rbx]
+        add eax, [rsi]
+        cmp eax, 0x2A74A1E4
+        strict
+        jne CheckForDebuggers_ret
+        mov ebp, [rbp + 4]
+        mov ebx, [rbx + 4]
+        mov esi, [rsi + 4]
+    %endif
+
+    push 0
+CheckForDebuggers_EnumProcesses_loop:
+    ; Get next process handle
+    mov rcx, rsp
+    mov r15, [rsp]
+    push rcx
+    mov rdx, PROCESS_QUERY_INFORMATION
+    mov r8, 0
+    mov r9, r8
+    sub rsp, 0x20
+    %if Options.Packing.bDirectSyscalls
+        mov r10, r15
+        mov eax, esi
+        sub rsp, 0x08
+        syscall
+        add rsp, 0x08
+    %else
+        mov rcx, r15
+        call rsi
+    %endif
+    add rsp, 0x28
+    mov r14, rax
+    test r15, r15
+    strict
+    jz CheckForDebuggers_EnumProcesses_skipclose
+
+    ; Close old handle
+    sub rsp, 0x20
+    %if Options.Packing.bDirectSyscalls
+        mov r10, r15
+        mov eax, ebp
+        syscall
+    %else
+        mov rcx, r15
+        call rbp
+    %endif
+    add rsp, 0x20
+
+CheckForDebuggers_EnumProcesses_skipclose:
+
+    ; Break if no new handles
+    mov rcx, 0x8000001A
+    mov rax, 0
+    sub r14, rcx
+    strict
+    jz CheckForDebuggers_EnumProcesses_exit
+
+    ; Get process name
+    mov r11, [rsp]
+    mov rdx, 27
+    mov r9, 0x210
+    sub rsp, 0x210 - (sizeof(CONTEXT) + 0x10)
+    mov word [rsp], 0
+    mov word [rsp + 2], 0x198
+    lea r8, [rsp + 0x10]
+    mov [rsp + 4], r8
+    mov r8, rsp
+    push 0
+    sub rsp, 0x20
+    %if Options.Packing.bDirectSyscalls
+        mov r10, r11
+        mov eax, ebx
+        sub rsp, 0x08
+        syscall
+        add rsp, 0x08
+    %else
+        mov rcx, r11
+        call rbx
+    %endif
+    add rsp, 0x238 - (sizeof(CONTEXT) + 0x10)
+    test rax, rax
+    strict
+    jnz CheckForDebuggers_EnumProcesses_loop
+    sub rsp, 0x210 - (sizeof(CONTEXT) + 0x10)
+
+    ; Hash name
+    mov rcx, [rsp + 8]
+    mov rdx, 0
+    mov dx, [rsp]
+    add rcx, rdx
+    mov rdx, 0
+CheckForDebuggers_EnumProcesses_findend:
+    add rdx, 2
+    sub rcx, 2
+    mov r8w, [rcx]
+    sub r8b, '\\'
+    strict
+    jnz CheckForDebuggers_EnumProcesses_findend
+    add rcx, 2
+    sub rdx, 2
+    sub rsp, sizeof(CSha256) + sizeof(Sha256Digest)
+    push rcx
+    push rdx
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x10)]
+    mov rdx, sizeof(CSha256)
+    call ShellcodeData.Labels.RtlZeroMemory
+    lea rcx, [rsp + (sizeof(Sha256Digest) + 0x10)]
+    call Sha256_Init
+    pop r8
+    pop rdx
+    lea rcx, [rsp + (sizeof(Sha256Digest))]
+    call Sha256_Update
+    lea rcx, [rsp + (sizeof(Sha256Digest))]
+    mov rdx, rsp
+    call Sha256_Final
+
+    ; Compare to blacklist
+    mov r9, 1
+    mov r11, 0
+    lea rdx, [DEBUG_PROC_BLACKLIST]
+    mov r8, DEBUG_PROC_BLACKLIST_LEN
+CheckForDebuggers_EnumProcesses_compare:
+    mov rax, 0
+    mov r10, [rdx + offsetof(Sha256Digest, high.high)]
+    cmp r10, [rsp + offsetof(Sha256Digest, high.high)]
+    strict
+    cmovne rax, r9
+    mov r10, [rdx + offsetof(Sha256Digest, high.low)]
+    cmp r10, [rsp + offsetof(Sha256Digest, high.low)]
+    strict
+    cmovne rax, r9
+    mov r10, [rdx + offsetof(Sha256Digest, low.high)]
+    cmp r10, [rsp + offsetof(Sha256Digest, low.high)]
+    strict
+    cmovne rax, r9
+    mov r10, [rdx + offsetof(Sha256Digest, low.low)]
+    cmp r10, [rsp + offsetof(Sha256Digest, low.low)]
+    strict
+    cmovne rax, r9
+    test rax, rax
+    strict
+    cmovz r8, r9
+    add rdx, sizeof(Sha256Digest)
+    dec r8
+    strict
+    jnz CheckForDebuggers_EnumProcesses_compare
+
+    add rsp, 0x210 + sizeof(CSha256) + sizeof(Sha256Digest) - (sizeof(CONTEXT) + 0x10)
+    test rax, rax
+    strict
+    cmovz rax, r9
+    strict
+    jz CheckForDebuggers_EnumProcesses_exit
+    jmp CheckForDebuggers_EnumProcesses_loop
+CheckForDebuggers_EnumProcesses_exit:
+    add rsp, 8
+
 CheckForDebuggers_ret:
+    pop rbp
+    pop rbx
     pop rsi
     add rsp, sizeof(CONTEXT) + 0x10
     test rax, rax
