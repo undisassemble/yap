@@ -624,9 +624,6 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     mov rcx, rax
     lea rdx, [GCT]
     call ShellcodeData.Labels.GetProcAddress
-    test rax, rax
-    strict
-    jz CheckForDebuggers_ret
     mov dword [rsp + (offsetof(CONTEXT, ContextFlags) + 0x10)], CONTEXT_ALL
     lea rdx, [rsp + 0x10]
     sub rsp, 0x20
@@ -692,11 +689,11 @@ CheckForDebuggers_SkipHWBP:
     xor rcx, CODEINTEGRITY_OPTION_ENABLED
     and rcx, CODEINTEGRITY_OPTION_ENABLED | CODEINTEGRITY_OPTION_TESTSIGN | CODEINTEGRITY_OPTION_DEBUGMODE_ENABLED
     or rax, rcx
+    strict
+    jnz CheckForDebuggers_ret
 
     ; -- Hidden thread check --
 %if Options.Packing.bAntiDebug
-    strict
-    jnz CheckForDebuggers_ret
     mov rcx, rsi
     lea rdx, [QIT]
     call ShellcodeData.Labels.GetProcAddress
@@ -733,6 +730,88 @@ CheckForDebuggers_SkipHWBP:
     strict
     jnz CheckForDebuggers_ret
 %endif
+
+    ; -- Check NtQueryInformationProcess values --
+	mov rcx, rsi
+	lea rdx, [QIP]
+	call ShellcodeData.Labels.GetProcAddress
+	mov rbx, rax
+	%if Options.Packing.bDirectSyscalls
+		mov eax, [rbx]
+		sub eax, 0xB8D18B4C
+		strict
+		jnz CheckForDebuggers_ret
+		mov ebx, [rbx + 4]
+	%endif
+
+	; ProcessDebugPort
+	mov rdx, 7
+	push 0
+	mov r8, rsp
+	push 0
+	mov r9, sizeof(HANDLE)
+	%if Options.Packing.bDirectSyscalls
+		mov r10, 0xFFFFFFFFFFFFFFFF
+		sub rsp, 0x28
+		mov eax, ebx
+		syscall
+		add rsp, 0x30
+	%else
+		mov rcx, 0xFFFFFFFFFFFFFFFF
+		sub rsp, 0x20
+		call rbx
+		add rsp, 0x28
+	%endif
+	pop rax
+	test rax, rax
+	strict
+	jnz CheckForDebuggers_ret
+
+	; ProcessDebugObjectHandle
+	mov rdx, 30
+	push 0
+	mov r8, rsp
+	push 0
+	mov r9, sizeof(HANDLE)
+	%if Options.Packing.bDirectSyscalls
+		mov r10, 0xFFFFFFFFFFFFFFFF
+		sub rsp, 0x28
+		mov eax, ebx
+		syscall
+		add rsp, 0x38
+	%else
+		mov rcx, 0xFFFFFFFFFFFFFFFF
+		sub rsp, 0x20
+		call rbx
+		add rsp, 0x30
+	%endif
+	sub eax, 0xC0000353
+	strict
+	jnz CheckForDebuggers_ret
+
+	; ProcessDebugFlags
+	mov rdx, 31
+	push 0
+	mov r8, rsp
+	push 0
+	mov r9, 4
+	%if Options.Packing.bDirectSyscalls
+		mov r10, 0xFFFFFFFFFFFFFFFF
+		sub rsp, 0x28
+		mov eax, ebx
+		syscall
+		add rsp, 0x30
+	%else
+		mov rcx, 0xFFFFFFFFFFFFFFFF
+		sub rsp, 0x20
+		call rbx
+		add rsp, 0x28
+	%endif
+    mov al, 1
+	pop rdx
+	test rdx, rdx
+	strict
+	jz CheckForDebuggers_ret
 
     ; -- Proc list check --
     mov rcx, rsi
