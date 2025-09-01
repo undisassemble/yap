@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-08-30
+ * @date 2025-08-31
  * @copyright MIT License
  */
 
@@ -36,19 +36,19 @@ HANDLE hStdOut = NULL;
 Asm* pAssembly = NULL;
 
 // Shtuff
-void ReLibLogError(const char* message, ...) {
+void __stdcall ReLibLogError(const char* message, ...) {
 	va_list args;
 	va_start(args, message);
 	vLOG(Failed, MODULE_RELIB, message, args);
 	va_end(args);
 }
-void ReLibLogWarn(const char* message, ...) {
+void __stdcall ReLibLogWarn(const char* message, ...) {
 	va_list args;
 	va_start(args, message);
 	vLOG(Warning, MODULE_RELIB, message, args);
 	va_end(args);
 }
-void ReLibLog(const char* message, ...) {
+void __stdcall ReLibLog(const char* message, ...) {
 	va_list args;
 	va_start(args, message);
 	vLOG(Info, MODULE_RELIB, message, args);
@@ -160,9 +160,9 @@ DWORD WINAPI Begin(void* args) {
 
 		// Dump disassembly
 #ifdef _DEBUG
-#ifdef ENABLE_DUMPING
+		HANDLE hDumped = NULL;
 		if (Options.Debug.bDumpAsm) {
-			HANDLE hDumped = CreateFile("yap.dump.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			hDumped = CreateFile("yap.dump.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];
 			ZydisFormatter Formatter;
 			ZydisFormatterInit(&Formatter, ZYDIS_FORMATTER_STYLE_INTEL);
@@ -171,11 +171,17 @@ DWORD WINAPI Begin(void* args) {
 				Vector<Line>* Lines = Sections[SecIndex].Lines;
 				for (size_t i = 0, j = Lines->Size(); i < j; i++) {
 					Line line = Lines->At(i);
+					ZydisDecodedInstruction inst;
+					ZydisDecodedOperand ops[4];
 					int n = 0;
 					switch (line.Type) {
 					case Decoded:
 						n = snprintf(buf, 512, "%8.8s:%p\t", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA);
-						ZydisFormatterFormatInstruction(&Formatter, &line.Decoded.Instruction, line.Decoded.Operands, line.Decoded.Instruction.operand_count_visible, &buf[n], 512 - n, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, NULL);
+						inst = line.Decoded.Instruction;
+						for (int i = 0; i < inst.operand_count_visible; i++) {
+							ops[i] = line.Decoded.Operands[i];
+						}
+						ZydisFormatterFormatInstruction(&Formatter, &inst, ops, line.Decoded.Instruction.operand_count_visible, &buf[n], 512 - n, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, NULL);
 						n = lstrlenA(buf);
 						buf[n] = '\n';
 						n++;
@@ -200,9 +206,7 @@ DWORD WINAPI Begin(void* args) {
 			}
 			CloseHandle(hDumped);
 		}
-#endif
 
-		HANDLE hDumped = NULL;
 		if (Options.Debug.bDumpFunctions) {
 			hDumped = CreateFile("yap.functions.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];

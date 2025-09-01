@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-08-17
+ * @date 2025-08-31
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -258,9 +258,7 @@ void DrawGUI() {
 		}
 
 		if (ImGui::BeginTabItem(ICON_BUG " Debug")) {
-#ifdef ENABLE_DUMPING
 			IMGUI_TOGGLE("Dump disassembly", Options.Debug.bDumpAsm);
-#endif
 			IMGUI_TOGGLE("Dump individual sections", Options.Debug.bDumpSections);
 			IMGUI_TOGGLE("Dump function ranges", Options.Debug.bDumpFunctions);
 			IMGUI_TOGGLE("Create breakpoints", Options.Debug.bGenerateBreakpoints);

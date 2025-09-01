@@ -149,10 +149,6 @@ set_target_properties(YAPClient PROPERTIES PREFIX "" SUFFIX ".exe")
 if (DEFINED CMAKE_STRIP AND CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_custom_command(TARGET YAPClient POST_BUILD COMMAND objcopy --only-keep-debug $<TARGET_FILE:YAPClient> "bin/${CMAKE_BUILD_TYPE}/YAPClient.dbg" COMMAND ${CMAKE_STRIP} $<TARGET_FILE:YAPClient>)
 endif()
-if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND ENABLE_DUMPING)
-	message(STATUS "Enabled reasm dumps")
-	target_compile_definitions(YAPClient PUBLIC ENABLE_DUMPING)
-endif()
 
 ##### EXTRA #####
 if (CMAKE_BUILD_TYPE STREQUAL "Release")

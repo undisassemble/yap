@@ -233,8 +233,6 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	ShellcodeData.Labels.FatalError = a.newLabel();
 	Mem PEB = ptr(0x60);
 	PEB.setSegment(gs);
-	CSha256 sha = { 0 };
-	Sha256Digest _digest = { 0 };
 	Label unpack = a.newLabel();
 	Label Sha256_Init = a.newLabel();
 	Label Sha256_Update = a.newLabel();

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2025-05-01
+ * @date 2025-08-31
  * @copyright MIT License
  */
 
@@ -102,7 +102,7 @@ void LOG(LoggingLevel_t level, const char* mod, const char* str, ...) {
 }
 
 void vLOG(LoggingLevel_t level, const char* mod, const char* str, va_list vargs) {
-	char buffer[MAX_PATH];
+	char buffer[1024];
 	vsnprintf(buffer, sizeof(buffer), str, vargs);
 	if (Data.bUsingConsole) {
 		if (level) {
