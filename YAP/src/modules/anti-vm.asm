@@ -1,6 +1,7 @@
 %define ASSEMBLER a.
 
-    mov eax, 1
+    ; Hypervisor check
+    mov rax, 1
     cpuid
     mov edx, ecx
     lea rcx, [VMFL]
@@ -8,7 +9,7 @@
     strict 
     %if Options.Packing.bAllowHyperV
         jnc nohv
-        mov eax, 0x40000000
+        mov rax, 0x40000000
         cpuid
         mov eax, ecx
         lea rcx, [VMFL]
@@ -25,3 +26,31 @@
         jc ShellcodeData.Labels.FatalError
     %endif
 nohv:
+
+    ; RDTSC timing check
+    mov r8, 0
+    mov r9, 0x10
+rdtsc_loop:
+    rdtsc
+    block
+    shl rdx, 32
+    block
+    or rax, rdx
+    block
+    sub r8, rax
+    block
+    mov rax, 1
+    block
+    cpuid
+    block
+    rdtsc
+    shl rdx, 32
+    or rax, rdx
+    add r8, rax
+    dec r9
+    jnz rdtsc_loop
+    shr r8, 4
+    lea rcx, [VMFL]
+    cmp r8, 0x500
+    strict
+    jg ShellcodeData.Labels.FatalError
