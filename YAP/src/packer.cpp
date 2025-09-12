@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-08-31
+ * @date 2025-09-12
  * @copyright MIT License
  *
  * @todo Improve anti-debug
@@ -137,12 +137,17 @@ Buffer PackSection(_In_ Buffer SectionData) {
 		data.Release();
 		return data;
 	}
+	if (data.Size() == UINT64_MAX) {
+		LOG(Failed, MODULE_PACKER, "Impossible compressed size\n");
+		data.Release();
+		return data;
+	}
 	data.Allocate(OldSize);
 
 	// Encode (inverse cause yeah)
 	BYTE key = DecoderProc[0].value;
 	BYTE nextkey = 0;
-	for (int i = 0; i < data.Size(); i++) {
+	for (size_t i = 0; i < data.Size(); i++) {
 		nextkey = key + data.Data()[i];
 		nextkey ^= data.Data()[i];
 		for (int j = DecoderProc.Size() - 1; j > 0; j--) {
@@ -211,6 +216,7 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal, _In_ IMA
 	}
 	buf.Allocate(holder.textSection()->buffer().size());
 	memcpy(buf.Data(), holder.textSection()->buffer().data(), buf.Size());
+	LOG(Info, MODULE_PACKER, "TLS code %s relocations\n", holder.hasRelocEntries() ? "contains" : "does not contain");
 	LOG(Success, MODULE_PACKER, "Generated TLS shellcode\n");
 	return buf;
 }
@@ -295,7 +301,7 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	for (WORD i = 0, n = pOriginal->NTHeaders.FileHeader.NumberOfSections; i < n; i++) {
 		if (!pOriginal->SectionHeaders[i].Misc.VirtualSize || !pOriginal->SectionHeaders[i].SizeOfRawData) continue;
 		Buffer buf = Copied.SectionData[i];
-		for (int j = 0; j < buf.Size(); j++) a.db(buf.Data()[j]);
+		a.embed(buf.Data(), buf.Size());
 	}
 	a.bind(InternalShell);
 	a.embed(CompressedInternal.Data(), CompressedInternal.Size());
@@ -863,6 +869,10 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	Data.State = Packing;
 	Data.sTask = "Preparing";
 	srand(GetTickCount64());
+	ZeroMemory(&ShellcodeData.RequestedFunctions, sizeof(ShellcodeData.RequestedFunctions));
+	ShellcodeData.RequestedFunctions.iIndex = -1;
+	ShellcodeData.RequestedFunctions.iKernel32 = -1;
+	ShellcodeData.RequestedFunctions.iNtDLL = -1;
 
 	if (Options.Packing.EncodingCounts > 1) {
 #ifdef _DEBUG

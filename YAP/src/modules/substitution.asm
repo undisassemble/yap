@@ -145,7 +145,7 @@
 	; RAW_C HeldLocks--;
 
 ; mov mem, imm
-%elif mnem(kIdMov) && o0.isMem() && o1.isImm() && ToMem(o0).size() == 8
+%elif mnem(kIdMov) && o0.isMem() && o1.isImm() && ToMem(o0).size() == 8 && ToImm(o1).value() <= 0x7FFFFFFF
 	%if resolve(ToMem(o0))
 		; RAW_C Gp reg = truerandreg();
 		push ToImm(o1)

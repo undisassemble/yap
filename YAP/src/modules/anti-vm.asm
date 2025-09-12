@@ -48,6 +48,7 @@ rdtsc_loop:
     or rax, rdx
     add r8, rax
     dec r9
+    strict
     jnz rdtsc_loop
     shr r8, 4
     lea rcx, [VMFL]

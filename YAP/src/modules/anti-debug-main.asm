@@ -18,7 +18,7 @@
     lea rdx, [Context]
     %if Options.Packing.bDirectSyscalls
         mov r10d, [rax]
-        lea rcx, [DBGFL]
+        lea rcx, [HOOKFL]
         cmp r10d, 0xB8D18B4C
         strict
         jnz ShellcodeData.Labels.FatalError
@@ -62,7 +62,7 @@
     mov r9, 0
     %if Options.Packing.bDirectSyscalls
         mov r10d, [rax]
-        lea rcx, [DBGFL]
+        lea rcx, [HOOKFL]
         cmp r10d, 0xB8D18B4C
         strict
         jnz ShellcodeData.Labels.FatalError
