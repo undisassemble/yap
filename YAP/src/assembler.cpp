@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler functions
  * @version 0.0.0
- * @date 2025-08-29
+ * @date 2025-09-13
  * @copyright MIT License
  */
 
@@ -145,9 +145,11 @@ int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {
 		// Random push
 		if (rand() & 1) {
 			temp = randreg();
-			stack.Push(temp);
-			ret++;
-			push((rand() & 1) ? 0 : rand());
+			if (temp.r64() != rsp && temp.size() == 8) {
+				stack.Push(temp);
+				ret++;
+				push((rand() & 1) ? 0 : rand());
+			}
 		}
 
 		// Random math again
@@ -185,7 +187,7 @@ void ProtectedAssembler::restorestack(_In_ int n) {
 }
 
 void ProtectedAssembler::randinst(Gp o0) {
-	if (!stack.Includes(o0) || Blacklist.Includes(o0.r64()) || Blacklist.Includes(o0) || o0.size() != 8) return;
+	if (!stack.Includes(o0) || Blacklist.Includes(o0.r64()) || o0.size() != 8 || o0 == rsp) return;
 	HeldLocks++;
 	const BYTE sz = 32;
 	const BYTE beg_unsafe = 17;

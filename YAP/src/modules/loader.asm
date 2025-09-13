@@ -93,7 +93,7 @@ USR:
     embed "USER32.dll", 11
 	align AlignMode::kCode, alignof(LPCSTR)
 ADDRFL:
-	embed "Failed to get address of imported function", 43
+	embed "Failed to get address of imported function.", 44
 	align AlignMode::kCode, alignof(LPCSTR)
 DBGFL:
 	embed "Please close any debuggers.", 28

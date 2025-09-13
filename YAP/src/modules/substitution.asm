@@ -9,7 +9,6 @@
 	pop ToGp(o0)
 
 ; call reg
-; TODO: Make sure this works with strict
 %elif mnem(kIdCall) && o0.isGp()
 	; RAW_C BYTE dist = 0;
 	%if !bStrict && !bForceStrict
@@ -35,7 +34,6 @@
 	; RAW_C }
 
 ; call label
-; TODO: Make sure this works with strict
 %elif mnem(kIdCall) && o0.isLabel()
 	; RAW_C Gp reg = truerandreg();
 	; RAW_C BYTE dist = 0;
@@ -64,7 +62,6 @@
 	; RAW_C }
 
 ; call mem
-; TODO: Make sure this works with strict
 %elif mnem(kIdCall) && o0.isMem() && ToMem(o0).baseReg() != rsp
 	; RAW_C Gp reg = truerandreg();
 	; RAW_C Mem _o0 = ToMem(o0);
@@ -99,7 +96,6 @@
 	; RAW_C db(byte);
 	; RAW_C }
 
-
 ; mov reg, imm
 %elif mnem(kIdMov) && o0.isGp() && o1.isImm() && ToGp(o0).size() >= 4 && ToImm(o1).value() <= 0x7FFFFFFF
 	; RAW_C HeldLocks++;
@@ -132,13 +128,13 @@
 	; RAW_C _o1.setSize(ToGp(o0).size());
 	; RAW_C HeldLocks++;
 	; RAW_C Blacklist.Push(ToGp(o0).r64());
-	; RAW_C Blacklist.Push(ToGp(_o1.indexReg()).r64());
-	; RAW_C Blacklist.Push(ToGp(_o1.baseReg()).r64());
+	; RAW_C if (_o1.hasIndexReg()) Blacklist.Push(ToGp(_o1.indexReg()).r64());
+	; RAW_C if (_o1.hasBaseReg()) Blacklist.Push(ToGp(_o1.baseReg()).r64());
 	; RAW_C randstack(0, 7);
 	push _o1
 	; RAW_C stack.Push(ToGp(o0));
-	; RAW_C Blacklist.Pop();
-	; RAW_C Blacklist.Pop();
+	; RAW_C if (_o1.hasBaseReg()) Blacklist.Pop();
+	; RAW_C if (_o1.hasIndexReg()) Blacklist.Pop();
 	; RAW_C Blacklist.Pop();
 	; RAW_C randstack(0, 7);
 	; RAW_C restorestack();
@@ -179,7 +175,6 @@
 		push ToGp(o1)
 		pop _o0
 	%endif
-		
 
 ; ret
 %elif mnem(kIdRet) && !o0.isImm()

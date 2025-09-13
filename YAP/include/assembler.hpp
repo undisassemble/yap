@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler definitions
  * @version 0.0.0
- * @date 2025-08-29
+ * @date 2025-09-13
  * @copyright MIT License
  */
 
@@ -38,7 +38,7 @@ private:
 	BYTE HeldLocks = 0;
 	bool bStrict = false;
 	Gp regs[15] = { rax, rbx, rcx, rdx, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15 };
-	Vector<Gp> Blacklist;
+	Vector<Gpq> Blacklist;
 	Gp truerandreg() { return regs[rand() % countof(regs)]; }
 	Gp randsize(Gp o0) {
 		switch (rand() % 10) {
