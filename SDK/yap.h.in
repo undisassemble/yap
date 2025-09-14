@@ -5,7 +5,7 @@
  * @details Two files are required to use the SDK: `yap.h` and `yap.dll`, make sure that `__YAP_VERSION__` matches the packer. You must link to `yap.dll` directly, so that it appears in the applications import directory. After protection, `yap.dll` is unlinked, meaning you don't need to (and shouldn't) distribute `yap.dll` along with your application. You cannot use `GetModuleHandle`/`GetProcAddress` to resolve `yap.dll` imports.
  * @warning Do not rename `yap.dll`, renaming it prevents the SDK from being recognized.
  * @version 0.0.0
- * @date 2025-08-31
+ * @date 2025-09-14
  * @copyright MIT License
  */
 
@@ -45,11 +45,12 @@ extern "C" {
  * @note Only the main thread of the application can check for hardware breakpoints.
  * 
  * @param [in] bIsMainThread Whether or not to perform the HWBP check, only should be used when called by the main thread.
+ * @param [in] bCheckRunningProcs Whether or not to check if any blacklisted processes are running. Disabled by default because it is SLOW and probably isn't that useful.
  *
  * @retval true Debugger present.
  * @retval false No debugger present.
  */
-__declspec(dllimport) bool __stdcall CheckForDebuggers(_In_ bool bIsMainThread = false);
+__declspec(dllimport) bool __stdcall CheckForDebuggers(_In_ bool bIsMainThread = false, _In_ bool bCheckRunningProcs = false);
 
 /*!
  * @brief Kills all other running threads, shows an error message with the specified message, and exits.

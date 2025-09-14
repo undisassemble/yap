@@ -592,12 +592,13 @@ DEBUG_PROC_BLACKLIST:
 
 ; GLOBAL
 ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
-    sub rsp, sizeof(CONTEXT) + 0x10
     push rsi
     push rbx
     push rbp
+    sub rsp, sizeof(CONTEXT) + 0x10
 
     ; -- PEB check --
+    mov rbp, rdx
     mov r10, PEB
     mov rax, 0
     or al, [r10 + 0x02]
@@ -814,6 +815,10 @@ CheckForDebuggers_SkipHWBP:
 	jz CheckForDebuggers_ret
 
     ; -- Proc list check --
+    mov al, 0
+    test rbp, rbp
+    strict
+    jz CheckForDebuggers_ret
     mov rcx, rsi
     lea rdx, [NTCLOSE]
     call ShellcodeData.Labels.GetProcAddress
@@ -997,10 +1002,10 @@ CheckForDebuggers_EnumProcesses_exit:
     add rsp, 8
 
 CheckForDebuggers_ret:
+    add rsp, sizeof(CONTEXT) + 0x10
     pop rbp
     pop rbx
     pop rsi
-    add rsp, sizeof(CONTEXT) + 0x10
     test rax, rax
     strict
     setnz al

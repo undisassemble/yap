@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-08-31
+ * @date 2025-09-14
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -66,7 +66,6 @@ bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _
 	return bRet;
 }
 
-#ifdef _DEBUG
 void DebugWarning() {
 	ImGui::SameLine();
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
@@ -74,7 +73,6 @@ void DebugWarning() {
 	ImGui::PopStyleColor();
 	ImGui::SetItemTooltip("This feature is experimental, use with caution!");
 }
-#endif
 
 void FeatureWarning(_In_ char* text = NULL) {
 	ImGui::SameLine();
@@ -161,12 +159,12 @@ void DrawGUI() {
 			// DEBUG_ONLY(IMGUI_TOGGLE("Anti-patch", Options.Packing.bAntiPatch));
 			// DEBUG_ONLY(ImGui::SetItemTooltip("Verify signature of binary before loading.\n"));
 			// DEBUG_ONLY(DebugWarning());
-			DEBUG_ONLY(IMGUI_TOGGLE("Anti-VM", Options.Packing.bAntiVM));
-			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a virtual machine."));
-			DEBUG_ONLY(ImGui::SameLine());
-			DEBUG_ONLY(IMGUI_TOGGLE("Allow Hyper-V", Options.Packing.bAllowHyperV));
-			DEBUG_ONLY(ImGui::SetItemTooltip("Still run if the detected VM is only MS Hyper-V."));
-			DEBUG_ONLY(DebugWarning());
+			IMGUI_TOGGLE("Anti-VM", Options.Packing.bAntiVM);
+			ImGui::SetItemTooltip("Prevent app from running in a virtual machine.");
+			ImGui::SameLine();
+			IMGUI_TOGGLE("Allow Hyper-V", Options.Packing.bAllowHyperV);
+			ImGui::SetItemTooltip("Still run if the detected VM is only MS Hyper-V.");
+			DebugWarning();
 			DEBUG_ONLY(IMGUI_TOGGLE("Anti-sandbox", Options.Packing.bAntiSandbox));
 			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a sandboxed environment."));
 			DEBUG_ONLY(DebugWarning());

@@ -3,7 +3,7 @@
     !error "Must define VERSION"
 !endif
 Name "Yet Another Packer"
-OutFile "YAP-${VERSION}-Installer.exe"
+OutFile "Installer-win64.exe"
 InstallDir "$PROGRAMFILES64\Yet Another Packer"
 RequestExecutionLevel admin
 SetCompressor lzma
@@ -45,7 +45,7 @@ VIProductVersion "${VERSION}.0"
 VIFileVersion "${VERSION}.0"
 VIAddVersionKey "ProductVersion" "${VERSION}"
 VIAddVersionKey "FileVersion" "${VERSION}"
-VIAddVersionKey "FileDescription" "Protector for AMD64 native Windows PEs."
+VIAddVersionKey "FileDescription" "A free and open source protector for x86_64 Windows PEs. "
 
 ;-- INSTALLER --;
 Section
