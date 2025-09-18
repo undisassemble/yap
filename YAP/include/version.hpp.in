@@ -3,13 +3,13 @@
  * @author undisassemble
  * @brief Version information
  * @version 0.0.0
- * @date 2025-09-14
+ * @date 2025-09-18
  * @copyright MIT License
  */
 
 #pragma once
 
-#define __YAP_VERSION__ "@PROJECT_VERSION@" // Remove dev tag for releases
+#define __YAP_VERSION__ "@PROJECT_VERSION@-dev" // Remove dev tag for releases
 #define __YAP_VERSION_MASK_DEBUG__ 0xFF000000
 #define __YAP_VERSION_MASK_MAJOR__ 0x000000FF
 #define __YAP_VERSION_MASK_MINOR__ 0x0000FF00

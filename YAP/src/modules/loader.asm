@@ -107,7 +107,7 @@ QSI:
 INTEG_OPT:
     dd 8
     dd 0
-%define DEBUG_PROC_BLACKLIST_LEN 21
+%define DEBUG_PROC_BLACKLIST_LEN 22
 DEBUG_PROC_BLACKLIST:
 	embed &Sha256WStr(L"x96dbg.exe"), sizeof(Sha256Digest)
 	embed &Sha256WStr(L"x64dbg.exe"), sizeof(Sha256Digest)
@@ -116,6 +116,7 @@ DEBUG_PROC_BLACKLIST:
 	embed &Sha256WStr(L"x32dbg-unsigned.exe"), sizeof(Sha256Digest)
 	embed &Sha256WStr(L"TitanHideGUI.exe"), sizeof(Sha256Digest)
 	embed &Sha256WStr(L"ida.exe"), sizeof(Sha256Digest)
+	embed &Sha256WStr(L"ida64.exe"), sizeof(Sha256Digest)
 	embed &Sha256WStr(L"cutter.exe"), sizeof(Sha256Digest)
 	embed &Sha256WStr(L"rizin.exe"), sizeof(Sha256Digest)
 	embed &Sha256WStr(L"rz-asm.exe"), sizeof(Sha256Digest)
