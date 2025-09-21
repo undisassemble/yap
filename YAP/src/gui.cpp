@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-09-14
+ * @date 2025-09-21
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -109,8 +109,8 @@ void DrawGUI() {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
-			if (ImGui::MenuItem(ICON_CIRCLE_QUESTION " Feature help")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/docs/features.md", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
+			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open Website")) { ShellExecuteA(Data.hWnd, "open", "https://undisassemble.dev/yap", NULL, NULL, 0); }
 			if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
 			ImGui::EndMenu();
 		}
