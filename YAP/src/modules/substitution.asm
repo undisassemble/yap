@@ -176,6 +176,26 @@
 		pop _o0
 	%endif
 
+; jmp reg
+%elif mnem(kIdJmp) && o0.isGp()
+	push ToGp(o0)
+	ret
+
+; jmp label
+%elif mnem(kIdJmp) && o0.isLabel()
+	; RAW_C Gp reg = truerandreg();
+	push reg
+	lea reg, [ToLabel(o0)]
+	xchg reg, [rsp]
+	ret
+
+; jmp mem
+%elif mnem(kIdJmp) && o0.isMem()
+	%if !resolve(ToMem(o0))
+		push ToMem(o0)
+	%endif
+	ret
+
 ; ret
 %elif mnem(kIdRet) && !o0.isImm()
 	%if stack.Size()
