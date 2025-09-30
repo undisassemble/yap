@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-09-21
+ * @date 2025-09-30
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -234,6 +234,8 @@ void DrawGUI() {
 				ImGui::PopItemWidth();
 				IMGUI_TOGGLE("Fake symbol table", Options.Advanced.bFakeSymbols);
 				IMGUI_TOGGLE("Mutate", Options.Advanced.bMutateAssembly);
+				ImGui::SameLine();
+				IMGUI_TOGGLE("Substitute", Options.Advanced.bEnableSubstitution);
 				FeatureWarning("I highly recommend keeping this setting enabled.");
 				IMGUI_TOGGLE("Semi-random section names", Options.Advanced.bSemiRandomSecNames);
 				IMGUI_TOGGLE("Full-random section names", Options.Advanced.bTrueRandomSecNames);

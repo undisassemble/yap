@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-09-12
+ * @date 2025-09-30
  * @copyright MIT License
  *
  * @todo Improve anti-debug
@@ -199,7 +199,8 @@ Buffer GenerateTLSShellcode(_In_ PE* pPackedBinary, _In_ PE* pOriginal, _In_ IMA
 	AsmJitErrorHandler ErrorHandler;
 	holder.setErrorHandler(&ErrorHandler);
 	ProtectedAssembler a(&holder);
-	a.bMutate = a.bSubstitute = Options.Advanced.bMutateAssembly;
+	a.bMutate = Options.Advanced.bMutateAssembly;
+	a.bSubstitute = Options.Advanced.bEnableSubstitution;
 	a.MutationLevel = Options.Packing.MutationLevel;
 	Mem PEB = ptr(0x60);
 	PEB.setSegment(gs);
@@ -231,7 +232,8 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	AsmJitErrorHandler ErrorHandler;
 	holder.setErrorHandler(&ErrorHandler);
 	ProtectedAssembler a(&holder);
-	a.bMutate = a.bSubstitute = Options.Advanced.bMutateAssembly;
+	a.bMutate = Options.Advanced.bMutateAssembly;
+	a.bSubstitute = Options.Advanced.bEnableSubstitution;
 	a.MutationLevel = Options.Packing.MutationLevel;
 	ShellcodeData.Labels.GetModuleHandleW = a.newLabel();
 	ShellcodeData.Labels.GetProcAddress = a.newLabel();
@@ -357,7 +359,8 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	AsmJitErrorHandler ErrorHandler;
 	holder.setErrorHandler(&ErrorHandler);
 	ProtectedAssembler a(&holder);
-	a.bMutate = a.bSubstitute = Options.Advanced.bMutateAssembly;
+	a.bMutate = Options.Advanced.bMutateAssembly;
+	a.bSubstitute = Options.Advanced.bEnableSubstitution;
 	a.MutationLevel = Options.Packing.MutationLevel;
 	a.desync();
 	Label KERNEL32DLL = a.newLabel();

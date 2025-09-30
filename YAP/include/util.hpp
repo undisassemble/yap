@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2025-05-25
+ * @date 2025-09-30
  * @copyright MIT License
  */
 
@@ -171,7 +171,8 @@ struct Options_t {
 		bool bSemiRandomSecNames : 1 = true;
 		bool bFakeSymbols : 1 = true;
 		bool bMutateAssembly : 1 = true;
-		uint64_t reserved : 27 = 0;
+		bool bEnableSubstitution : 1 = true;
+		uint64_t reserved : 26 = 0;
 		BYTE UPXVersionMajor = 5;
 		BYTE UPXVersionMinor = 0;
 		BYTE UPXVersionPatch = 2;

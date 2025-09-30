@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler functions
  * @version 0.0.0
- * @date 2025-09-13
+ * @date 2025-09-30
  * @copyright MIT License
  */
 
@@ -612,10 +612,10 @@ Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand
 
 	// Mutate
 	bool bSubFailed = false;
-	if (bMutate && !bWaitingOnEmit && !(uint32_t)(OldPrefixes & (InstOptions::kX86_Lock | InstOptions::kX86_Rep | InstOptions::kX86_Repne | InstOptions::kX86_XAcquire | InstOptions::kX86_XRelease))) {
+	if (!bWaitingOnEmit && !(uint32_t)(OldPrefixes & (InstOptions::kX86_Lock | InstOptions::kX86_Rep | InstOptions::kX86_Repne | InstOptions::kX86_XAcquire | InstOptions::kX86_XRelease))) {
 		bool bOldForce = bForceStrict;
 		bForceStrict |= bStrict;
-		if (!HeldLocks) stub();
+		if (!HeldLocks && bMutate) stub();
 		
 		// Substitution
 		if (bSubstitute) {
@@ -631,6 +631,8 @@ Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand
 	} else {
 		bSubFailed = true;
 	}
+
+	// Emit
 	_instOptions = OldPrefixes;
 	bStrict = bWaitingOnEmit = false;
 	return bSubFailed ? Assembler::_emit(instId, o0, o1, o2, opExt) : ErrorCode::kErrorOk;
