@@ -191,16 +191,18 @@
 
 ; jmp mem
 %elif mnem(kIdJmp) && o0.isMem()
-	%if !resolve(ToMem(o0))
+	%if resolve(ToMem(o0))
+		; RAW_C Gp reg = truerandreg();
+		xchg [rsp], reg
+		mov reg, [reg]
+		xchg [rsp], reg
+	%else
 		push ToMem(o0)
 	%endif
 	ret
 
 ; ret
 %elif mnem(kIdRet) && !o0.isImm()
-	%if stack.Size()
-		; RAW_C restorestack();
-	%endif
 	; RAW_C Gp reg = truerandreg();
 	push reg
 	mov reg, qword [0x7FFE02F8]
