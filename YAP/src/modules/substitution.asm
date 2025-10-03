@@ -98,47 +98,20 @@
 
 ; mov reg, imm
 %elif mnem(kIdMov) && o0.isGp() && o1.isImm() && ToGp(o0).size() >= 4 && ToImm(o1).value() <= 0x7FFFFFFF
-	; RAW_C HeldLocks++;
-	; RAW_C Blacklist.Push(ToGp(o0).r64());
-	; RAW_C randstack(0, 7);
 	push ToImm(o1)
-	; RAW_C stack.Push(ToGp(o0).r64());
-	; RAW_C Blacklist.Pop();
-	; RAW_C randstack(0, 7);
-	; RAW_C restorestack();
-	; RAW_C HeldLocks--;
+	pop ToGp(o0).r64()
 
 ; mov reg, reg
 %elif mnem(kIdMov) && o0.isGp() && o1.isGp() && ToGp(o1).r64() != rsp && ToGp(o0).size() == ToGp(o1).size() && (ToGp(o0).size() == 2 || ToGp(o0).size() == 8)
-	; RAW_C HeldLocks++;
-	; RAW_C Blacklist.Push(ToGp(o0).r64());
-	; RAW_C Blacklist.Push(ToGp(o1).r64());
-	; RAW_C randstack(0, 7);
 	push ToGp(o1)
-	; RAW_C stack.Push(ToGp(o0));
-	; RAW_C Blacklist.Pop();
-	; RAW_C Blacklist.Pop();
-	; RAW_C randstack(0, 7);
-	; RAW_C restorestack();
-	; RAW_C HeldLocks--;
+	pop ToGp(o0)
 
 ; mov reg, mem
 %elif mnem(kIdMov) && o0.isGp() && o1.isMem() && ToMem(o1).baseReg() != rsp && (ToGp(o0).size() == 2 || ToGp(o0).size() == 8)
 	; RAW_C Mem _o1 = ToMem(o1);
 	; RAW_C _o1.setSize(ToGp(o0).size());
-	; RAW_C HeldLocks++;
-	; RAW_C Blacklist.Push(ToGp(o0).r64());
-	; RAW_C if (_o1.hasIndexReg()) Blacklist.Push(ToGp(_o1.indexReg()).r64());
-	; RAW_C if (_o1.hasBaseReg()) Blacklist.Push(ToGp(_o1.baseReg()).r64());
-	; RAW_C randstack(0, 7);
 	push _o1
-	; RAW_C stack.Push(ToGp(o0));
-	; RAW_C if (_o1.hasBaseReg()) Blacklist.Pop();
-	; RAW_C if (_o1.hasIndexReg()) Blacklist.Pop();
-	; RAW_C Blacklist.Pop();
-	; RAW_C randstack(0, 7);
-	; RAW_C restorestack();
-	; RAW_C HeldLocks--;
+	pop ToGp(o0)
 
 ; mov mem, imm
 %elif mnem(kIdMov) && o0.isMem() && o1.isImm() && ToMem(o0).size() == 8 && ToImm(o1).value() <= 0x7FFFFFFF

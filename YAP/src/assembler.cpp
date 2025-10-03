@@ -5,6 +5,8 @@
  * @version 0.0.0
  * @date 2025-09-30
  * @copyright MIT License
+ * 
+ * @todo mov substitution can be improved, mix it in with other push/pop instructions properly
  */
 
 #include "assembler.hpp"
@@ -61,6 +63,7 @@ bool ProtectedAssembler::resolve(_In_ Mem o0) {
 	if (o0.hasBaseLabel()) {
 		if (rand() & 1) {
 			push(reg);
+			block();
 			lea(reg, ptr(rip));
 			off = offset();
 			add(ptr(rsp), reg);
@@ -77,6 +80,7 @@ bool ProtectedAssembler::resolve(_In_ Mem o0) {
 		} else {
 			NeededLink link = { 0 };
 			push(reg);
+			block();
 			mov(reg, 0xFF00FF00FF00FF00);
 			link.offsetToLink = offset() - 8;
 			link.offsetOfRIP = off;
@@ -283,6 +287,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 			BYTE selected = valid[rand() % sizeof(valid)];
 			db(selected);
 		}
+		block();
 		not_(o0);
 		break;
 	}
@@ -305,6 +310,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 			BYTE validators[] = { 0x40, 0x42, 0x44, 0x46, 0x48, 0x4A, 0x4C, 0x4E };
 			db(validators[rand() % sizeof(validators)]);
 		}
+		block();
 		setz(o0.r8());
 		break;
 	}
@@ -327,6 +333,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 			BYTE validators[] = { 0x40, 0x42, 0x44, 0x46, 0x48, 0x4A, 0x4C, 0x4E };
 			db(validators[rand() % sizeof(validators)]);
 		}
+		block();
 		setnz(o0.r8());
 		break;
 	}
@@ -619,9 +626,7 @@ Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand
 		
 		// Substitution
 		if (bSubstitute) {
-			bSubstitute = false;
 			#include "modules/substitution.inc"
-			bSubstitute = true;
 		} else {
 			bSubFailed = true;
 		}
