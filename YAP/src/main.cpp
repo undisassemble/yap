@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-08-31
+ * @date 2025-11-05
  * @copyright MIT License
  */
 
@@ -176,7 +176,7 @@ DWORD WINAPI Begin(void* args) {
 					int n = 0;
 					switch (line.Type) {
 					case Decoded:
-						n = snprintf(buf, 512, "%8.8s:%p\t", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA);
+						n = snprintf(buf, 512, "%8.8s:%llx\t", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA);
 						inst = line.Decoded.Instruction;
 						for (int i = 0; i < inst.operand_count_visible; i++) {
 							ops[i] = line.Decoded.Operands[i];
@@ -188,16 +188,16 @@ DWORD WINAPI Begin(void* args) {
 						buf[n] = 0;
 						break;
 					case Embed:
-						n = snprintf(buf, 512, "%8.8s:%p\tData %#x\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, line.Embed.Size);
+						n = snprintf(buf, 512, "%8.8s:%llx\tData %#lx\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, line.Embed.Size);
 						break;
 					case Padding:
-						n = snprintf(buf, 512, "%8.8s:%p\tPadding %#x\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, line.Padding.Size);
+						n = snprintf(buf, 512, "%8.8s:%llx\tPadding %#lx\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, line.Padding.Size);
 						break;
 					case JumpTable:
-						n = snprintf(buf, 512, "%8.8s:%p\tcase 0x%p\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, pAssembly->NTHeaders.OptionalHeader.ImageBase + ((line.bRelative ? line.JumpTable.Base : 0) + line.JumpTable.Value));
+						n = snprintf(buf, 512, "%8.8s:%llx\tcase 0x%llx\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, pAssembly->NTHeaders.OptionalHeader.ImageBase + ((line.bRelative ? line.JumpTable.Base : 0) + line.JumpTable.Value));
 						break;
 					case Pointer:
-						n = snprintf(buf, 512, "%8.8s:%p\tPtr 0x%p\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, (line.Pointer.IsAbs ? line.Pointer.Abs : pAssembly->NTHeaders.OptionalHeader.ImageBase + line.Pointer.RVA));
+						n = snprintf(buf, 512, "%8.8s:%llx\tPtr 0x%llx\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, (line.Pointer.IsAbs ? line.Pointer.Abs : pAssembly->NTHeaders.OptionalHeader.ImageBase + line.Pointer.RVA));
 					default:
 						break;
 					}
