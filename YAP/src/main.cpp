@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-11-05
+ * @date 2025-11-25
  * @copyright MIT License
  */
 
@@ -150,7 +150,7 @@ DWORD WINAPI Begin(void* args) {
 
 		// Disassemble
 		Data.State = Disassembling;
-		if (!pAssembly->Disassemble()) {
+		if (!pAssembly->Disassemble(DEBUG_ONLY(!Options.Debug.bSkipDisasmValidation))) {
 			Modal("Disassembly failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Disassembly failed\n");
 			goto th_exit;

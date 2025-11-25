@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-09-30
+ * @date 2025-11-25
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -265,6 +265,7 @@ void DrawGUI() {
 			IMGUI_TOGGLE("Wrap real instructions in NOPs", Options.Debug.bGenerateMarks);
 			IMGUI_TOGGLE("Strict mutation", Options.Debug.bStrictMutation);
 			IMGUI_TOGGLE("Disable relocations", Options.Debug.bDisableRelocations);
+			IMGUI_TOGGLE("Skip disassembly validation", Options.Debug.bSkipDisasmValidation);
 			if (ImGui::Button("Test error")) Modal("Test error", "Error", MB_OK | MB_ICONERROR);
 			ImGui::SameLine();
 			if (ImGui::Button("Test warning")) Modal("Test warning", "Warning", MB_OK | MB_ICONWARNING);

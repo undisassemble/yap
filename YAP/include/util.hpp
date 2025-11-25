@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2025-09-30
+ * @date 2025-11-25
  * @copyright MIT License
  */
 
@@ -188,7 +188,8 @@ struct Options_t {
 		bool bGenerateMarks : 1 = false;
 		bool bDisableRelocations : 1 = false;
 		bool bStrictMutation : 1 = false;
-		uint64_t reserved : 25 = 0;
+		bool bSkipDisasmValidation : 1 = false;
+		uint64_t reserved : 24 = 0;
 	} Debug;
 };
 
