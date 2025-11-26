@@ -171,37 +171,11 @@ DWORD WINAPI Begin(void* args) {
 				Vector<Line>* Lines = Sections[SecIndex].Lines;
 				for (size_t i = 0, j = Lines->Size(); i < j; i++) {
 					Line line = Lines->At(i);
-					ZydisDecodedInstruction inst;
-					ZydisDecodedOperand ops[4];
-					int n = 0;
-					switch (line.Type) {
-					case Decoded:
-						n = snprintf(buf, 512, "%8.8s:%llx\t", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA);
-						inst = line.Decoded.Instruction;
-						for (int i = 0; i < inst.operand_count_visible; i++) {
-							ops[i] = line.Decoded.Operands[i];
-						}
-						ZydisFormatterFormatInstruction(&Formatter, &inst, ops, line.Decoded.Instruction.operand_count_visible, &buf[n], 512 - n, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, NULL);
-						n = lstrlenA(buf);
-						buf[n] = '\n';
-						n++;
-						buf[n] = 0;
-						break;
-					case Embed:
-						n = snprintf(buf, 512, "%8.8s:%llx\tData %#lx\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, line.Embed.Size);
-						break;
-					case Padding:
-						n = snprintf(buf, 512, "%8.8s:%llx\tPadding %#lx\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, line.Padding.Size);
-						break;
-					case JumpTable:
-						n = snprintf(buf, 512, "%8.8s:%llx\tcase 0x%llx\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, pAssembly->NTHeaders.OptionalHeader.ImageBase + ((line.bRelative ? line.JumpTable.Base : 0) + line.JumpTable.Value));
-						break;
-					case Pointer:
-						n = snprintf(buf, 512, "%8.8s:%llx\tPtr 0x%llx\n", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA, (line.Pointer.IsAbs ? line.Pointer.Abs : pAssembly->NTHeaders.OptionalHeader.ImageBase + line.Pointer.RVA));
-					default:
-						break;
-					}
+					int n = snprintf(buf, sizeof(buf), "%8.8s:%llx\t", pAssembly->SectionHeaders[SecIndex].Name, pAssembly->NTHeaders.OptionalHeader.ImageBase + line.OldRVA);
 					WriteFile(hDumped, buf, n, NULL, NULL);
+					line.ToString(buf, sizeof(buf), Formatter);
+					WriteFile(hDumped, buf, lstrlenA(buf), NULL, NULL);
+					WriteFile(hDumped, "\n", 1, NULL, NULL);
 				}
 			}
 			CloseHandle(hDumped);
