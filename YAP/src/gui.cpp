@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-11-25
+ * @date 2025-12-26
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -26,8 +26,9 @@
 
 // Globals
 bool bMinimized = false, bOpen = true, bInitialized = false;
-const int width = 850;
-const int height = 560;
+int iGuiWidth = 850;
+int iGuiHeight = 560;
+float fGuiScale = 1.f;
 ImGuiWindow* pImGuiWindow = NULL;
 extern Asm* pAssembly;
 ImWchar range[] = { 0xE005, 0xF8FF, 0 };
@@ -116,8 +117,8 @@ void DrawGUI() {
 		}
 		//ImGui::SetCursorPos(ImVec2((width - ImGui::CalcTextSize("Yet Another Packer").x) / 2, 0));
 		//ImGui::Text("Yet Another Packer");
-		if (ImGui::CollapseButton(ImGui::GetCurrentWindow()->GetID("#COLLAPSE"), ImVec2(802, 3))) { ImGui::GetCurrentWindow()->Collapsed = !ImGui::GetCurrentWindow()->Collapsed; }
-		if (ImGui::CloseButton(ImGui::GetCurrentWindow()->GetID("#CLOSE"), ImVec2(824, 3))) { bOpen = false; }
+		if (ImGui::CollapseButton(ImGui::GetCurrentWindow()->GetID("#COLLAPSE"), ImVec2(iGuiWidth - 48 * fGuiScale, 3))) { ImGui::GetCurrentWindow()->Collapsed = !ImGui::GetCurrentWindow()->Collapsed; }
+		if (ImGui::CloseButton(ImGui::GetCurrentWindow()->GetID("#CLOSE"), ImVec2(iGuiWidth - 26 * fGuiScale, 3))) { bOpen = false; }
 		ImGui::EndMenuBar();
 	}
 	
@@ -180,7 +181,7 @@ void DrawGUI() {
 			IMGUI_TOGGLE("Process masquerading", Options.Packing.bEnableMasquerade);
 			ImGui::SetItemTooltip("Makes the packed executable appear as a different process (NOT process hollowing).\nPlease note that the smaller the path the easier it is to use.");
 			ImGui::SameLine();
-			ImGui::SetNextItemWidth((float)width / 2);
+			ImGui::SetNextItemWidth((float)iGuiWidth / 2);
 			ImGui::InputText(" ", Options.Packing.Masquerade, MAX_PATH);
 			ImGui::SameLine();
 			if (ImGui::Button("Scramble")) {
@@ -303,7 +304,7 @@ void DrawGUI() {
 		}
 
 		ImGui::EndTabBar();
-		ImGui::SetCursorPos(ImVec2(770 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] : 0), 530 + ImGui::GetScrollY()));
+		ImGui::SetCursorPos(ImVec2(iGuiWidth - 80 * fGuiScale - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] : 0), iGuiHeight - 30 * fGuiScale + ImGui::GetScrollY()));
 		if (ImGui::Button(ICON_SHIELD_HALVED " Protect")) {
 			char file[MAX_PATH] = { 0 };
 			if (!OpenFileDialogue(file, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, false)) {
@@ -509,13 +510,8 @@ bool BeginGUI() {
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags = ImGuiConfigFlags_NavEnableKeyboard;
 	io.IniFilename = NULL;
-	io.Fonts->Clear();
-	io.FontDefault = NULL;
-	io.Fonts->AddFontFromMemoryCompressedTTF(font_compressed_data, font_compressed_size, 16.f);
-	ImFontConfig config;
-	config.MergeMode = true;
-	config.GlyphMinAdvanceX = 16.f;
-	io.Fonts->AddFontFromMemoryCompressedTTF(icons_compressed_data, icons_compressed_size, 16.f, &config, range);
+
+	// Setup style
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.Colors[ImGuiCol_WindowBg] = ImColor(25, 25, 25, 255);
 	style.Colors[ImGuiCol_PopupBg] = ImColor(20, 20, 20, 240);
@@ -540,23 +536,42 @@ bool BeginGUI() {
     style.Colors[ImGuiCol_Header] = ImColor(40, 40, 40, 255);
     style.Colors[ImGuiCol_HeaderHovered] = ImColor(60, 60, 60, 255);
     style.Colors[ImGuiCol_HeaderActive] = ImColor(80, 80, 80, 255);
-	
 	style.WindowRounding = 10.0f;
 	style.WindowBorderSize = 0.0f;
 	style.FrameRounding = 5.0f;
 	style.GrabMinSize = 10.0f;
 	style.GrabRounding = 5.0f;
 
+	// Scaling
+	int x, y, mon_x, mon_y;
+	glfwGetMonitorWorkarea(glfwGetPrimaryMonitor(), &x, &y, &mon_x, &mon_y);
+	fGuiScale = mon_x / 1920.f;
+	if (mon_y / 1080.f < fGuiScale) {
+		fGuiScale = mon_y / 1080.f;
+	}
+	LOG(Info, MODULE_YAP, "Detected monitor size: (%d, %d)\n", mon_x, mon_y);
+	LOG(Info, MODULE_YAP, "GUI scaling: %f\n", fGuiScale);
+	style.ScaleAllSizes(fGuiScale);
+	iGuiWidth *= fGuiScale;
+	iGuiHeight *= fGuiScale;
+
+	// Setup fonts
+	io.Fonts->Clear();
+	io.FontDefault = NULL;
+	io.Fonts->AddFontFromMemoryCompressedTTF(font_compressed_data, font_compressed_size, 16 * fGuiScale);
+	ImFontConfig config;
+	config.MergeMode = true;
+	config.GlyphMinAdvanceX = 16.f;
+	io.Fonts->AddFontFromMemoryCompressedTTF(icons_compressed_data, icons_compressed_size, 16 * fGuiScale, &config, range);
+
 	// Create window
 	glfwWindowHint(GLFW_RESIZABLE, 0);
 	glfwWindowHint(GLFW_DECORATED, 0);
 	glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, 1);
-	GLFWwindow* pWindow = glfwCreateWindow(width, height, "Yet Another Packer", NULL, NULL);
+	GLFWwindow* pWindow = glfwCreateWindow(iGuiWidth, iGuiHeight, "Yet Another Packer", NULL, NULL);
 	if (!pWindow) return false;
 	Data.hWnd = glfwGetWin32Window(pWindow);
-	int x, y, mon_x, mon_y;
-	glfwGetMonitorWorkarea(glfwGetPrimaryMonitor(), &x, &y, &mon_x, &mon_y);
-	glfwSetWindowPos(pWindow, x + (mon_x - width) / 2, y + (mon_y - height) / 2);
+	glfwSetWindowPos(pWindow, x + (mon_x - iGuiWidth) / 2, y + (mon_y - iGuiHeight) / 2);
 	glfwMakeContextCurrent(pWindow);
 	glfwSwapInterval(1);
 	ImGui_ImplGlfw_InitForOpenGL(pWindow, true);
@@ -611,7 +626,7 @@ bool BeginGUI() {
 
 		// Render
 		ImGui::SetNextWindowPos(ImVec2(0, 0));
-		ImGui::SetNextWindowSize(ImVec2(width, height));
+		ImGui::SetNextWindowSize(ImVec2(iGuiWidth, iGuiHeight));
 		ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
 		DrawGUI();
 
