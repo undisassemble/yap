@@ -122,15 +122,14 @@ endif()
 
 # Generate includes
 file(GLOB SOURCES_ASM "YAP/src/modules/*.asm")
-add_custom_target(Generated ${Python3_EXECUTABLE} "${CMAKE_CURRENT_BINARY_DIR}/generate_asm.py" DEPENDS ${SOURCES_ASM})
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/YAP/include/modules/loader.inc" DEPENDS ${SOURCES_ASM} COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_BINARY_DIR}/generate_asm.py")
 
 # YAPClient.exe
 file(GLOB SOURCES
 	"YAP/src/*.cpp"
 	"YAP/meta/YAPClient.rc"
 )
-add_executable(YAPClient WIN32 ${SOURCES})
-add_dependencies(YAPClient Generated)
+add_executable(YAPClient WIN32 ${SOURCES} "${CMAKE_CURRENT_BINARY_DIR}/YAP/include/modules/loader.inc")
 target_include_directories(YAPClient PRIVATE "YAP/include")
 target_link_options(YAPClient PUBLIC -mwindows)
 target_compile_definitions(YAPClient PUBLIC _GLFW_WIN32)
