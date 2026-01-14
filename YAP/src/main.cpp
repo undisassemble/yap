@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2025-11-25
+ * @date 2026-01-14
  * @copyright MIT License
  */
 
@@ -15,6 +15,7 @@
 #include "packer.hpp"
 #include "gui.hpp"
 #include "debugger.hpp"
+#include "substitution.hpp"
 #include <time.h>
 #include <GLFW/glfw3.h>
 
@@ -85,6 +86,7 @@ int main(int argc, char** argv) {
 			CloseHandle(pi.hThread);
 		}
 	}
+	RegisterDefaultSubstitutions();
 	
 	// Look for - commands
 	for (int i = 1; i < argc; i++) {

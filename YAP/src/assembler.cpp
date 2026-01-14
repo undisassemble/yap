@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler functions
  * @version 0.0.0
- * @date 2025-09-30
+ * @date 2026-01-14
  * @copyright MIT License
  * 
  * @todo mov substitution can be improved, mix it in with other push/pop instructions properly
@@ -11,6 +11,7 @@
 
 #include "assembler.hpp"
 #include "util.hpp"
+#include "substitution.hpp"
 
 // SDK defs
 #define YAP_OP_REASM_MUTATION 0b10000000
@@ -626,7 +627,15 @@ Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand
 		
 		// Substitution
 		if (bSubstitute) {
-			#include "modules/substitution.inc"
+			DWORD id = MakeSubstitutionID((Inst::Id)instId, o0.opType(), o1.opType(), o2.opType(), opExt ? opExt->opType() : OperandType::kNone);
+			for (int i = 0; i < SubstitutionDict.Size(); i++) {
+				if (SubstitutionDict[i].first == id) {
+					bSubFailed = !SubstitutionDict[i].second(this, o0, o1, o2, opExt ? *opExt : Operand_());
+					id = _UI32_MAX;
+					break;
+				}
+			}
+			if (id != _UI32_MAX) bSubFailed = true;
 		} else {
 			bSubFailed = true;
 		}

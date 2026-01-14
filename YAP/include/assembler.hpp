@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler definitions
  * @version 0.0.0
- * @date 2025-09-13
+ * @date 2026-01-14
  * @copyright MIT License
  */
 
@@ -39,6 +39,10 @@ private:
 	bool bStrict = false;
 	Gp regs[15] = { rax, rbx, rcx, rdx, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15 };
 	Vector<Gpq> Blacklist;
+	Vector<Gp> stack;
+	Vector<NeededLink> NeededLinks;
+
+public:
 	Gp truerandreg() { return regs[rand() % countof(regs)]; }
 	Gp randsize(Gp o0) {
 		switch (rand() % 10) {
@@ -79,14 +83,11 @@ private:
 		return o1;
 	}
 	Gp randreg() { return stack.Size() ? stack[rand() % stack.Size()] : (Gp)rsp; }
-	Vector<Gp> stack;
-	Vector<NeededLink> NeededLinks;
 	int randstack(_In_ int nMin = 0, _In_ int nMax = 15);
 	void restorestack(_In_ int n = -1);
 	void randinst(Gp o0);
 	uint64_t GetStackSize();
 
-public:
 	/*!
 	 * @brief Allow mutation.
 	 */
@@ -165,6 +166,11 @@ public:
 	 * @brief Prevents `stub()` from modifying `RFLAGS`.
 	 */
 	void strict() { bStrict = true; }
+
+	/*!
+	 * @brief If the next instruction will avoid modifying `RFLAGS`.
+	 */
+	bool is_strict() { return bStrict || bForceStrict; }
 
 	/*!
 	 * @brief Resolves memory address and pushes to top of stack.
