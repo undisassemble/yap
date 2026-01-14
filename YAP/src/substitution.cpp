@@ -12,11 +12,11 @@
 
 Vector<std::pair<DWORD, SubstitutionCallback_t>> SubstitutionDict;
 
-DWORD MakeSubstitutionID(Inst::Id mnemonic, OperandType o0, OperandType o1, OperandType o2, OperandType o3) {
+DWORD MakeSubstitutionID(_In_ Inst::Id mnemonic, _In_ OperandType o0, _In_ OperandType o1, _In_ OperandType o2, _In_ OperandType o3) {
     return (DWORD)mnemonic | ((DWORD)o0 << 11) | ((DWORD)o1 << 14) | ((DWORD)o2 << 17) | ((DWORD)o3 << 20);
 }
 
-void AddSubstitute(SubstitutionCallback_t callback, DWORD SubstitutionID) {
+void AddSubstitute(_In_ SubstitutionCallback_t callback, _In_ DWORD SubstitutionID) {
     // Overwrite existing substitution
     for (int i = 0; i < SubstitutionDict.Size(); i++) {
         if (SubstitutionDict[i].first == SubstitutionID) {
@@ -29,7 +29,7 @@ void AddSubstitute(SubstitutionCallback_t callback, DWORD SubstitutionID) {
     SubstitutionDict.Push(std::make_pair(SubstitutionID, callback));
 }
 
-void AddSubstitute(SubstitutionCallback_t callback, Inst::Id mnemonic, OperandType o0, OperandType o1, OperandType o2, OperandType o3) {
+void AddSubstitute(_In_ SubstitutionCallback_t callback, _In_ Inst::Id mnemonic, _In_ OperandType o0, _In_ OperandType o1, _In_ OperandType o2, _In_ OperandType o3) {
     LOG(Info, MODULE_REASSEMBLER, "Registered substitute for %u %u, %u, %u, %u\n", mnemonic, o0, o1, o2, o3);
     AddSubstitute(callback, MakeSubstitutionID(mnemonic, o0, o1, o2, o3));
 }
@@ -70,7 +70,7 @@ namespace Defaults {
 
     bool __stdcall call(ProtectedAssembler* pAsm, const Label& o0, const Operand_&, const Operand_&, const Operand_&) {
         Label call_label_after = pAsm->newLabel();
-        Gp reg = pAsm->truerandreg();
+        Gp reg = truerandreg();
 	    BYTE dist = 0;
 	    if (!pAsm->is_strict()) {
 	    	dist = 64 + (rand() % 192);
@@ -101,7 +101,7 @@ namespace Defaults {
     bool __stdcall call(ProtectedAssembler* pAsm, const Mem& o0, const Operand_&, const Operand_&, const Operand_&) {
         if (o0.baseReg() == rsp) return false;
         Label call_mem_after = pAsm->newLabel();
-        Gp reg = pAsm->truerandreg();
+        Gp reg = truerandreg();
         Mem _o0 = o0;
         _o0.setSize(8);
 	    BYTE dist = 0;
@@ -162,7 +162,7 @@ namespace Defaults {
     bool __stdcall mov(ProtectedAssembler* pAsm, const Mem& o0, const Imm& o1, const Operand_&, const Operand_&) {
         if (o0.size() != 8 || o1.value() > 0x7FFFFFFF) return false;
         if (pAsm->resolve(o0)) {
-	    	Gp reg = pAsm->truerandreg();
+	    	Gp reg = truerandreg();
 	    	pAsm->push(o1);
 	    	pAsm->xchg(reg, ptr(rsp, 8));
 	    	pAsm->pop(qword_ptr(reg));
@@ -181,7 +181,7 @@ namespace Defaults {
 	    if (pAsm->resolve(_o0)) {
 	    	Gp reg;
 	    	do {
-	    	    reg = pAsm->truerandreg();
+	    	    reg = truerandreg();
 	    	} while (reg == o1.r64());
 	    	pAsm->push(o1);
 	    	if (o1.size() == 8) {
@@ -207,7 +207,7 @@ namespace Defaults {
     }
 
     bool __stdcall jmp(ProtectedAssembler* pAsm, const Label& o0, const Operand_&, const Operand_&, const Operand_&) {
-        Gp reg = pAsm->truerandreg();
+        Gp reg = truerandreg();
 	    pAsm->push(reg);
 	    pAsm->lea(reg, ptr(o0));
 	    pAsm->xchg(reg, ptr(rsp));
@@ -217,7 +217,7 @@ namespace Defaults {
 
     bool __stdcall jmp(ProtectedAssembler* pAsm, const Mem& o0, const Operand_&, const Operand_&, const Operand_&) {
         if (pAsm->resolve(o0)) {
-	    	Gp reg = pAsm->truerandreg();
+	    	Gp reg = truerandreg();
 	    	pAsm->xchg(ptr(rsp), reg);
 	    	pAsm->mov(reg, ptr(reg));
 	    	pAsm->xchg(ptr(rsp), reg);
@@ -229,7 +229,7 @@ namespace Defaults {
     }
     
     bool __stdcall ret(ProtectedAssembler* pAsm, const Operand_&, const Operand_&, const Operand_&, const Operand_&) {
-        Gp reg = pAsm->truerandreg();
+        Gp reg = truerandreg();
 	    pAsm->push(reg);
 	    pAsm->mov(reg, qword_ptr(0x7FFE02F8));
 	    pAsm->xchg(qword_ptr(rsp), reg);

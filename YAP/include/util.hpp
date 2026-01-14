@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2025-11-25
+ * @date 2026-01-14
  * @copyright MIT License
  */
 
@@ -107,15 +107,6 @@ struct Data_t {
 	bool bUserCancelled : 1 = false;
 	bool bUsingConsole : 1 = false;
 	bool bRunning : 1 = false;
-#ifdef _DEBUG // Using DEBUG_ONLY macro doesn't work
-	uint64_t TimeSpentSearching = 0;
-	uint64_t TimeSpentFilling = 0;
-	uint64_t TimeSpentInserting = 0;
-	union {
-		uint64_t TimeSpentDisassembling = 0;
-		uint64_t TimeSpentAssembling;
-	};
-#endif
 };
 
 DWORD WINAPI Begin(void* args);
@@ -172,8 +163,8 @@ struct Options_t {
 		bool bEnableSubstitution : 1 = true;
 		uint64_t reserved : 26 = 0;
 		BYTE UPXVersionMajor = 5;
-		BYTE UPXVersionMinor = 0;
-		BYTE UPXVersionPatch = 2;
+		BYTE UPXVersionMinor = 1;
+		BYTE UPXVersionPatch = 0;
 		char Sec1Name[9] = { 0 };
 		char Sec2Name[9] = { 0 };
 	} Advanced;

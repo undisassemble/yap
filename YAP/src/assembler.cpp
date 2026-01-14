@@ -18,10 +18,59 @@
 #define YAP_OP_REASM_SUB      0b00000010
 
 bool bFailed = false;
+Gp _regs[15] = { rax, rbx, rcx, rdx, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15 };
+
+Gp truerandreg() {
+	return _regs[rand() % countof(_regs)];
+}
+
+Gp randsize(_In_ Gp o0) {
+	switch (rand() % 10) {
+	case 0:
+		return o0.r8();
+	case 1:
+		return o0.r16();
+	case 2:
+	case 3:
+	case 4:
+		return o0.r32();
+	default:
+		return o0.r64();
+	}
+	return o0;
+}
+
+Gp randregofsamesize(_In_ Gp o0) {
+	Gp o1;
+	do {
+		o1 = truerandreg();
+		switch (o0.size()) {
+		case 1:
+			o1 = o1.r8();
+			break;
+		case 2:
+			o1 = o1.r16();
+			break;
+		case 4:
+			o1 = o1.r32();
+			break;
+		case 8:
+			o1 = o1.r64();
+		}
+	} while (o1 == o0);
+	if (o1.size() != o0.size()) {
+		LOG(Warning, MODULE_PACKER, "Size mismatch!\n");
+	}
+	return o1;
+}
 
 void AsmJitErrorHandler::handleError(_In_ Error error, _In_ const char* message, _In_ BaseEmitter* emitter) {
 	LOG(Failed, MODULE_YAP, "AsmJit error: %s\n", message);
 	bFailed = true;
+}
+
+Gp ProtectedAssembler::randreg() {
+	return stack.Size() ? stack[rand() % stack.Size()] : (Gp)rsp;
 }
 
 bool ProtectedAssembler::resolve(_In_ Mem o0) {
@@ -141,7 +190,7 @@ int ProtectedAssembler::randstack(_In_ int nMin, _In_ int nMax) {
 		// Select register
 		do {
 			temp = truerandreg();
-		} while (stack.Size() < countof(regs) - Blacklist.Size() && (stack.Includes(temp) || Blacklist.Includes(temp.r64())));
+		} while (stack.Size() < countof(_regs) - Blacklist.Size() && (stack.Includes(temp) || Blacklist.Includes(temp.r64())));
 		if (stack.Includes(temp) || Blacklist.Includes(temp.r64())) break;
 		push(temp);
 		stack.Push(temp);

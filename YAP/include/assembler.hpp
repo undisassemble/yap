@@ -12,6 +12,27 @@
 #include "relib/asm.hpp"
 using namespace x86;
 
+extern Gp _regs[15];
+
+/*!
+ * @brief Returns a random 64-bit general-purpose register, other than `rsp`.
+ */
+Gp truerandreg();
+
+/*!
+ * @brief Returns the same general-purpose register, but as a random size. i.e. `randsize(rax)` -> `ax`.
+ * 
+ * @param [in] o0 Register to change the size of.
+ */
+Gp randsize(_In_ Gp o0);
+
+/*!
+ * @brief Returns a random 64-bit general-purpose register with the same size as `o0`, other than `rsp`. Will not return the same register provided.
+ * 
+ * @param [in] o0 The register to base the size off of.
+ */
+Gp randregofsamesize(_In_ Gp o0);
+
 /*!
  * @brief Data about a link to be resolved after assembly.
  */
@@ -37,55 +58,42 @@ private:
 	bool bWaitingOnEmit = false;
 	BYTE HeldLocks = 0;
 	bool bStrict = false;
-	Gp regs[15] = { rax, rbx, rcx, rdx, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15 };
 	Vector<Gpq> Blacklist;
 	Vector<Gp> stack;
 	Vector<NeededLink> NeededLinks;
 
 public:
-	Gp truerandreg() { return regs[rand() % countof(regs)]; }
-	Gp randsize(Gp o0) {
-		switch (rand() % 10) {
-		case 0:
-			return o0.r8();
-		case 1:
-			return o0.r16();
-		case 2:
-		case 3:
-		case 4:
-			return o0.r32();
-		default:
-			return o0.r64();
-		}
-		return o0;
-	}
-	Gp randregofsamesize(_In_ Gp o0) {
-		Gp o1;
-		do {
-			o1 = truerandreg();
-			switch (o0.size()) {
-			case 1:
-				o1 = o1.r8();
-				break;
-			case 2:
-				o1 = o1.r16();
-				break;
-			case 4:
-				o1 = o1.r32();
-				break;
-			case 8:
-				o1 = o1.r64();
-			}
-		} while (o1 == o0);
-		if (o1.size() != o0.size()) {
-			LOG(Warning, MODULE_PACKER, "Size mismatch!\n");
-		}
-		return o1;
-	}
-	Gp randreg() { return stack.Size() ? stack[rand() % stack.Size()] : (Gp)rsp; }
+	/*!
+	 * @brief Returns a register that can be clobbered safely. Returns `rsp` if no register available (please don't clobber `rsp`).
+	 */
+	Gp randreg();
+
+	/*!
+	 * @brief Saves between `nMin` and `nMax` random registers to the stack.
+	 * 
+	 * @param [in] nMin Minimum number of registers to save.
+	 * @param [in] nMax Maximum number of registers to save.
+	 * @return int Number of registers saved.
+	 */
 	int randstack(_In_ int nMin = 0, _In_ int nMax = 15);
+
+	/*!
+	 * @brief Restores `n` registers from the stack.
+	 * 
+	 * @param [in] n Number of registers to restore, -1 restores them all.
+	 */
 	void restorestack(_In_ int n = -1);
-	void randinst(Gp o0);
+	
+	/*!
+	 * @brief Adds a random instruction using `o0`.
+	 * 
+	 * @param [in] o0 Register to use in whatever instruction it chooses via magic 8 ball.
+	 */
+	void randinst(_In_ Gp o0);
+
+	/*!
+	 * @brief Returns the size (in bytes) of the temporary stack. `rsp + GetStackSize()` = where the original rsp is.
+	 */
 	uint64_t GetStackSize();
 
 	/*!
@@ -187,7 +195,7 @@ public:
 	Error dw(uint16_t o0, size_t o1 = 1) { block(); return Assembler::dw(o0, o1); }
 	Error dd(uint32_t o0, size_t o1 = 1) { block(); return Assembler::dd(o0, o1); }
 	Error dq(uint64_t o0, size_t o1 = 1) { block(); return Assembler::dq(o0, o1); }
-	Error embed(const void* data, size_t dataSize) override { block(); return::Assembler::embed(data, dataSize); }
+	Error embed(const void* data, size_t dataSize) override { block(); return Assembler::embed(data, dataSize); }
 	Error jz(Label o0) { strict(); return Assembler::jz(o0); }
 	Error jz(Imm o0) { strict(); return Assembler::jz(o0); }
 	Error jnz(Label o0) { strict(); return Assembler::jnz(o0); }
