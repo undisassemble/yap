@@ -102,8 +102,6 @@ struct Data_t {
 	float fTaskProgress = 0.f;
 	char* sTask = NULL;
 	State_t State = Idle;
-	uint64_t Reserved = 0;
-	uint64_t InUse = 0;
 	HWND hWnd = NULL;
 	bool bParsing : 1 = false;
 	bool bUserCancelled : 1 = false;

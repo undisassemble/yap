@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2025-12-26
+ * @date 2026-01-14
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -326,10 +326,10 @@ void DrawGUI() {
 
 	// Data
 	else {
-		ImGui::SeparatorText("Overall");
-		ImGui::Text("Memory Usage Status (%llu KB committed)", (Data.Reserved + ReLibMetrics.Memory.Reserved) / 1000);
+		ImGui::SeparatorText("Memory");
+		ImGui::Text("Memory Usage Status (%.2f MB committed)", (ReLibMetrics.Memory.ByBuffer) / 1000000.f);
 		ImGui::SameLine();
-		ImGui::ProgressBar((Data.Reserved + ReLibMetrics.Memory.Reserved) ? ((double)(Data.InUse + ReLibMetrics.Memory.InUse) / (Data.Reserved + ReLibMetrics.Memory.Reserved)) : (double)0);
+		ImGui::ProgressBar(ReLibMetrics.Memory.ByVector ? ((double)ReLibMetrics.Memory.VectorUsed / ReLibMetrics.Memory.ByVector) : (double)0);
 		switch (Data.State) {
 		case Packing:
 			ImGui::SeparatorText("Packing");
