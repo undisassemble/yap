@@ -69,6 +69,12 @@ dcd_loop:
 	; RAW_C case DI_NEG:
 	    neg byte [rcx]
 	; RAW_C break;
+	; RAW_C case DI_ROR:
+		ror byte [rcx], DecoderProc.At(i).value
+	; RAW_C break;
+	; RAW_C case DI_ROL:
+		rol byte [rcx], DecoderProc.At(i).value
+	; RAW_C break;
 	; RAW_C case DI_ADD:
         %if DecoderProc.At(i).value
             add byte [rcx], DecoderProc.At(i).value
@@ -160,6 +166,11 @@ enc_loop:
     ; RAW_C case DI_NEG:
         neg byte [rcx]
     ; RAW_C break;
+	; RAW_C case DI_ROR:
+		rol byte [rcx], DecoderProc.At(i).value
+	; RAW_C break;
+	; RAW_C case DI_ROL:
+		ror byte [rcx], DecoderProc.At(i).value
     ; RAW_C case DI_ADD:
         %if DecoderProc.At(i).value
             sub byte [rcx], DecoderProc.At(i).value

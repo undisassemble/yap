@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2025-09-30
+ * @date 2026-02-18
  * @copyright MIT License
  *
  * @todo Improve anti-debug
@@ -39,8 +39,8 @@ enum DecoderInstMnemonic : BYTE {
 	DI_XOR,
 	DI_NOT,
 	DI_NEG,
-	//DI_ROR,
-	//DI_ROL,
+	DI_ROR,
+	DI_ROL,
 	DI_ADD,
 	DI_SUB,
 	DI_START
@@ -108,6 +108,8 @@ Buffer PackSection(_In_ Buffer SectionData) {
 		for (int i = 0, n = 10 + (rand() & 15); i < n; i++) {
 			inst.Mnemonic = (DecoderInstMnemonic)(rand() % DI_START);
 			inst.value = rand() & 1 ? 0 : rand() & 0xFF;
+			if (inst.Mnemonic == DI_ROR || inst.Mnemonic == DI_ROL)
+				inst.value %= 8;
 			DecoderProc.Push(inst);
 		}
 	}
@@ -160,6 +162,12 @@ Buffer PackSection(_In_ Buffer SectionData) {
 				break;
 			case DI_NEG:
 				data.Data()[i] = ~data.Data()[i] + 1;
+				break;
+			case DI_ROR:
+				data.Data()[i] = (data.Data()[i] << DecoderProc[j].value) | (data.Data()[i] >> (8 - DecoderProc[j].value));
+				break;
+			case DI_ROL:
+				data.Data()[i] = (data.Data()[i] >> DecoderProc[j].value) | (data.Data()[i] << (8 - DecoderProc[j].value));
 				break;
 			case DI_ADD:
 				data.Data()[i] -= DecoderProc[j].value ? DecoderProc[j].value : key;
@@ -452,8 +460,10 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			DecoderProc.Release();
 			DecoderInst inst;
 			for (int i = 0, n = 10 + (rand() & 15); i < n; i++) {
-				inst.Mnemonic = (DecoderInstMnemonic)(rand() % DI_SUB);
+				inst.Mnemonic = (DecoderInstMnemonic)(rand() % DI_START);
 				inst.value = rand64() & 0xFFFFFFFF;
+				if (inst.Mnemonic == DI_ROR || inst.Mnemonic == DI_ROL)
+					inst.value %= 64;
 				DecoderProc.Push(inst);
 			}
 
@@ -503,6 +513,12 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 					break;
 				case DI_NEG:
 					a.neg(rax);
+					break;
+				case DI_ROR:
+					a.ror(rax, DecoderProc[i].value);
+					break;
+				case DI_ROL:
+					a.rol(rax, DecoderProc[i].value);
 					break;
 				case DI_ADD:
 					a.add(rax, DecoderProc[i].value);

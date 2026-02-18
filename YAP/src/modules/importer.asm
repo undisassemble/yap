@@ -97,6 +97,10 @@ obfuscate_ptr:
                 not rax
             %elif DecoderProc[i].Mnemonic == DI_NEG
                 neg rax
+            %elif DecoderProc[i].Mnemonic == DI_ROR
+                rol rax, DecoderProc[i].value
+            %elif DecoderProc[i].Mnemonic == DI_ROL
+                ror rax, DecoderProc[i].value
             %elif DecoderProc[i].Mnemonic == DI_ADD
                 sub rax, DecoderProc[i].value
             %elif DecoderProc[i].Mnemonic == DI_SUB
