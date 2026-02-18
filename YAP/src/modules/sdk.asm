@@ -532,6 +532,9 @@ GetProcAddress_lp:
     strict
     jne GetProcAddress_lp
     inc rax
+    mov r15, rsp
+    and r15, 0x0F
+    sub rsp, r15
     push rax
     mov byte [r14], 0
     lea rcx, [rsp + 0x08]
@@ -543,6 +546,7 @@ GetProcAddress_lp:
     sub rsp, 0x20
     call r12
     add rsp, 0x20
+    add rsp, r15
     add rsp, 64
     pop r15
     pop r14
