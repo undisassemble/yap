@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2026-01-14
+ * @date 2026-03-06
  * @copyright MIT License
  */
 
@@ -164,7 +164,7 @@ struct Options_t {
 		uint64_t reserved : 26 = 0;
 		BYTE UPXVersionMajor = 5;
 		BYTE UPXVersionMinor = 1;
-		BYTE UPXVersionPatch = 0;
+		BYTE UPXVersionPatch = 1;
 		char Sec1Name[9] = { 0 };
 		char Sec2Name[9] = { 0 };
 	} Advanced;
