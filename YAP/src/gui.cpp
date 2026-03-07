@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-01-14
+ * @date 2026-03-06
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -11,6 +11,7 @@
 
 #include "imgui.h"
 #include "util.hpp"
+#include <sal.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include "gui.hpp"
 #include "font.hpp"
@@ -36,11 +37,15 @@ RELEASE_ONLY(const) ImVec4 fBgColTopLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25
 RELEASE_ONLY(const) ImVec4 fBgColTopRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 RELEASE_ONLY(const) ImVec4 fBgColBotLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 RELEASE_ONLY(const) ImVec4 fBgColBotRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
+uint8_t u8CurrentCategory = 0;
 struct {
 	char* pTitle = NULL;
 	char* pText = NULL;
 	UINT uType = 0;
 } CurrentModal;
+
+#define IMGUI_TOGGLE(str, var) { bool _TEMP_BOOL = var; if(ImGui::Checkbox(str, &_TEMP_BOOL)) { var = _TEMP_BOOL; } } // Allows ImGui::Checkbox to be used with bitfields
+
 
 // Opens file dialogue
 bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo) {
@@ -129,208 +134,25 @@ void DrawGUI() {
 	
 	// Configuration menu
 	if (!Data.bRunning) {
-		ImGui::BeginTabBar("#Tabs");
-
-		if (ImGui::BeginTabItem(ICON_BOX_ARCHIVE " Packer")) {
-			IMGUI_TOGGLE("Enable Packer", Options.Packing.bEnabled);
-			ImGui::SetItemTooltip("Wraps the original binary with a custom loader.");
+		// Category selection
+		const char* categories[] = {
+			"Menu 1",
+			"Menu 2",
+			"Menu 3"
+		};
+		const float fBtnWidth = ((float)iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemSpacing.x * (countof(categories) - 1)) / (countof(categories));
+		ImGui::PushFont(NULL, ImGui::GetFontSize() * 1.25);
+		for (int i = 0; i < countof(categories); i++) {
+			ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(u8CurrentCategory == i ? ImGuiCol_ButtonActive : ImGuiCol_Button));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(u8CurrentCategory == i ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered));
+			if (ImGui::Button(categories[i], ImVec2(fBtnWidth, 50))) u8CurrentCategory = i;
+			ImGui::PopStyleColor(2);
 			ImGui::SameLine();
-			IMGUI_TOGGLE("Don't pack resources", Options.Packing.bDontCompressRsrc);
-			ImGui::SetItemTooltip("Preserves everything in the resource directory, keeping details such as icons and privileges.");
-			ImGui::SliderInt("Depth", &Options.Packing.EncodingCounts, 1, 10);
-			ImGui::SetItemTooltip("Number of times the application should be packed.\n1: packed app\n2: packed packed app\n3: packed packed packed app\netc.");
-			ImGui::SliderInt("Compression level", &Options.Packing.CompressionLevel, 1, 9);
-			ImGui::SetItemTooltip("How compressed the binary should be.");
-			ImGui::SliderInt("Mutation level", &Options.Packing.MutationLevel, 1, 5);
-			ImGui::SetItemTooltip("The amount of garbage that should be generated (more -> slower).");
-			IMGUI_TOGGLE("Hide IAT", Options.Packing.bHideIAT);
-			ImGui::SetItemTooltip("Attempts to hide the packed binaries IAT.");
-			ImGui::SameLine();
-			IMGUI_TOGGLE("API emulation", Options.Packing.bAPIEmulation);
-			ImGui::SetItemTooltip("Emulate some simple WINAPI functions.\n");
-			IMGUI_TOGGLE("Delayed entry point", Options.Packing.bDelayedEntry);
-			ImGui::SetItemTooltip("Changes the behavior of the entry point before it is run.");
-			IMGUI_TOGGLE("DLL sideloading mitigations", Options.Packing.bMitigateSideloading);
-			ImGui::SetItemTooltip("Prioritizes DLLs in Windows directories, loading those first instead of DLLs placed in the local directory.");
-			ImGui::SameLine();
-			IMGUI_TOGGLE("Only load Microsoft signed DLLs", Options.Packing.bOnlyLoadMicrosoft);
-			ImGui::SetItemTooltip("Only allows DLLs that have been signed by Microsoft to be loaded.");
-			IMGUI_TOGGLE("Direct syscalls", Options.Packing.bDirectSyscalls);
-			ImGui::SetItemTooltip("Skips use of some windows API functions and instead makes calls directly to the kernel, can break with future Windows updates.");
-			IMGUI_TOGGLE("Anti-dump", Options.Packing.bAntiDump);
-			ImGui::SetItemTooltip("Prevent PE dumpers and reconstructors from dumping the running process.");
-			FeatureInfo("If enabled, you must use GetSelf() instead of GetModuleHandleA(NULL) to get the applications base address.");
-			IMGUI_TOGGLE("Anti-debug", Options.Packing.bAntiDebug);
-			ImGui::SetItemTooltip("Prevent debuggers from attaching to process.");
-			// DEBUG_ONLY(IMGUI_TOGGLE("Anti-patch", Options.Packing.bAntiPatch));
-			// DEBUG_ONLY(ImGui::SetItemTooltip("Verify signature of binary before loading.\n"));
-			// DEBUG_ONLY(DebugWarning());
-			IMGUI_TOGGLE("Anti-VM", Options.Packing.bAntiVM);
-			ImGui::SetItemTooltip("Prevent app from running in a virtual machine.");
-			ImGui::SameLine();
-			IMGUI_TOGGLE("Allow Hyper-V", Options.Packing.bAllowHyperV);
-			ImGui::SetItemTooltip("Still run if the detected VM is only MS Hyper-V.");
-			DebugWarning();
-			DEBUG_ONLY(IMGUI_TOGGLE("Anti-sandbox", Options.Packing.bAntiSandbox));
-			DEBUG_ONLY(ImGui::SetItemTooltip("Prevent app from running in a sandboxed environment."));
-			DEBUG_ONLY(DebugWarning());
-			// DEBUG_ONLY(if (Options.Packing.bDelayedEntry && Options.Packing.Immitate == ExeStealth) Options.Packing.Immitate = YAP);
-			// DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::BeginDisabled());
-			// DEBUG_ONLY(IMGUI_TOGGLE("Partial unpacking", Options.Packing.bPartialUnpacking));
-			// DEBUG_ONLY(ImGui::SetItemTooltip(Options.Reassembly.bEnabled ? "Only allows one function to be loaded at a time, preventing the whole program from being dumped at once." : "Requires reassembler to be enabled"));
-			// DEBUG_ONLY(FeatureWarning("This feature is not threadsafe, and only works on single threaded apps."));
-			// DEBUG_ONLY(DebugWarning());
-			// DEBUG_ONLY(if (!Options.Reassembly.bEnabled) ImGui::EndDisabled());
-			ImGui::Combo("Immitate packer", (int*)&Options.Packing.Immitate, Options.Packing.bDelayedEntry ? "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0" : "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0");
-			ImGui::SetItemTooltip("Changes some details about the packed binary to make it look like another packer.");
-			IMGUI_TOGGLE("Process masquerading", Options.Packing.bEnableMasquerade);
-			ImGui::SetItemTooltip("Makes the packed executable appear as a different process (NOT process hollowing).\nPlease note that the smaller the path the easier it is to use.");
-			ImGui::SameLine();
-			ImGui::SetNextItemWidth((float)iGuiWidth / 2);
-			ImGui::InputText(" ", Options.Packing.Masquerade, MAX_PATH);
-			ImGui::SameLine();
-			if (ImGui::Button("Scramble")) {
-				ZeroMemory(Options.Packing.Masquerade, sizeof(Options.Packing.Masquerade));
-				for (int i = 0, n = rand() % 32; i < n; i++) {
-					Options.Packing.Masquerade[i] = rand() & 0xFF;
-					if (!Options.Packing.Masquerade[i]) break;
-				}
-			}
-			ImGui::SetItemTooltip("Set to randomized string.");
-			DEBUG_ONLY(IMGUI_TOGGLE("Mark critical (requires admin)", Options.Packing.bMarkCritical));
-			DEBUG_ONLY(ImGui::SetItemTooltip("Marks the process as critical, causing the system to bluescreen when the process crashes or is killed.\nRequires the packed process to be run with administrator privileges.\n\nDoes not bluescreen if the process exits gracefully."));
-			DEBUG_ONLY(DebugWarning());
-			ImGui::InputText("Leave a message", Options.Packing.Message, 64);
-			ImGui::SetItemTooltip("Leave a little message for any possible reverse engineers.");
-			ImGui::EndTabItem();
 		}
-
-		if (ImGui::BeginTabItem(ICON_CODE " Reassembler")) {
-			IMGUI_TOGGLE("Enabled", Options.Reassembly.bEnabled);
-			ImGui::SetItemTooltip("Disassembles your application, and assembles a new modified version.");
-			ImGui::SliderInt("Mutation level", &Options.Reassembly.MutationLevel, 0, 5);
-			ImGui::SetItemTooltip("How much garbage code should be inserted between real code (more -> slower).");
-			IMGUI_TOGGLE("Remove useless data", Options.Reassembly.bRemoveData);
-			ImGui::SetItemTooltip("Removes some data from the PE headers.");
-			IMGUI_TOGGLE("Strip debug symbols", Options.Reassembly.bStrip);
-			ImGui::SetItemTooltip("Remove debugging information from the PE.");
-			IMGUI_TOGGLE("Strip DOS stub", Options.Reassembly.bStripDOSStub);
-			ImGui::SetItemTooltip("Remove DOS stub from the PE.");
-			IMGUI_TOGGLE("Instruction substitution", Options.Reassembly.bSubstitution);
-			ImGui::SetItemTooltip("Replaces some existing instructions with other, more complicated alternatives.");
-			ImGui::EndTabItem();
-		}
-
-		if (ImGui::BeginTabItem(ICON_GEARS " Advanced")) {
-			if (ImGui::TreeNode("Packer")) {
-				BYTE MIN = 0;
-				BYTE MAX = 9;
-				ImGui::PushItemWidth(20);
-				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f, 8.f));
-				ImGui::PushID("UPXVersionMajor");
-				ImGui::DragScalar(".", ImGuiDataType_U8, &Options.Advanced.UPXVersionMajor, 1.f, &MIN, &MAX);
-				ImGui::PopID();
-				ImGui::SameLine();
-				ImGui::PushID("UPXVersionMinor");
-				ImGui::DragScalar(".", ImGuiDataType_U8, &Options.Advanced.UPXVersionMinor, 1.f, &MIN, &MAX);
-				ImGui::PopID();
-				ImGui::SameLine();
-				ImGui::DragScalar("UPX version", ImGuiDataType_U8, &Options.Advanced.UPXVersionPatch, 1.f, &MIN, &MAX);
-				ImGui::PopStyleVar();
-				ImGui::PopItemWidth();
-				IMGUI_TOGGLE("Fake symbol table", Options.Advanced.bFakeSymbols);
-				IMGUI_TOGGLE("Mutate", Options.Advanced.bMutateAssembly);
-				ImGui::SameLine();
-				IMGUI_TOGGLE("Substitute", Options.Advanced.bEnableSubstitution);
-				FeatureWarning("I highly recommend keeping this setting enabled.");
-				IMGUI_TOGGLE("Semi-random section names", Options.Advanced.bSemiRandomSecNames);
-				IMGUI_TOGGLE("Full-random section names", Options.Advanced.bTrueRandomSecNames);
-				ImGui::InputText("Section 1 name", Options.Advanced.Sec1Name, 9);
-				ImGui::InputText("Section 2 name", Options.Advanced.Sec2Name, 9);
-				ImGui::TreePop();
-			}
-			if (ImGui::TreeNode("Reassembler")) {
-				ImGui::InputScalar("Rebase image", ImGuiDataType_U64, &Options.Reassembly.Rebase, NULL, NULL, "%p", ImGuiInputTextFlags_CharsHexadecimal);
-				ImGui::SetItemTooltip("Changes images prefered base address. (0 to disable)");
-				ImGui::TreePop();
-			}
-			ImGui::EndTabItem();
-		}
-
-#ifdef _DEBUG
-		if (ImGui::BeginTabItem(ICON_BUG " Style Editor")) {
-			ImGui::ColorEdit4("Background Gradient Top Left", (float*)&fBgColTopLeft);
-			ImGui::ColorEdit4("Background Gradient Top Right", (float*)&fBgColTopRight);
-			ImGui::ColorEdit4("Background Gradient Bottom Left", (float*)&fBgColBotLeft);
-			ImGui::ColorEdit4("Background Gradient Bottom Right", (float*)&fBgColBotRight);
-			ImGui::ShowStyleEditor();
-			ImGui::EndTabItem();
-		}
-
-		if (ImGui::BeginTabItem(ICON_BUG " Debug")) {
-			IMGUI_TOGGLE("Dump disassembly", Options.Debug.bDumpAsm);
-			IMGUI_TOGGLE("Dump individual sections", Options.Debug.bDumpSections);
-			IMGUI_TOGGLE("Dump function ranges", Options.Debug.bDumpFunctions);
-			IMGUI_TOGGLE("Create breakpoints", Options.Debug.bGenerateBreakpoints);
-			IMGUI_TOGGLE("Wrap real instructions in NOPs", Options.Debug.bGenerateMarks);
-			IMGUI_TOGGLE("Strict mutation", Options.Debug.bStrictMutation);
-			IMGUI_TOGGLE("Disable relocations", Options.Debug.bDisableRelocations);
-			IMGUI_TOGGLE("Skip disassembly validation", Options.Debug.bSkipDisasmValidation);
-			if (ImGui::Button("Test error")) Modal("Test error", "Error", MB_OK | MB_ICONERROR);
-			ImGui::SameLine();
-			if (ImGui::Button("Test warning")) Modal("Test warning", "Warning", MB_OK | MB_ICONWARNING);
-			ImGui::SameLine();
-			if (ImGui::Button("Test info")) Modal("Test info", "Information", MB_OK | MB_ICONINFORMATION);
-			
-			ImGui::Text("DecodedInstruction reduction: %lld bytes (%.2f%%)", (int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction), 100.f * (int64_t)((int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction)) / (int64_t)sizeof(ZydisDecodedInstruction));
-			ImGui::Text("DecodedOperand reduction: %lld bytes (%.2f%%)", (int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand), 100.f * (int64_t)((int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand)) / (int64_t)sizeof(ZydisDecodedOperand));
-			ImGui::Text("Total memory reduction (per line): %lld bytes (%.2f%%)", (int64_t)(sizeof(DecodedOperand) * 4 + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) * 4 + sizeof(ZydisDecodedInstruction)), 100.f * (int64_t)((sizeof(DecodedOperand) * 4 + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) * 4 + sizeof(ZydisDecodedInstruction))) / (int64_t)(sizeof(Line) - sizeof(DecodedInstruction) - sizeof(DecodedOperand) * 4 + sizeof(ZydisDecodedInstruction) + sizeof(ZydisDecodedOperand) * 4));
-			
-			if (ImGui::TreeNode("Icon Tests")) {
-				ImGui::DebugTextEncoding(ICON_FILE_SHIELD ICON_SHIELD ICON_SHIELD_HALVED ICON_TRIANGLE_EXCLAMATION ICON_CIRCLE_INFO ICON_CIRCLE_QUESTION ICON_FOLDER_OPEN ICON_FILE ICON_FLOPPY_DISK ICON_CODE ICON_MICROCHIP ICON_BOX ICON_BOX_OPEN ICON_BOX_ARCHIVE ICON_BUG);
-				ImGui::TreePop();
-			}
-			ImGui::ShowMetricsWindow();
-			ImGui::EndTabItem();
-		}
-#endif
-
-		if (ImGui::BeginTabItem(ICON_CIRCLE_INFO " Version")) {
-			ImGui::SeparatorText("Version information");
-			ImGui::Text("YAP: " __YAP_VERSION__);
-			ImGui::Text("ReLib: " __RELIB_VERSION__);
-			ImGui::Text("LZMA: 24.07");
-			ImGui::Text("ImGui: " IMGUI_VERSION);
-			ImGui::Text("Zydis: %lld.%lld.%lld", ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION));
-			ImGui::Text("Zycore: %lld.%lld.%lld", ZYCORE_VERSION_MAJOR(ZYCORE_VERSION), ZYCORE_VERSION_MINOR(ZYCORE_VERSION), ZYCORE_VERSION_PATCH(ZYCORE_VERSION));
-			ImGui::Text("AsmJit: %d.%d.%d", ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION));
-			ImGui::Text("GLFW: %s", glfwGetVersionString());
-			ImGui::Text("OpenGL: %s", glGetString(GL_VERSION));
-			ImGui::SeparatorText("Build information");
-			ImGui::Text("Build: " __YAP_BUILD__);
-			ImGui::Text("Time: " __DATE__ " @ " __TIME__);
-			ImGui::EndTabItem();
-		}
-
-		ImGui::EndTabBar();
-		ImGui::SetCursorPos(ImVec2(iGuiWidth - 80 * fGuiScale - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] : 0), iGuiHeight - 30 * fGuiScale + ImGui::GetScrollY()));
-		if (ImGui::Button(ICON_SHIELD_HALVED " Protect")) {
-			char file[MAX_PATH] = { 0 };
-			if (!OpenFileDialogue(file, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, false)) {
-				Modal("Failed to get file name", "Error", MB_OK | MB_ICONERROR);
-				LOG(Failed, MODULE_YAP, "Failed to open file dialogue: %d\n", CommDlgExtendedError());
-			} else {
-				pAssembly = new Asm(file);
-				if (pAssembly->Status) {
-					Modal("Unable to parse binary\n", "Error", MB_OK | MB_ICONERROR);
-					LOG(Failed, MODULE_YAP, "Failed to parse binary (%d)\n", pAssembly->Status);
-					delete pAssembly;
-					pAssembly = NULL;
-				} else {
-					CreateThread(0, 0, Begin, 0, 0, 0);
-				}
-			}
-		}
+		ImGui::PopFont();
+		ImGui::NewLine();
+		
+		ImGui::Text("Menu %hhd", u8CurrentCategory);
 	}
 
 	// Data

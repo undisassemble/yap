@@ -69,7 +69,6 @@ void LOG(LoggingLevel_t level, const char* mod, const char* str, ...);
 void vLOG(LoggingLevel_t level, const char* mod, const char* str, va_list vargs);
 
 // Macros
-#define IMGUI_TOGGLE(str, var) { bool _TEMP_BOOL = var; if(ImGui::Checkbox(str, &_TEMP_BOOL)) { var = _TEMP_BOOL; } } // Allows ImGui::Checkbox to be used with bitfields
 #define ASMJIT_LIBRARY_VERSION_MAJOR(version) ((version & 0xFF0000) >> 16)
 #define ASMJIT_LIBRARY_VERSION_MINOR(version) ((version & 0xFF00) >> 8)
 #define ASMJIT_LIBRARY_VERSION_PATCH(version) (version & 0xFF)
