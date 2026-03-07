@@ -136,9 +136,10 @@ void DrawGUI() {
 	if (!Data.bRunning) {
 		// Category selection
 		const char* categories[] = {
-			"Menu 1",
-			"Menu 2",
-			"Menu 3"
+			ICON_BOX_ARCHIVE " Packing",
+			ICON_CODE " Reassembly",
+			ICON_GEARS " Advanced",
+			DEBUG_ONLY(ICON_BUG " Debug")
 		};
 		const float fBtnWidth = ((float)iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemSpacing.x * (countof(categories) - 1)) / (countof(categories));
 		ImGui::PushFont(NULL, ImGui::GetFontSize() * 1.25);
@@ -151,8 +152,28 @@ void DrawGUI() {
 		}
 		ImGui::PopFont();
 		ImGui::NewLine();
+
+		// Category contents
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y);
+		ImGui::BeginChild("#TabContents", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetStyle().WindowPadding.y - ImGui::GetCursorPosY()));
 		
-		ImGui::Text("Menu %hhd", u8CurrentCategory);
+		if (u8CurrentCategory == 0) { // Packing
+			
+		}
+
+		else if (u8CurrentCategory == 1) { // Reassembly
+
+		}
+
+		else if (u8CurrentCategory == 2) { // Advanced
+
+		}
+
+		else {
+			ImGui::Text("I don't know how but this broke, tried to load tab %hhu which doesn't exist", u8CurrentCategory);
+		}
+
+		ImGui::EndChild();
 	}
 
 	// Data
