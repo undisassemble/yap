@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-06
+ * @date 2026-03-07
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -44,8 +44,13 @@ struct {
 	UINT uType = 0;
 } CurrentModal;
 
-#define IMGUI_TOGGLE(str, var) { bool _TEMP_BOOL = var; if(ImGui::Checkbox(str, &_TEMP_BOOL)) { var = _TEMP_BOOL; } } // Allows ImGui::Checkbox to be used with bitfields
-
+// Widgets
+#define WIDGET_DEBUG 1
+#define WIDGET_WARNING 2
+#define WIDGET_INFO 4
+namespace Widget {
+	bool Checkbox(_In_ const char* label, _In_ bool value, _In_ uint8_t flags = 0, _In_ const char* ftext = NULL);
+}
 
 // Opens file dialogue
 bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo) {
@@ -76,35 +81,11 @@ bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _
 	return bRet;
 }
 
-void DebugWarning() {
-	ImGui::SameLine();
-	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
-	ImGui::Text(ICON_BUG);
-	ImGui::PopStyleColor();
-	ImGui::SetItemTooltip("This feature is experimental, use with caution!");
-}
-
-void FeatureWarning(_In_ char* text = NULL) {
-	ImGui::SameLine();
-	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
-	ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
-	ImGui::PopStyleColor();
-	if (text) ImGui::SetItemTooltip("%s", text);
-}
-
-void FeatureInfo(_In_ char* text = NULL) {
-	ImGui::SameLine();
-	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(152, 205, 253, 255));
-	ImGui::Text(ICON_CIRCLE_INFO);
-	ImGui::PopStyleColor();
-	if (text) ImGui::SetItemTooltip("%s", text);
-}
-
 void DrawGUI() {
 	// Dont do anything if window is not shown
 	if (!bOpen || bMinimized) return;
 	
-	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar);
+	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 	ImGui::GetBackgroundDrawList()->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(iGuiWidth, iGuiHeight), ImGui::GetColorU32(fBgColTopLeft), ImGui::GetColorU32(fBgColTopRight), ImGui::GetColorU32(fBgColBotRight), ImGui::GetColorU32(fBgColBotLeft));
 
 	// Menu bar
@@ -139,6 +120,7 @@ void DrawGUI() {
 			ICON_BOX_ARCHIVE " Packing",
 			ICON_CODE " Reassembly",
 			ICON_GEARS " Advanced",
+			DEBUG_ONLY(ICON_PALETTE " Style Editor"),
 			DEBUG_ONLY(ICON_BUG " Debug")
 		};
 		const float fBtnWidth = ((float)iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemSpacing.x * (countof(categories) - 1)) / (countof(categories));
@@ -158,7 +140,8 @@ void DrawGUI() {
 		ImGui::BeginChild("#TabContents", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetStyle().WindowPadding.y - ImGui::GetCursorPosY()));
 		
 		if (u8CurrentCategory == 0) { // Packing
-			
+			Options.Packing.bEnabled = Widget::Checkbox("Enabled", Options.Packing.bEnabled);
+			Options.Packing.bDontCompressRsrc = Widget::Checkbox("Don't Pack Resources", Options.Packing.bDontCompressRsrc);
 		}
 
 		else if (u8CurrentCategory == 1) { // Reassembly
@@ -168,6 +151,17 @@ void DrawGUI() {
 		else if (u8CurrentCategory == 2) { // Advanced
 
 		}
+
+		#ifdef _DEBUG
+		else if (u8CurrentCategory == 3) { // Style editor
+			ImGui::ColorEdit4("Background Gradient Bottom Left", (float*)&fBgColBotLeft);
+			ImGui::ColorEdit4("Background Gradient Bottom Right", (float*)&fBgColBotRight);
+			ImGui::ColorEdit4("Background Gradient Top Left", (float*)&fBgColTopLeft);
+			ImGui::ColorEdit4("Background Gradient Top Right", (float*)&fBgColTopRight);
+			ImGui::ShowStyleEditor();
+		}
+
+		#endif
 
 		else {
 			ImGui::Text("I don't know how but this broke, tried to load tab %hhu which doesn't exist", u8CurrentCategory);
@@ -516,4 +510,58 @@ int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
 	while (CurrentModal.pText) Sleep(100);
 	ReleaseMutex(hMutex);
 	return CurrentModal.uType;
+}
+
+
+
+
+
+/***** WIDGETS *****/
+
+void DebugWarning() {
+	ImGui::SameLine();
+	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
+	ImGui::Text(ICON_BUG);
+	ImGui::PopStyleColor();
+	ImGui::SetItemTooltip("This feature is experimental, use with caution!");
+}
+
+void FeatureWarning(_In_ const char* text = NULL) {
+	ImGui::SameLine();
+	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
+	ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
+	ImGui::PopStyleColor();
+	if (text) ImGui::SetItemTooltip("%s", text);
+}
+
+void FeatureInfo(_In_ const char* text = NULL) {
+	ImGui::SameLine();
+	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(152, 205, 253, 255));
+	ImGui::Text(ICON_CIRCLE_INFO);
+	ImGui::PopStyleColor();
+	if (text) ImGui::SetItemTooltip("%s", text);
+}
+
+void RenderWidgetContainer() {
+	ImVec2 tl = ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetCursorScreenPos().y);
+	ImVec2 br = ImVec2(iGuiWidth - tl.x - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] + tl.x : 0), tl.y + ImGui::GetFrameHeight() + ImGui::GetStyle().FramePadding.y * 2);
+	ImGui::GetWindowDrawList()->AddRectFilled(tl, br, ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)), ImGui::GetStyle().FrameRounding);
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
+	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().FramePadding.x);
+}
+
+void LeaveWidget(uint8_t flags = 0, const char* ftext = NULL) {
+	if (flags & WIDGET_DEBUG) { DebugWarning(); }
+	if (flags & WIDGET_WARNING) { FeatureWarning(ftext); }
+	if (flags & WIDGET_INFO) { FeatureInfo(ftext); }
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
+	ImGui::Dummy(ImVec2(0, 0));
+}
+
+bool Widget::Checkbox(const char* label, bool value, uint8_t flags, const char* ftext) {
+	RenderWidgetContainer();
+	bool v = value;
+	ImGui::Checkbox(label, &v);
+	LeaveWidget(flags, ftext);
+	return v;
 }
