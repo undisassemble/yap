@@ -31,7 +31,11 @@ int iGuiHeight = 560;
 float fGuiScale = 1.f;
 ImGuiWindow* pImGuiWindow = NULL;
 extern Asm* pAssembly;
-ImWchar range[] = { 0xE005, 0xF8FF, 0 };
+const ImWchar range[] = { 0xE005, 0xF8FF, 0 };
+RELEASE_ONLY(const) ImVec4 fBgColTopLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
+RELEASE_ONLY(const) ImVec4 fBgColTopRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
+RELEASE_ONLY(const) ImVec4 fBgColBotLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
+RELEASE_ONLY(const) ImVec4 fBgColBotRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 struct {
 	char* pTitle = NULL;
 	char* pText = NULL;
@@ -92,10 +96,11 @@ void FeatureInfo(_In_ char* text = NULL) {
 }
 
 void DrawGUI() {
-// Dont do anything if window is not shown
+	// Dont do anything if window is not shown
 	if (!bOpen || bMinimized) return;
 	
 	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar);
+	ImGui::GetBackgroundDrawList()->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(iGuiWidth, iGuiHeight), ImGui::GetColorU32(fBgColTopLeft), ImGui::GetColorU32(fBgColTopRight), ImGui::GetColorU32(fBgColBotRight), ImGui::GetColorU32(fBgColBotLeft));
 
 	// Menu bar
 	if (ImGui::BeginMenuBar()) {
@@ -254,6 +259,10 @@ void DrawGUI() {
 
 #ifdef _DEBUG
 		if (ImGui::BeginTabItem(ICON_BUG " Style Editor")) {
+			ImGui::ColorEdit4("Background Gradient Top Left", (float*)&fBgColTopLeft);
+			ImGui::ColorEdit4("Background Gradient Top Right", (float*)&fBgColTopRight);
+			ImGui::ColorEdit4("Background Gradient Bottom Left", (float*)&fBgColBotLeft);
+			ImGui::ColorEdit4("Background Gradient Bottom Right", (float*)&fBgColBotRight);
 			ImGui::ShowStyleEditor();
 			ImGui::EndTabItem();
 		}
@@ -513,7 +522,7 @@ bool BeginGUI() {
 
 	// Setup style
 	ImGuiStyle& style = ImGui::GetStyle();
-	style.Colors[ImGuiCol_WindowBg] = ImColor(25, 25, 25, 255);
+	style.Colors[ImGuiCol_WindowBg] = ImColor(25, 25, 25, 0);
 	style.Colors[ImGuiCol_PopupBg] = ImColor(20, 20, 20, 240);
 	style.Colors[ImGuiCol_FrameBg] = ImColor(40, 40, 40, 255);
     style.Colors[ImGuiCol_FrameBgHovered] = ImColor(60, 60, 60, 255);
