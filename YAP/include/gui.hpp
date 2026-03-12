@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI definitions
  * @version 0.0.0
- * @date 2025-05-01
+ * @date 2026-03-12
  * @copyright MIT License
  */
 
@@ -12,6 +12,11 @@
 #include "util.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
+
+/*!
+ * @brief Sets up the basic UI elements, should only be used after the initial config is loaded.
+ */
+void SetupUIElements();
 
 /*!
  * @brief Starts the UI.

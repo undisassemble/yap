@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-11
+ * @date 2026-03-12
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -18,6 +18,7 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <ctime>
+#include <vector>
 #include "imgui_internal.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -32,10 +33,10 @@ float fGuiScale = 1.f;
 ImGuiWindow* pImGuiWindow = NULL;
 extern Asm* pAssembly;
 const ImWchar range[] = { 0xE005, 0xF8FF, 0 };
-RELEASE_ONLY(const) ImVec4 fBgColTopLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
-RELEASE_ONLY(const) ImVec4 fBgColTopRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
-RELEASE_ONLY(const) ImVec4 fBgColBotLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
-RELEASE_ONLY(const) ImVec4 fBgColBotRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
+ImVec4 fBgColTopLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
+ImVec4 fBgColTopRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
+ImVec4 fBgColBotLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
+ImVec4 fBgColBotRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 uint8_t u8CurrentCategory = 0;
 struct {
 	char* pTitle = NULL;
@@ -43,12 +44,39 @@ struct {
 	UINT uType = 0;
 } CurrentModal;
 
+// UI elements
+enum ElementType_t : uint8_t {
+	ElemCheckbox
+};
+
+struct Element_t {
+	ElementType_t Type;
+	void* pValue;
+	const char* pLabel;
+	const char* pDescription;
+	uint8_t u8Flags;
+	const char* pFlagText = NULL;
+};
+
+struct Checkbox : Element_t {
+	Checkbox(_In_ const char* pLabel, _In_ const char* pValueName, _In_ const char* pDescription = NULL, _In_ uint8_t u8Flags = 0, _In_ const char* pFlagText = NULL) {
+		this->Type = ElemCheckbox;
+		this->pValue = &std::get<bool>(config[pValueName]);
+		this->pLabel = pLabel;
+		this->pDescription = pDescription;
+		this->u8Flags = u8Flags;
+		this->pFlagText = pFlagText;
+	}
+};
+
+std::vector<std::pair<const char*, std::vector<Element_t>>> elements;
+
 // Widgets
 #define WIDGET_DEBUG 1
 #define WIDGET_WARNING 2
 #define WIDGET_INFO 4
 namespace Widget {
-	bool Checkbox(_In_ const char* label, _In_ bool value, _In_ uint8_t flags = 0, _In_ const char* ftext = NULL);
+	bool Checkbox(_In_ const char* label, _In_ bool* pValue, _In_ uint8_t flags = 0, _In_ const char* ftext = NULL);
 }
 
 // Opens file dialogue
@@ -115,19 +143,12 @@ void DrawGUI() {
 	// Configuration menu
 	if (!Data.bRunning) {
 		// Category selection
-		const char* categories[] = {
-			ICON_BOX_ARCHIVE " Packing",
-			ICON_CODE " Reassembly",
-			ICON_GEARS " Advanced",
-			DEBUG_ONLY(ICON_PALETTE " Style Editor"),
-			DEBUG_ONLY(ICON_BUG " Debug")
-		};
-		const float fBtnWidth = ((float)iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemSpacing.x * (countof(categories) - 1)) / (countof(categories));
+		const float fBtnWidth = ((float)iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemSpacing.x * (elements.size() - 1)) / elements.size();
 		ImGui::PushFont(NULL, ImGui::GetFontSize() * 1.25);
-		for (int i = 0; i < countof(categories); i++) {
+		for (int i = 0; i < elements.size(); i++) {
 			ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(u8CurrentCategory == i ? ImGuiCol_ButtonActive : ImGuiCol_Button));
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(u8CurrentCategory == i ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered));
-			if (ImGui::Button(categories[i], ImVec2(fBtnWidth, 50))) u8CurrentCategory = i;
+			if (ImGui::Button(elements[i].first, ImVec2(fBtnWidth, 50))) u8CurrentCategory = i;
 			ImGui::PopStyleColor(2);
 			ImGui::SameLine();
 		}
@@ -138,28 +159,25 @@ void DrawGUI() {
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y);
 		ImGui::BeginChild("#TabContents", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetStyle().WindowPadding.y - ImGui::GetCursorPosY()));
 		
-		if (u8CurrentCategory == 0) { // Packing
-			
+		if (u8CurrentCategory < elements.size()) {
+			std::vector<Element_t> items = elements[u8CurrentCategory].second;
+			for (Element_t& item : items) {
+				switch (item.Type) {
+				case ElemCheckbox:
+					Widget::Checkbox(item.pLabel, reinterpret_cast<bool*>(item.pValue), item.u8Flags, item.pFlagText);
+				}
+			}
 		}
 
-		else if (u8CurrentCategory == 1) { // Reassembly
-
-		}
-
-		else if (u8CurrentCategory == 2) { // Advanced
-
-		}
-
-		#ifdef _DEBUG
-		else if (u8CurrentCategory == 3) { // Style editor
-			ImGui::ColorEdit4("Background Gradient Bottom Left", (float*)&fBgColBotLeft);
-			ImGui::ColorEdit4("Background Gradient Bottom Right", (float*)&fBgColBotRight);
-			ImGui::ColorEdit4("Background Gradient Top Left", (float*)&fBgColTopLeft);
-			ImGui::ColorEdit4("Background Gradient Top Right", (float*)&fBgColTopRight);
-			ImGui::ShowStyleEditor();
-		}
-
-		#endif
+		// #ifdef _DEBUG
+		// else if (u8CurrentCategory == 3) { // Style editor
+		// 	ImGui::ColorEdit4("Background Gradient Bottom Left", (float*)&fBgColBotLeft);
+		// 	ImGui::ColorEdit4("Background Gradient Bottom Right", (float*)&fBgColBotRight);
+		// 	ImGui::ColorEdit4("Background Gradient Top Left", (float*)&fBgColTopLeft);
+		// 	ImGui::ColorEdit4("Background Gradient Top Right", (float*)&fBgColTopRight);
+		// 	ImGui::ShowStyleEditor();
+		// }
+		// #endif
 
 		else {
 			ImGui::Text("I don't know how but this broke, tried to load tab %hhu which doesn't exist", u8CurrentCategory);
@@ -510,6 +528,44 @@ int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
 	return CurrentModal.uType;
 }
 
+void SetupUIElements() {
+	elements = {
+		{
+			ICON_BOX_ARCHIVE " Packing",
+			{
+				Checkbox("Enabled", "Packing.bEnabled"),
+				Checkbox("Anti-Dump", "Packing.bAntiDump"),
+			}
+		},
+		{
+			ICON_CODE " Reassembly",
+			{
+
+			}
+		},
+		{
+			ICON_GEARS " Advanced",
+			{
+
+			}
+		},
+#ifdef _DEBUG
+		{
+			ICON_PALETTE " Style Editor",
+			{
+
+			}
+		},
+		{
+			ICON_BUG " Debug",
+			{
+
+			}
+		}
+#endif
+	};
+}
+
 
 
 
@@ -556,10 +612,9 @@ void LeaveWidget(uint8_t flags = 0, const char* ftext = NULL) {
 	ImGui::Dummy(ImVec2(0, 0));
 }
 
-bool Widget::Checkbox(const char* label, bool value, uint8_t flags, const char* ftext) {
+bool Widget::Checkbox(const char* label, bool* pValue, uint8_t flags, const char* ftext) {
 	RenderWidgetContainer();
-	bool v = value;
-	ImGui::Checkbox(label, &v);
+	bool v = ImGui::Checkbox(label, pValue);
 	LeaveWidget(flags, ftext);
 	return v;
 }

@@ -3,17 +3,13 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2026-03-11
+ * @date 2026-03-12
  * @copyright MIT License
  */
 
 #include "util.hpp"
 
 std::unordered_map<const char*, std::variant<bool, int, Buffer, uint64_t>> config;
-
-void ClearConfig() {
-
-}
 
 void LoadDefaultConfig() {
 	config["Packing.bEnabled"] = false;
@@ -36,7 +32,7 @@ void LoadDefaultConfig() {
 	config["Packing.bPartialUnpacking"] = false;
 	config["Packing.iCompressionLevel"] = 5;
 	config["Packing.iImmitate"] = YAP;
-	config["Packing.sMasquerade"] = Buffer(MAX_PATH);
+	if (!config.contains("Packing.sMasquerade")) config["Packing.sMasquerade"] = Buffer(MAX_PATH);
 	memcpy(std::get<Buffer>(config["Packing.sMasquerade"]).Data(), "C:\\Windows\\System32\\cmd.exe", 28);
 	config["Packing.sMessage"] = Buffer(64);
 	config["Packing.iMutationLevel"] = 3;
@@ -58,8 +54,8 @@ void LoadDefaultConfig() {
 	config["Advanced.iUPXVersionMajor"] = 5;
 	config["Advanced.iUPXVersionMinor"] = 1;
 	config["Advanced.iUPXVersionPatch"] = 1;
-	config["Advanced.sSec1Name"] = Buffer(9);
-	config["Advanced.sSec2Name"] = Buffer(9);
+	if (!config.contains("Advanced.sSec1Name")) config["Advanced.sSec1Name"] = Buffer(9);
+	if (!config.contains("Advanced.sSec2Name")) config["Advanced.sSec2Name"] = Buffer(9);
 
 	config["Debug.bDumpAsm"] = false;
 	config["Debug.bDumpSections"] = false;
