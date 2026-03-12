@@ -11,7 +11,7 @@
     mov edx, 52
     lea r8, [policy]
     mov r9d, holder.labelOffset(NTD) - holder.labelOffset(policy)
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, 0xFFFFFFFFFFFFFFFF
         mov ecx, [rax]
         cmp ecx, 0xB8D18B4C

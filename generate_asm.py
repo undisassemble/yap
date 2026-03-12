@@ -251,10 +251,6 @@ def parse_line(line: str) -> str:
         toret = ""
         line = line.split(';')[0].strip()
 
-        # Error checking
-        if line.count('[') > 1:
-            raise Exception("Too many memory operands")
-
         # Label
         if line[-1] == ':':
             if line[:-1] in BoundLabels:

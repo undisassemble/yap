@@ -16,7 +16,7 @@
     strict
     jz ShellcodeData.Labels.FatalError
     lea rdx, [Context]
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10d, [rax]
         lea rcx, [HOOKFL]
         cmp r10d, 0xB8D18B4C
@@ -60,7 +60,7 @@
     lea rdx, [INTEG_OPT]
     mov r8, sizeof(SYSTEM_CODEINTEGRITY_INFORMATION)
     mov r9, 0
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10d, [rax]
         lea rcx, [HOOKFL]
         cmp r10d, 0xB8D18B4C
@@ -91,7 +91,7 @@
 	strict
 	jz ShellcodeData.Labels.FatalError
 	mov rsi, rax
-	%if Options.Packing.bDirectSyscalls
+	%if std::get<bool>(config["Packing.bDirectSyscalls"])
 		lea rcx, [HOOKFL]
 		mov eax, [rsi]
 		sub eax, 0xB8D18B4C
@@ -106,7 +106,7 @@
 	mov r8, rsp
 	push 0
 	mov r9, sizeof(HANDLE)
-	%if Options.Packing.bDirectSyscalls
+	%if std::get<bool>(config["Packing.bDirectSyscalls"])
 		mov r10, 0xFFFFFFFFFFFFFFFF
 		sub rsp, 0x28
 		mov eax, esi
@@ -130,7 +130,7 @@
 	mov r8, rsp
 	push 0
 	mov r9, sizeof(HANDLE)
-	%if Options.Packing.bDirectSyscalls
+	%if std::get<bool>(config["Packing.bDirectSyscalls"])
 		mov r10, 0xFFFFFFFFFFFFFFFF
 		sub rsp, 0x28
 		mov eax, esi
@@ -153,7 +153,7 @@
 	mov r8, rsp
 	push 0
 	mov r9, 4
-	%if Options.Packing.bDirectSyscalls
+	%if std::get<bool>(config["Packing.bDirectSyscalls"])
 		mov r10, 0xFFFFFFFFFFFFFFFF
 		sub rsp, 0x28
 		mov eax, esi

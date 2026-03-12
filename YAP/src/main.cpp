@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2026-01-14
+ * @date 2026-03-11
  * @copyright MIT License
  */
 
@@ -30,7 +30,6 @@ namespace Console {
 }
 
 // Globals
-Options_t Options;
 Data_t Data;
 HANDLE hLogFile = NULL;
 HANDLE hStdOut = NULL;
@@ -87,6 +86,7 @@ int main(int argc, char** argv) {
 		}
 	}
 	RegisterDefaultSubstitutions();
+	LoadDefaultConfig();
 	
 	// Look for - commands
 	for (int i = 1; i < argc; i++) {
@@ -102,11 +102,11 @@ int main(int argc, char** argv) {
 	}
 
 	// Search CLI
-	strcpy_s(Data.Project, argv[1]);
+	strcpy_s(Data.ConfigPath, argv[1]);
 	if (argc > 2) {
 		if (!strcmp(argv[2], "create")) {
 			Console::SetupConsole();
-			SaveProject();
+			SaveConfig();
 			return 0;
 		} else if (!strcmp(argv[2], "version")) {
 			Console::SetupConsole();
@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
 			return 0;
 		}
 	}
-	if (Data.Project[0] && !LoadProject()) return 1;
+	if (Data.ConfigPath[0] && !LoadConfig()) return 1;
 
 	// Setup UI
 	if (!Data.bUsingConsole && argc < 4) {
@@ -144,15 +144,13 @@ DWORD WINAPI Begin(void* args) {
 	Data.bRunning = true;
 	LOG(Info, MODULE_YAP, "Starting YAP\n");
 
-	Options_t OptionsBackup = Options;
-
 	// Reassembler
-	if (Options.Reassembly.bEnabled) {
+	if (std::get<bool>(config["Reassembly.bEnabled"])) {
 		LOG(Info, MODULE_YAP, "Starting reassembler\n");
 
 		// Disassemble
 		Data.State = Disassembling;
-		if (!pAssembly->Disassemble(DEBUG_ONLY(!Options.Debug.bSkipDisasmValidation))) {
+		if (!pAssembly->Disassemble(DEBUG_ONLY(!std::get<bool>(config["Debug.bSkipDisasmValidation"])))) {
 			Modal("Disassembly failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Disassembly failed\n");
 			goto th_exit;
@@ -163,7 +161,7 @@ DWORD WINAPI Begin(void* args) {
 		// Dump disassembly
 #ifdef _DEBUG
 		HANDLE hDumped = NULL;
-		if (Options.Debug.bDumpAsm) {
+		if (std::get<bool>(config["Debug.bDumpAsm"])) {
 			hDumped = CreateFile("yap.dump.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];
 			ZydisFormatter Formatter;
@@ -183,7 +181,7 @@ DWORD WINAPI Begin(void* args) {
 			CloseHandle(hDumped);
 		}
 
-		if (Options.Debug.bDumpFunctions) {
+		if (std::get<bool>(config["Debug.bDumpFunctions"])) {
 			hDumped = CreateFile("yap.functions.txt", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			char buf[512];
 			for (int i = 0; i < pAssembly->GetFunctionRanges().Size(); i++) {
@@ -194,12 +192,12 @@ DWORD WINAPI Begin(void* args) {
 #endif
 
 		// Modify
-		if (Options.Reassembly.bStrip && !pAssembly->Strip()) {
+		if (std::get<bool>(config["Reassembly.bStrip"]) && !pAssembly->Strip()) {
 			Modal("Failed to strip PE", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Failed to strip PE\n");
 			goto th_exit;
 		}
-		if (Options.Reassembly.bRemoveData) {
+		if (std::get<bool>(config["Reassembly.bRemoveData"])) {
 			pAssembly->CleanHeaders();
 		}
 
@@ -212,9 +210,9 @@ DWORD WINAPI Begin(void* args) {
 		ProtectedAssembler a(&holder);
 		a.bForceStrict = true;
 		a.bAdvancedResolve = false;
-		a.bMutate = Options.Reassembly.MutationLevel > 0;
-		a.bSubstitute = Options.Reassembly.bSubstitution;
-		a.MutationLevel = Options.Reassembly.MutationLevel;
+		a.bMutate = std::get<int>(config["Reassembly.iMutationLevel"]) > 0;
+		a.bSubstitute = std::get<bool>(config["Reassembly.bSubstitution"]);
+		a.MutationLevel = std::get<int>(config["Reassembly.iMutationLevel"]);
 		pAssembly->SetAssembler(reinterpret_cast<Assembler*>(&a));
 		Data.State = Assembling;
 		if (!pAssembly->Assemble()) {
@@ -225,17 +223,17 @@ DWORD WINAPI Begin(void* args) {
 		Data.State = Idle;
 
 		// Modify again
-		if (Options.Reassembly.bStripDOSStub) {
+		if (std::get<bool>(config["Reassembly.bStripDOSStub"])) {
 			pAssembly->StripDosStub();
 			pAssembly->FixHeaders();
 		}
-		if (Options.Reassembly.Rebase) {
-			pAssembly->RebaseImage(Options.Reassembly.Rebase);
+		if (std::get<uint64_t>(config["Reassembly.Rebase"])) {
+			pAssembly->RebaseImage(std::get<uint64_t>(config["u64Reassembly.Rebase"]));
 		}
 	}
 
 	// Pack
-	if (Options.Packing.bEnabled) {
+	if (std::get<bool>(config["Packing.bEnabled"])) {
 		LOG(Info, MODULE_YAP, "Starting packer\n");
 		Asm* pPacked = new Asm();
 		pPacked->Status = Normal;
@@ -282,7 +280,6 @@ DWORD WINAPI Begin(void* args) {
 	}
 
 th_exit:
-	Options = OptionsBackup;
 	LOG(Info, MODULE_YAP, "Ending YAP\n");
 	Data.bRunning = false;
 	delete pAssembly;
@@ -316,20 +313,20 @@ void Console::buildversion() {
 }
 
 void Console::version() {
-	HANDLE hFile = CreateFileA(Data.Project, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE hFile = CreateFileA(Data.ConfigPath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	BYTE Sig[3] = { 0 };
 	DWORD Ver = 0;
 
 	// Check if opened
 	if (!hFile || hFile == INVALID_HANDLE_VALUE) {
-		LOG(Failed, MODULE_YAP, "Could not open file %s (%d)\n", Data.Project, GetLastError());
+		LOG(Failed, MODULE_YAP, "Could not open file %s (%d)\n", Data.ConfigPath, GetLastError());
 		return;
 	}
 
 	// Read signature
 	ReadFile(hFile, Sig, 3, NULL, NULL);
 	if (memcmp(Sig, "YAP", 3)) {
-		LOG(Failed, MODULE_YAP, "%s is not a YAP project\n", Data.Project);
+		LOG(Failed, MODULE_YAP, "%s is not a YAP project\n", Data.ConfigPath);
 	} else {
 		// Read version
 		ReadFile(hFile, &Ver, sizeof(DWORD), NULL, NULL);
@@ -346,7 +343,7 @@ void Console::protect(char* input, char* output) {
 		return;
 	}
 	// Load project
-	if (!LoadProject()) return;
+	if (!LoadConfig()) return;
 
 	// Output name
 	char TrueOutput[MAX_PATH] = { 0 };

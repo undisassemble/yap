@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-07
+ * @date 2026-03-11
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -11,7 +11,6 @@
 
 #include "imgui.h"
 #include "util.hpp"
-#include <sal.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include "gui.hpp"
 #include "font.hpp"
@@ -92,12 +91,12 @@ void DrawGUI() {
 	if (ImGui::BeginMenuBar()) {
 		ImGui::Text("Yet Another Packer    |");
 		if (ImGui::BeginMenu("File")) {
-			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
-			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadProject(); }
-			if (!Data.Project[0]) ImGui::BeginDisabled();
-			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveProject(); }
-			if (!Data.Project[0]) ImGui::EndDisabled();
-			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveProject(); }
+			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
+			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
+			if (!Data.ConfigPath[0]) ImGui::BeginDisabled();
+			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveConfig(); }
+			if (!Data.ConfigPath[0]) ImGui::EndDisabled();
+			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
@@ -140,8 +139,7 @@ void DrawGUI() {
 		ImGui::BeginChild("#TabContents", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetStyle().WindowPadding.y - ImGui::GetCursorPosY()));
 		
 		if (u8CurrentCategory == 0) { // Packing
-			Options.Packing.bEnabled = Widget::Checkbox("Enabled", Options.Packing.bEnabled);
-			Options.Packing.bDontCompressRsrc = Widget::Checkbox("Don't Pack Resources", Options.Packing.bDontCompressRsrc);
+			
 		}
 
 		else if (u8CurrentCategory == 1) { // Reassembly
@@ -451,22 +449,22 @@ bool BeginGUI() {
 		if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
 			// Ctrl + N
 			if (ImGui::IsKeyDown(ImGuiKey_N)) {
-				OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
-				SaveProject();
+				OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
+				SaveConfig();
 			}
 
 			// Ctrl + O
 			if (ImGui::IsKeyDown(ImGuiKey_O)) {
-				OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false);
-				LoadProject();
+				OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false);
+				LoadConfig();
 			}
 
 			// Ctrl + (Shift) + S
 			if (ImGui::IsKeyDown(ImGuiKey_S)) {
 				if (ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift)) {
-					OpenFileDialogue(Data.Project, sizeof(Data.Project), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
+					OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
 				}
-				SaveProject();
+				SaveConfig();
 			}
 		}
 

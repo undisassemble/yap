@@ -7,7 +7,7 @@
     lea rcx, [VMFL]
     bt edx, 31
     strict 
-    %if Options.Packing.bAllowHyperV
+    %if std::get<bool>(config["Packing.bAllowHyperV"])
         jnc nohv
         mov rax, 0x40000000
         cpuid

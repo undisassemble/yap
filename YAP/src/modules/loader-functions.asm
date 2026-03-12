@@ -45,7 +45,7 @@ ShellcodeData.Labels.FatalError:
     call ShellcodeData.Labels.GetProcAddress
     mov rbx, rax
     sub rsp, 0x20
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, 0
         mov eax, [rbx + 4]
         syscall
@@ -60,7 +60,7 @@ ShellcodeData.Labels.FatalError:
     mov r9, MB_OK | MB_ICONERROR
     sub rsp, 0x20
     call rbp
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, 0xFFFFFFFFFFFFFFFF
         mov eax, [rbx + 4]
         syscall
@@ -170,7 +170,7 @@ GetModuleHandleW_skip:
     ret
 GetModuleHandleW_bad:
     %ifdef _DEBUG
-        %if Options.Debug.bGenerateBreakpoints
+        %if std::get<bool>(config["Debug.bGenerateBreakpoints"])
             int3
         %endif
     %endif
@@ -292,7 +292,7 @@ GetProcAddress_skip:
     jmp GetProcAddress_ret
 GetProcAddress_bad:
     %ifdef _DEBUG
-        %if Options.Debug.bGenerateBreakpoints
+        %if std::get<bool>(config["Debug.bGenerateBreakpoints"])
             int3
         %endif
     %endif

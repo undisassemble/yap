@@ -78,7 +78,7 @@ ShellcodeData.Labels.FatalError:
     call ShellcodeData.Labels.GetProcAddress
     mov rbx, rax
     sub rsp, 0x20
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, 0
         mov eax, [rbx + 4]
         syscall
@@ -93,7 +93,7 @@ ShellcodeData.Labels.FatalError:
     mov r9, MB_OK | MB_ICONERROR
     sub rsp, 0x20
     call rbp
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, 0xFFFFFFFFFFFFFFFF
         mov eax, [rbx + 4]
         syscall
@@ -203,7 +203,7 @@ GetModuleHandleW_skip:
     ret
 GetModuleHandleW_bad:
     %ifdef _DEBUG
-        %if Options.Debug.bGenerateBreakpoints
+        %if std::get<bool>(config["Debug.bGenerateBreakpoints"])
             int3
         %endif
     %endif
@@ -296,7 +296,7 @@ ShellcodeData.Labels.GetProcAddress:
     push rbx
     push rsi
     push rbp
-    %if Options.Packing.bHideIAT
+    %if std::get<bool>(config["Packing.bHideIAT"])
         mov r8, 1
         ror r8, 1
         and r8, rcx
@@ -408,13 +408,13 @@ GetProcAddress_skip:
     jmp GetProcAddress_ret
 GetProcAddress_bad:
     %ifdef _DEBUG
-        %if Options.Debug.bGenerateBreakpoints
+        %if std::get<bool>(config["Debug.bGenerateBreakpoints"])
             int3
         %endif
     %endif
     mov eax, 0
 GetProcAddress_ret:
-    %if Options.Packing.bHideIAT
+    %if std::get<bool>(config["Packing.bHideIAT"])
         ; Verify need to check
         cmp r15b, 0
         strict
@@ -494,7 +494,7 @@ GetProcAddress_check_in_e:
    
     ; Handle import thingy dothingy magigys
     %ifdef _DEBUG
-        %if Options.Debug.bGenerateBreakpoints
+        %if std::get<bool>(config["Debug.bGenerateBreakpoints"])
             int3
         %endif
     %endif
@@ -508,7 +508,7 @@ GetProcAddress_check_in_e:
     mov rcx, rax
     push rcx
     lea rdx, [GPA]
-    %if Options.Packing.bHideIAT
+    %if std::get<bool>(config["Packing.bHideIAT"])
         mov sil, r15b
     %endif
     call ShellcodeData.Labels.GetProcAddress
@@ -516,7 +516,7 @@ GetProcAddress_check_in_e:
     pop rcx
     lea rdx, [LLA]
     call ShellcodeData.Labels.GetProcAddress
-    %if Options.Packing.bHideIAT
+    %if std::get<bool>(config["Packing.bHideIAT"])
         mov r15b, sil
     %endif
     mov r13, rax
@@ -560,7 +560,7 @@ GCT:
     embed &Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest)
 QSI:
     embed &Sha256Str("NtQuerySystemInformation"), sizeof(Sha256Digest)
-%if Options.Packing.bAntiDebug
+%if std::get<bool>(config["Packing.bAntiDebug"])
 QIT:
     embed &Sha256Str("NtQueryInformationThread"), sizeof(Sha256Digest)
 %endif
@@ -633,7 +633,7 @@ ShellcodeData.RequestedFunctions.CheckForDebuggers.Func:
     mov dword [rsp + (offsetof(CONTEXT, ContextFlags) + 0x10)], CONTEXT_ALL
     lea rdx, [rsp + 0x10]
     sub rsp, 0x20
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, 0xFFFFFFFFFFFFFFFE
         mov ecx, [rax]
         xchg rax, rcx
@@ -677,7 +677,7 @@ CheckForDebuggers_SkipHWBP:
     mov r8, sizeof(SYSTEM_CODEINTEGRITY_INFORMATION)
     mov r9, 0
     sub rsp, 0x20
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, 103
         mov ecx, [rax]
         xchg rax, rcx
@@ -699,7 +699,7 @@ CheckForDebuggers_SkipHWBP:
     jnz CheckForDebuggers_ret
 
     ; -- Hidden thread check --
-%if Options.Packing.bAntiDebug
+%if std::get<bool>(config["Packing.bAntiDebug"])
     mov rcx, rsi
     lea rdx, [QIT]
     call ShellcodeData.Labels.GetProcAddress
@@ -709,7 +709,7 @@ CheckForDebuggers_SkipHWBP:
     push 0
     push 0
     sub rsp, 0x20
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, 0xFFFFFFFFFFFFFFFE
         mov ecx, [rax]
         xchg rax, rcx
@@ -742,7 +742,7 @@ CheckForDebuggers_SkipHWBP:
 	lea rdx, [QIP]
 	call ShellcodeData.Labels.GetProcAddress
 	mov rbx, rax
-	%if Options.Packing.bDirectSyscalls
+	%if std::get<bool>(config["Packing.bDirectSyscalls"])
 		mov eax, [rbx]
 		sub eax, 0xB8D18B4C
 		strict
@@ -756,7 +756,7 @@ CheckForDebuggers_SkipHWBP:
 	mov r8, rsp
 	push 0
 	mov r9, sizeof(HANDLE)
-	%if Options.Packing.bDirectSyscalls
+	%if std::get<bool>(config["Packing.bDirectSyscalls"])
 		mov r10, 0xFFFFFFFFFFFFFFFF
 		sub rsp, 0x28
 		mov eax, ebx
@@ -779,7 +779,7 @@ CheckForDebuggers_SkipHWBP:
 	mov r8, rsp
 	push 0
 	mov r9, sizeof(HANDLE)
-	%if Options.Packing.bDirectSyscalls
+	%if std::get<bool>(config["Packing.bDirectSyscalls"])
 		mov r10, 0xFFFFFFFFFFFFFFFF
 		sub rsp, 0x28
 		mov eax, ebx
@@ -801,7 +801,7 @@ CheckForDebuggers_SkipHWBP:
 	mov r8, rsp
 	push 0
 	mov r9, 4
-	%if Options.Packing.bDirectSyscalls
+	%if std::get<bool>(config["Packing.bDirectSyscalls"])
 		mov r10, 0xFFFFFFFFFFFFFFFF
 		sub rsp, 0x28
 		mov eax, ebx
@@ -847,7 +847,7 @@ CheckForDebuggers_SkipHWBP:
     jz CheckForDebuggers_ret
 
     ; Convert funs to syscall ids
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov eax, [rbp]
         add eax, [rbx]
         add eax, [rsi]
@@ -869,7 +869,7 @@ CheckForDebuggers_EnumProcesses_loop:
     mov r8, 0
     mov r9, r8
     sub rsp, 0x20
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, r15
         mov eax, esi
         sub rsp, 0x08
@@ -887,7 +887,7 @@ CheckForDebuggers_EnumProcesses_loop:
 
     ; Close old handle
     sub rsp, 0x20
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, r15
         mov eax, ebp
         syscall
@@ -918,7 +918,7 @@ CheckForDebuggers_EnumProcesses_skipclose:
     mov r8, rsp
     push 0
     sub rsp, 0x20
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, r11
         mov eax, ebx
         sub rsp, 0x08
@@ -1076,7 +1076,7 @@ VirtualProtectEx_skip_find:
     sub rsp, 0x08
     push r10
     sub rsp, 0x20
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, rcx
         mov ecx, [rax]
         xchg rax, rcx
@@ -1147,7 +1147,7 @@ VirtualQueryEx_skip_find:
     ; I don't know what the fuck is wrong with this syscall in particular, but I'm not dealing with this right now
     ; For future reference: this is exactly the same as the other syscalls added in this commit, but for some reason this throws 0xC0000004 (STATUS_INFO_LENGTH_MISMATCH) when calling via syscall, despite having the same apparent parameters
 
-    ; %if Options.Packing.bDirectSyscalls
+    ; %if std::get<bool>(config["Packing.bDirectSyscalls"])
     ;     mov r10, rcx
     ;     mov ecx, [rax]
     ;     xchg rax, rcx
@@ -1219,7 +1219,7 @@ VirtualFreeEx_skip_find:
     mov r8, rdx
     add r8, 8
     sub rsp, 0x20
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, rcx
         mov ecx, [rax]
         xchg rax, rcx

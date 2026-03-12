@@ -33,7 +33,7 @@ skip:
     jz ShellcodeData.Labels.FatalError
     mov rsi, rax
     lea rdi, [import_offsets]
-    %if Options.Packing.bHideIAT
+    %if std::get<bool>(config["Packing.bHideIAT"])
         lea r13, [import_array]
     %else
         mov r13, rdi
@@ -62,7 +62,7 @@ do_item:
     strict
     jz skiptest
     mov rdx, r12
-    %if Options.Packing.bHideIAT
+    %if std::get<bool>(config["Packing.bHideIAT"])
         mov r8, 1
         ror r8, 1
         or rcx, r8
@@ -74,7 +74,7 @@ do_item:
     jz ShellcodeData.Labels.FatalError
 
 skiptest:
-    %if !Options.Packing.bHideIAT
+    %if !std::get<bool>(config["Packing.bHideIAT"])
         mov r8, r13
         sub r8, r15
         mov [r8], rax

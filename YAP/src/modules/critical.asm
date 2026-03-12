@@ -11,7 +11,7 @@ data:
     dd 1
 ret:
     %ifdef _DEBUG
-        %if Options.Debug.bGenerateBreakpoints
+        %if std::get<bool>(config["Debug.bGenerateBreakpoints"])
             int3
         %endif
     %endif
@@ -37,7 +37,7 @@ _skip:
     sub rsp, r8
     push r8
     lea r8, [data]
-    %if Options.Packing.bDirectSyscalls
+    %if std::get<bool>(config["Packing.bDirectSyscalls"])
         mov r10, 0xFFFFFFFFFFFFFFFF
         mov ecx, [rax]
         cmp ecx, 0xB8D18B4C

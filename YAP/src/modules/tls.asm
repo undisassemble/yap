@@ -20,7 +20,7 @@ index:
 
 	; If it's not, call packed binaries TLS callbacks (if unpacked)
 	%if TLSCallbacks.Size()
-		%if Options.Packing.bAntiDebug
+		%if std::get<bool>(config["Packing.bAntiDebug"])
 			cmp rdx, 2
 			strict
 			jne donthide
@@ -62,7 +62,7 @@ reloc:
 	dq ShellcodeData.BaseAddress + pPackedBinary->NTHeaders.OptionalHeader.ImageBase + a.offset()
 _do:
 	desync_mov rdx
-    %if Options.Packing.bAntiDebug
+    %if std::get<bool>(config["Packing.bAntiDebug"])
         call hidethread
 	%endif
     push r12
@@ -82,7 +82,7 @@ _do:
 		mov r10d, [index]
 		mov [rax], r10d
 	%endif
-	%if Options.Packing.bAntiDebug
+	%if std::get<bool>(config["Packing.bAntiDebug"])
 		mov rax, 0
 		desync
 		mov rcx, PEB
@@ -104,7 +104,7 @@ _do:
 		push rcx
 		mov rcx, 0
 		%ifdef _DEBUG
-			%if Options.Debug.bGenerateBreakpoints
+			%if std::get<bool>(config["Debug.bGenerateBreakpoints"])
 				int3
 				block
 			%endif
@@ -113,7 +113,7 @@ _do:
 		block
 		jz pPackedBinary->NTHeaders.OptionalHeader.ImageBase + ShellcodeData.BaseAddress - (rand() & 0xFFFF)
 	%endif
-	%if Options.Packing.bAntiPatch
+	%if std::get<bool>(config["Packing.bAntiPatch"])
 		jmp checksigs
 		garbage
 HeaderDigest:
@@ -152,10 +152,10 @@ checksigs:
 		; RAW_C }
 		; fuck me (check the thingymadoodle)
 	%endif
-	%if Options.Packing.bDelayedEntry
+	%if std::get<bool>(config["Packing.bDelayedEntry"])
 		mov rax, pPackedBinary->NTHeaders.OptionalHeader.ImageBase + pPackedBinary->SectionHeaders[0].VirtualAddress
 		add rax, [reloc]
-		%if Options.Packing.bAntiDebug
+		%if std::get<bool>(config["Packing.bAntiDebug"])
 			cmp byte [rax], 0xCC
 			strict
 			mov rcx, 0
@@ -192,7 +192,7 @@ checksigs:
 	mov rax, 1
 	ret
 
-	%if Options.Packing.bAntiDebug
+	%if std::get<bool>(config["Packing.bAntiDebug"])
 NTD:
 		embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
 STI:
@@ -208,7 +208,7 @@ hidethread:
 		mov r8, 0
 		mov r9, 0
 		sub rsp, 0x20
-		%if Options.Packing.bDirectSyscalls
+		%if std::get<bool>(config["Packing.bDirectSyscalls"])
 			lea r10, [thingy]
 			mov ecx, [rax]
 			cmp ecx, 0xB8D18B4C

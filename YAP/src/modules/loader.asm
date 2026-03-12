@@ -5,9 +5,9 @@
 	; Data
 NTD:
 	embed &Sha256WStr(L"ntdll.dll"), sizeof(Sha256Digest)
-	%if Options.Packing.Message[0]
+	%if std::get<Buffer>(config["Packing.sMessage"]).Data()[0]
 message:
-		embed Options.Packing.Message, lstrlenA(Options.Packing.Message) + 1
+		embed std::get<Buffer>(config["Packing.sMessage"]).Data(), strnlen(reinterpret_cast<const char*>(std::get<Buffer>(config["Packing.sMessage"]).Data()), std::get<Buffer>(config["Packing.sMessage"]).Size()) + 1
 	%endif
     align AlignMode::kCode, alignof(LPCSTR)
 HOOKFL:
@@ -16,7 +16,7 @@ HOOKFL:
 VMFL:
     embed "A virtual environment has been detected, execution will not continue.", 70
 
-	%if Options.Packing.bAntiDebug
+	%if std::get<bool>(config["Packing.bAntiDebug"])
     	align AlignMode::kZero, alignof(CONTEXT)
 Context:
 		; RAW_C CONTEXT context = { 0 };
@@ -26,7 +26,7 @@ GCT:
     	embed &Sha256Str("ZwGetContextThread"), sizeof(Sha256Digest)
 	%endif
 
-	%if Options.Packing.bAntiDump
+	%if std::get<bool>(config["Packing.bAntiDump"])
     	align AlignMode::kZero, alignof(DWORD)
 TMP:
 		dd 0
@@ -34,7 +34,7 @@ VRT:
     	embed &Sha256Str("VirtualProtect"), sizeof(Sha256Digest)
 	%endif
 
-	%if Options.Packing.bAntiDebug || Options.Packing.bAntiVM
+	%if std::get<bool>(config["Packing.bAntiDebug"]) || std::get<bool>(config["Packing.bAntiVM"])
 GNP:
 		embed &Sha256Str("NtGetNextProcess"), sizeof(Sha256Digest)
 NTCLOSE:
@@ -43,7 +43,7 @@ QIP:
 		embed &Sha256Str("NtQueryInformationProcess"), sizeof(Sha256Digest)
 	%endif
 
-	%if Options.Packing.bMitigateSideloading
+	%if std::get<bool>(config["Packing.bMitigateSideloading"])
 DIR:
    		embed &Sha256Str("SetDllDirectoryA"), sizeof(Sha256Digest)
 SSP:
@@ -52,7 +52,7 @@ ZRO:
 		db 0
 	%endif
 
-	%if Options.Packing.bOnlyLoadMicrosoft
+	%if std::get<bool>(config["Packing.bOnlyLoadMicrosoft"])
 		align AlignMode::kCode, alignof(PROCESS_MITIGATION_POLICY)
 		; RAW_C PROCESS_MITIGATION_POLICY _policy = ProcessSignaturePolicy;
 		; RAW_C PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY sig_policy = { 0 };
@@ -100,7 +100,7 @@ DBGFL:
 	align AlignMode::kCode, alignof(LPCSTR)
 DSEFL:
 	embed "Please enable Driver Signature Enforcement and disable Test Signing.", 69
-%if Options.Packing.bAntiDebug
+%if std::get<bool>(config["Packing.bAntiDebug"])
 QSI:
     embed &Sha256Str("NtQuerySystemInformation"), sizeof(Sha256Digest)
     align AlignMode::kCode, alignof(SYSTEM_CODEINTEGRITY_INFORMATION)
@@ -132,7 +132,7 @@ DEBUG_PROC_BLACKLIST:
 	embed &Sha256WStr(L"dbgsrv.exe"), sizeof(Sha256Digest)
 	embed &Sha256WStr(L"DbgX.Shell.exe"), sizeof(Sha256Digest)
 %endif
-%if Options.Packing.bAntiVM
+%if std::get<bool>(config["Packing.bAntiVM"])
 %define VM_PROC_BLACKLIST_LEN 5
 VM_PROC_BLACKLIST:
 	embed &Sha256WStr(L"VBoxTray.exe"), sizeof(Sha256Digest)
@@ -144,7 +144,7 @@ VM_PROC_BLACKLIST:
 
 	; Entry point
 _entry:
-	%if Options.Packing.Message[0]
+	%if std::get<Buffer>(config["Packing.sMessage"]).Data()[0]
 		lea rax, [message]
 	%endif
 	push rsp
@@ -176,27 +176,27 @@ _entry:
 	desync_jnz
 
     ; Modules
-	%if Options.Packing.bMitigateSideloading
+	%if std::get<bool>(config["Packing.bMitigateSideloading"])
 		%include "modules/anti-sideloading.inc"
 	%endif
-	%if Options.Packing.bOnlyLoadMicrosoft
+	%if std::get<bool>(config["Packing.bOnlyLoadMicrosoft"])
 		%include "modules/ms-signing.inc"
 	%endif
-	%if Options.Packing.bAntiDebug
+	%if std::get<bool>(config["Packing.bAntiDebug"])
 		%include "modules/anti-debug-main.inc"
 	%endif
-	%if Options.Packing.bAntiVM
+	%if std::get<bool>(config["Packing.bAntiVM"])
 		%include "modules/anti-vm.inc"
 	%endif
-	%if Options.Packing.bAntiSandbox
+	%if std::get<bool>(config["Packing.bAntiSandbox"])
 		%include "modules/anti-sandbox.inc"
 	%endif
-	%if Options.Packing.bAntiDump
+	%if std::get<bool>(config["Packing.bAntiDump"])
 		%include "modules/anti-dump.inc"
 	%endif
  
  	; Check running processes
- 	%if Options.Packing.bAntiDebug || Options.Packing.bAntiVM
+ 	%if std::get<bool>(config["Packing.bAntiDebug"]) || std::get<bool>(config["Packing.bAntiVM"])
  		lea rcx, [NTD]
  		call ShellcodeData.Labels.GetModuleHandleW
  		mov rsi, rax
@@ -225,7 +225,7 @@ _entry:
  		push 0
 
 		; Convert funs to syscall ids
-		%if Options.Packing.bDirectSyscalls
+		%if std::get<bool>(config["Packing.bDirectSyscalls"])
  			lea rcx, [HOOKFL]
 			mov eax, [rbp]
 			add eax, [rbx]
@@ -247,7 +247,7 @@ EnumProcesses_loop:
  		mov r8, 0
  		mov r9, r8
  		sub rsp, 0x20
- 		%if Options.Packing.bDirectSyscalls
+ 		%if std::get<bool>(config["Packing.bDirectSyscalls"])
  			mov r10, r15
  			mov eax, esi
 			sub rsp, 0x08
@@ -265,7 +265,7 @@ EnumProcesses_loop:
 
 		; Close old handle
 		sub rsp, 0x20
-		%if Options.Packing.bDirectSyscalls
+		%if std::get<bool>(config["Packing.bDirectSyscalls"])
  			mov r10, r15
  			mov eax, ebp
  			syscall
@@ -295,7 +295,7 @@ EnumProcesses_skipclose:
 		mov r8, rsp
 		push 0
 		sub rsp, 0x20
-		%if Options.Packing.bDirectSyscalls
+		%if std::get<bool>(config["Packing.bDirectSyscalls"])
  			mov r10, r11
  			mov eax, ebx
 			sub rsp, 0x08
@@ -345,11 +345,11 @@ EnumProcesses_findend:
  		; Compare to blacklist
 		mov r9, 1
 		mov r11, 0
-		%if Options.Packing.bAntiDebug
+		%if std::get<bool>(config["Packing.bAntiDebug"])
 			lea rcx, [DBGFL]
 			lea rdx, [DEBUG_PROC_BLACKLIST]
 			mov r8, DEBUG_PROC_BLACKLIST_LEN
-		%elif Options.Packing.bAntiVM
+		%elif std::get<bool>(config["Packing.bAntiVM"])
 			lea rcx, [VMFL]
 			lea rdx, [VM_PROC_BLACKLIST]
 			mov r8, VM_PROC_BLACKLIST_LEN
@@ -380,7 +380,7 @@ EnumProcesses_compare:
 		strict
 		jnz EnumProcesses_compare
 
-		%if Options.Packing.bAntiDebug && Options.Packing.bAntiVM
+		%if std::get<bool>(config["Packing.bAntiDebug"]) && std::get<bool>(config["Packing.bAntiVM"])
 			test r11, r11
 			strict
 			jnz EnumProcesses_skipvm
@@ -445,7 +445,7 @@ decompressloop:
 	add rax, rcx
 
 	; Call internal
-	%if Options.Packing.bAntiDump
+	%if std::get<bool>(config["Packing.bAntiDump"])
 		lea rcx, [rip]
 		sub rcx, a.offset()
 		lea rdx, [end]
@@ -453,7 +453,7 @@ decompressloop:
 		sub rdx, r8
 	%endif
 	%ifdef _DEBUG
-		%if Options.Debug.bGenerateBreakpoints
+		%if std::get<bool>(config["Debug.bGenerateBreakpoints"])
 			int3
 			block
 		%endif

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Obfuscating assembler functions
  * @version 0.0.0
- * @date 2026-01-14
+ * @date 2026-03-11
  * @copyright MIT License
  * 
  * @todo mov substitution can be improved, mix it in with other push/pop instructions properly
@@ -245,7 +245,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 	HeldLocks++;
 	const BYTE sz = 32;
 	const BYTE beg_unsafe = 17;
-	BYTE end = (bStrict || bForceStrict DEBUG_ONLY(|| Options.Debug.bStrictMutation)) ? beg_unsafe : sz;
+	BYTE end = (bStrict || bForceStrict DEBUG_ONLY(|| std::get<bool>(config["Debug.bStrictMutation"]))) ? beg_unsafe : sz;
 	Mem peb = ptr(0x60);
 	peb.setSegment(gs);
 	switch (rand() % end) {
@@ -442,7 +442,7 @@ void ProtectedAssembler::randinst(Gp o0) {
 void ProtectedAssembler::stub() {
 	if (!bMutate) return;
 	HeldLocks++;
-	DEBUG_ONLY(if (Options.Debug.bGenerateMarks) nop());
+	DEBUG_ONLY(if (std::get<bool>(config["Debug.bGenerateMarks"])) nop());
 	if (stack.Size()) {
 		LOG(Warning, MODULE_PACKER, "Stub was requested when stack was not empty, ignoring request.\n");
 		return;
@@ -450,13 +450,13 @@ void ProtectedAssembler::stub() {
 	randstack(0, MutationLevel);
 	for (int i = 0, n = rand() % MutationLevel; i < n; i++) randinst(randreg());
 	restorestack();
-	DEBUG_ONLY(if (Options.Debug.bGenerateMarks) nop());
+	DEBUG_ONLY(if (std::get<bool>(config["Debug.bGenerateMarks"])) nop());
 	HeldLocks--;
 }
 
 size_t ProtectedAssembler::garbage() {
 	if (!bMutate) return 0;
-	DEBUG_ONLY(if (::Options.Debug.bGenerateMarks) { HeldLocks++;  nop(); xchg(rax, rax); HeldLocks--; });
+	DEBUG_ONLY(if (std::get<bool>(config["Debug.bGenerateMarks"])) { HeldLocks++;  nop(); xchg(rax, rax); HeldLocks--; });
 	Label randlabel;
 	randlabel = newLabel();
 	Gp reg;
@@ -596,7 +596,7 @@ size_t ProtectedAssembler::garbage() {
 			randlabel = newLabel();
 		}
 	}
-	DEBUG_ONLY(if (::Options.Debug.bGenerateMarks) { HeldLocks++;  nop(); xchg(rax, rax); HeldLocks--; });
+	DEBUG_ONLY(if (std::get<bool>(config["Debug.bGenerateMarks"])) { HeldLocks++;  nop(); xchg(rax, rax); HeldLocks--; });
 	return 0;
 }
 
@@ -649,7 +649,7 @@ uint64_t ProtectedAssembler::GetStackSize() {
 // Emitter hook
 Error ProtectedAssembler::_emit(InstId instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_* opExt) {
 	// Special ops
-	if (Options.Reassembly.bEnabled && instId == Inst::kIdNop && o0.isMem() && reinterpret_cast<const Mem*>(&o0)->hasOffset() && (reinterpret_cast<const Mem*>(&o0)->offset() & 0xFFFFFF00) == 0x89658000) {
+	if (std::get<bool>(config["Reassembly.bEnabled"]) && instId == Inst::kIdNop && o0.isMem() && reinterpret_cast<const Mem*>(&o0)->hasOffset() && (reinterpret_cast<const Mem*>(&o0)->offset() & 0xFFFFFF00) == 0x89658000) {
 		BYTE op = reinterpret_cast<const Mem*>(&o0)->offset() & 0xFF;
 		if (op & YAP_OP_REASM_MUTATION) {
 			bMutate = (MutationLevel = op & 0b01111111);
