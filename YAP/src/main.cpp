@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
 	}
 	RegisterDefaultSubstitutions();
 	LoadDefaultConfig();
-	SetupUIElements();
+	GUI::Setup();
 	
 	// Look for - commands
 	for (int i = 1; i < argc; i++) {
@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
 	if (!Data.bUsingConsole && argc < 4) {
 		DEBUG_ONLY(AllocConsole());
 		DEBUG_ONLY(Console::SetupConsole());
-		if (!BeginGUI()) {
+		if (!GUI::Begin()) {
 			MessageBox(NULL, "Failed to create GUI!", NULL, MB_ICONERROR | MB_OK);
 			return 1;
 		}
@@ -252,7 +252,7 @@ DWORD WINAPI Begin(void* args) {
 	LOG(Success, MODULE_YAP, "All modules passed\n");
 	if (Data.hWnd) {
 		do {
-			while (!OpenFileDialogue(Data.SaveFileName, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, true)) {
+			while (!GUI::OpenFileDialogue(Data.SaveFileName, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, true)) {
 				if (Modal("Failed to get save file name", "Error", MB_RETRYCANCEL | MB_ICONERROR) == IDCANCEL) {
 					Data.bUserCancelled = true;
 					break;

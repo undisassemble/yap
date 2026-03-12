@@ -18,7 +18,6 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <ctime>
-#include <vector>
 #include "imgui_internal.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -44,43 +43,15 @@ struct {
 	UINT uType = 0;
 } CurrentModal;
 
-// UI elements
-enum ElementType_t : uint8_t {
-	ElemCheckbox
-};
-
-struct Element_t {
-	ElementType_t Type;
-	void* pValue;
-	const char* pLabel;
-	const char* pDescription;
-	uint8_t u8Flags;
-	const char* pFlagText = NULL;
-};
-
-struct Checkbox : Element_t {
-	Checkbox(_In_ const char* pLabel, _In_ const char* pValueName, _In_ const char* pDescription = NULL, _In_ uint8_t u8Flags = 0, _In_ const char* pFlagText = NULL) {
-		this->Type = ElemCheckbox;
-		this->pValue = &std::get<bool>(config[pValueName]);
-		this->pLabel = pLabel;
-		this->pDescription = pDescription;
-		this->u8Flags = u8Flags;
-		this->pFlagText = pFlagText;
-	}
-};
-
-std::vector<std::pair<const char*, std::vector<Element_t>>> elements;
+std::vector<std::pair<const char*, std::vector<GUI::Widgets::Element_t>>> elements;
 
 // Widgets
-#define WIDGET_DEBUG 1
-#define WIDGET_WARNING 2
-#define WIDGET_INFO 4
-namespace Widget {
+namespace Renderer {
 	bool Checkbox(_In_ const char* label, _In_ bool* pValue, _In_ const char* pDescription = NULL, _In_ uint8_t flags = 0, _In_ const char* ftext = NULL);
 }
 
 // Opens file dialogue
-bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo) {
+bool GUI::OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo) {
 	// Initialize struct
 	OPENFILENAME FileName = { 0 };
 	FileName.lStructSize = sizeof(OPENFILENAME);
@@ -119,12 +90,12 @@ void DrawGUI() {
 	if (ImGui::BeginMenuBar()) {
 		ImGui::Text("Yet Another Packer    |");
 		if (ImGui::BeginMenu("File")) {
-			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
-			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
+			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { GUI::OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
+			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { GUI::OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
 			if (!Data.ConfigPath[0]) ImGui::BeginDisabled();
 			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveConfig(); }
 			if (!Data.ConfigPath[0]) ImGui::EndDisabled();
-			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
+			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { GUI::OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
@@ -160,11 +131,11 @@ void DrawGUI() {
 		ImGui::BeginChild("#TabContents", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetStyle().WindowPadding.y - ImGui::GetCursorPosY()));
 		
 		if (u8CurrentCategory < elements.size()) {
-			std::vector<Element_t> items = elements[u8CurrentCategory].second;
-			for (Element_t& item : items) {
+			std::vector<GUI::Widgets::Element_t> items = elements[u8CurrentCategory].second;
+			for (GUI::Widgets::Element_t& item : items) {
 				switch (item.Type) {
-				case ElemCheckbox:
-					Widget::Checkbox(item.pLabel, reinterpret_cast<bool*>(item.pValue), item.pDescription, item.u8Flags, item.pFlagText);
+				case GUI::Widgets::ElemCheckbox:
+					Renderer::Checkbox(item.pLabel, reinterpret_cast<bool*>(item.pValue), item.pDescription, item.u8Flags, item.pFlagText);
 				}
 			}
 		}
@@ -360,7 +331,7 @@ void GLFWErrorHandler(int error, const char* message) {
 	LOG(Failed, MODULE_YAP, "GLFW error %d: %s\n", error, message);
 }
 
-bool BeginGUI() {
+bool GUI::Begin() {
 	if (bInitialized)
 		return false;
 	bInitialized = true;
@@ -528,13 +499,13 @@ int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
 	return CurrentModal.uType;
 }
 
-void SetupUIElements() {
+void GUI::Setup() {
 	elements = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
 			{
-				Checkbox("Enabled", "Packing.bEnabled"),
-				Checkbox("Anti-Dump", "Packing.bAntiDump"),
+				GUI::Widgets::Checkbox("Enabled", "Packing.bEnabled"),
+				GUI::Widgets::Checkbox("Anti-Dump", "Packing.bAntiDump"),
 			}
 		},
 		{
@@ -570,7 +541,23 @@ void SetupUIElements() {
 
 
 
-/***** WIDGETS *****/
+/***** WIDGETS ******/
+
+GUI::Widgets::Element_t GUI::Widgets::Checkbox(_In_ const char* pLabel, _In_ const char* pValueName, _In_opt_ const char* pDescription, _In_opt_ uint8_t u8Flags, _In_opt_ const char* pFlagText) {
+	return {
+		ElemCheckbox,
+		&std::get<bool>(config[pValueName]),
+		pLabel,
+		pDescription,
+		u8Flags,
+		pFlagText
+	};
+}
+
+
+
+
+/***** RENDERER *****/
 
 void DebugWarning() {
 	ImGui::SameLine();
@@ -618,7 +605,7 @@ void LeaveWidget(uint8_t flags = 0, const char* ftext = NULL) {
 	ImGui::Dummy(ImVec2(0, 0));
 }
 
-bool Widget::Checkbox(const char* label, bool* pValue, const char* pDescription, uint8_t flags, const char* ftext) {
+bool Renderer::Checkbox(const char* label, bool* pValue, const char* pDescription, uint8_t flags, const char* ftext) {
 	RenderWidgetContainer(pDescription);
 	bool v = ImGui::Checkbox(label, pValue);
 	LeaveWidget(flags, ftext);
