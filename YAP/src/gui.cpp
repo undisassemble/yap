@@ -76,7 +76,7 @@ std::vector<std::pair<const char*, std::vector<Element_t>>> elements;
 #define WIDGET_WARNING 2
 #define WIDGET_INFO 4
 namespace Widget {
-	bool Checkbox(_In_ const char* label, _In_ bool* pValue, _In_ uint8_t flags = 0, _In_ const char* ftext = NULL);
+	bool Checkbox(_In_ const char* label, _In_ bool* pValue, _In_ const char* pDescription = NULL, _In_ uint8_t flags = 0, _In_ const char* ftext = NULL);
 }
 
 // Opens file dialogue
@@ -164,7 +164,7 @@ void DrawGUI() {
 			for (Element_t& item : items) {
 				switch (item.Type) {
 				case ElemCheckbox:
-					Widget::Checkbox(item.pLabel, reinterpret_cast<bool*>(item.pValue), item.u8Flags, item.pFlagText);
+					Widget::Checkbox(item.pLabel, reinterpret_cast<bool*>(item.pValue), item.pDescription, item.u8Flags, item.pFlagText);
 				}
 			}
 		}
@@ -596,10 +596,16 @@ void FeatureInfo(_In_ const char* text = NULL) {
 	if (text) ImGui::SetItemTooltip("%s", text);
 }
 
-void RenderWidgetContainer() {
+void RenderWidgetContainer(_In_ const char* pDescription) {
 	ImVec2 tl = ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetCursorScreenPos().y);
 	ImVec2 br = ImVec2(iGuiWidth - tl.x - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] + tl.x : 0), tl.y + ImGui::GetFrameHeight() + ImGui::GetStyle().FramePadding.y * 2);
 	ImGui::GetWindowDrawList()->AddRectFilled(tl, br, ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)), ImGui::GetStyle().FrameRounding);
+	if (pDescription) {
+		br.y = tl.y + (br.y - tl.y - ImGui::GetTextLineHeight()) / 2;
+		tl = ImGui::CalcTextSize(pDescription);
+		br.x -= ImGui::GetStyle().FramePadding.x + tl.x;
+		ImGui::GetWindowDrawList()->AddText(br, ImGui::GetColorU32(ImGuiCol_Text), pDescription);
+	}
 	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().FramePadding.x);
 }
@@ -612,8 +618,8 @@ void LeaveWidget(uint8_t flags = 0, const char* ftext = NULL) {
 	ImGui::Dummy(ImVec2(0, 0));
 }
 
-bool Widget::Checkbox(const char* label, bool* pValue, uint8_t flags, const char* ftext) {
-	RenderWidgetContainer();
+bool Widget::Checkbox(const char* label, bool* pValue, const char* pDescription, uint8_t flags, const char* ftext) {
+	RenderWidgetContainer(pDescription);
 	bool v = ImGui::Checkbox(label, pValue);
 	LeaveWidget(flags, ftext);
 	return v;
