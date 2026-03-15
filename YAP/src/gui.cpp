@@ -43,12 +43,9 @@ struct {
 	UINT uType = 0;
 } CurrentModal;
 
-std::vector<std::pair<const char*, std::vector<GUI::Widgets::Element_t>>> elements;
+using namespace GUI;
 
-// Widgets
-namespace Renderer {
-	void __stdcall Checkbox(_In_ GUI::Widgets::Element_t& element);
-}
+std::vector<std::pair<const char*, WidgetClasses::Base*>> GUI::Widgets;
 
 // Opens file dialogue
 bool GUI::OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo) {
@@ -90,12 +87,12 @@ void DrawGUI() {
 	if (ImGui::BeginMenuBar()) {
 		ImGui::Text("Yet Another Packer    |");
 		if (ImGui::BeginMenu("File")) {
-			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { GUI::OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
-			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { GUI::OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
+			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
+			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
 			if (!Data.ConfigPath[0]) ImGui::BeginDisabled();
 			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveConfig(); }
 			if (!Data.ConfigPath[0]) ImGui::EndDisabled();
-			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { GUI::OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
+			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About")) {
@@ -114,12 +111,12 @@ void DrawGUI() {
 	// Configuration menu
 	if (!Data.bRunning) {
 		// Category selection
-		const float fBtnWidth = ((float)iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemSpacing.x * (elements.size() - 1)) / elements.size();
+		const float fBtnWidth = ((float)iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemSpacing.x * (Widgets.size() - 1)) / Widgets.size();
 		ImGui::PushFont(NULL, ImGui::GetFontSize() * 1.25);
-		for (int i = 0; i < elements.size(); i++) {
+		for (int i = 0; i < GUI::Widgets.size(); i++) {
 			ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(u8CurrentCategory == i ? ImGuiCol_ButtonActive : ImGuiCol_Button));
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(u8CurrentCategory == i ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered));
-			if (ImGui::Button(elements[i].first, ImVec2(fBtnWidth, 50))) u8CurrentCategory = i;
+			if (ImGui::Button(GUI::Widgets[i].first, ImVec2(fBtnWidth, 50))) u8CurrentCategory = i;
 			ImGui::PopStyleColor(2);
 			ImGui::SameLine();
 		}
@@ -130,10 +127,11 @@ void DrawGUI() {
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y);
 		ImGui::BeginChild("#TabContents", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetStyle().WindowPadding.y - ImGui::GetCursorPosY()));
 		
-		if (u8CurrentCategory < elements.size()) {
-			std::vector<GUI::Widgets::Element_t> items = elements[u8CurrentCategory].second;
-			for (GUI::Widgets::Element_t& item : items) {
-				item.pRenderer(item);
+		if (u8CurrentCategory < Widgets.size()) {
+			WidgetClasses::Base* pItem = Widgets[u8CurrentCategory].second;
+			while (pItem != NULL) {
+				pItem->Render();
+				pItem = pItem->GetNextWidget();
 			}
 		}
 
@@ -497,26 +495,13 @@ int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
 }
 
 void GUI::Setup() {
-	elements = {
+	Widgets = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
-			{
-				GUI::Widgets::Checkbox("Enabled", "Packing.bEnabled"),
-				GUI::Widgets::Checkbox("Anti-Dump", "Packing.bAntiDump"),
-			}
+			new WidgetClasses::Checkbox("Enabled", NULL),
 		},
-		{
-			ICON_CODE " Reassembly",
-			{
-
-			}
-		},
-		{
-			ICON_GEARS " Advanced",
-			{
-
-			}
-		},
+		{ ICON_CODE " Reassembly", NULL },
+		{ ICON_GEARS " Advanced", NULL },
 #ifdef _DEBUG
 		{
 			ICON_PALETTE " Style Editor",
@@ -540,18 +525,15 @@ void GUI::Setup() {
 
 /***** WIDGETS ******/
 
-GUI::Widgets::Element_t GUI::Widgets::Checkbox(_In_ const char* pLabel, _In_ const char* pValueName, _In_opt_ const char* pDescription, _In_opt_ uint8_t u8Flags, _In_opt_ const char* pFlagText) {
-	return {
-		Renderer::Checkbox,
-		&std::get<bool>(config[pValueName]),
-		pLabel,
-		pDescription,
-		u8Flags,
-		pFlagText
-	};
+WidgetClasses::Checkbox::Checkbox(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription) {
+	this->pLabel = pLabel;
+	this->pDescription = pDescription;
+	pValue = &std::get<bool>(config[pConfigName]);
 }
 
-
+void WidgetClasses::Checkbox::Render() {
+	ImGui::Checkbox(pLabel, pValue);
+};
 
 
 /***** RENDERER *****/
@@ -600,10 +582,4 @@ void LeaveWidget(uint8_t flags = 0, const char* ftext = NULL) {
 	if (flags & WIDGET_INFO) { FeatureInfo(ftext); }
 	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 	ImGui::Dummy(ImVec2(0, 0));
-}
-
-void __stdcall Renderer::Checkbox(_In_ GUI::Widgets::Element_t& element) {
-	RenderWidgetContainer(element.pDescription);
-	ImGui::Checkbox(element.pLabel, reinterpret_cast<bool*>(element.pValue));
-	LeaveWidget(element.u8Flags, element.pFlagText);
 }

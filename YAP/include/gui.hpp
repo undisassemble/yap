@@ -46,36 +46,53 @@ namespace GUI {
      */
     bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo);
 
-    /*!
-     * @brief For use in creating custom UI pages/options
-     */
-    namespace Widgets {
-        struct Element_t {
-        	void (__stdcall* pRenderer)(_In_ Element_t&);
-        	void* pValue;
-        	const char* pLabel;
-        	const char* pDescription;
-        	uint8_t u8Flags;
-        	const char* pFlagText = NULL;
+    namespace WidgetClasses {
+        /*!
+         * @brief Base class for any widgets.
+         */
+        class Base {
+        protected:
+            Base* pNextPeer = NULL;
+            Base* pChildren = NULL;
+            const char* pLabel = NULL;
+            const char* pDescription = NULL;
+            uint8_t u8Flags = 0;
+            const char* pFlagText = NULL;
+        
+        public:
+            inline Base* GetNextWidget() { return pNextPeer; }
+            inline Base* GetChildren() { return pChildren; }
+            inline void DebugWarning() { u8Flags = WIDGET_DEBUG; pFlagText = "TODO"; }
+            inline void FeatureWarning(_In_ const char* pText) { u8Flags = WIDGET_WARNING; pFlagText = pText; }
+            inline void FeatureInfo(_In_ const char* pText) { u8Flags = WIDGET_INFO; pFlagText = pText; }
+            inline void RemoveNextWidget() { if (pNextPeer) pNextPeer = pNextPeer->GetNextWidget(); }
+            
+            inline void SetNextWidget(_In_ Base* pWidget) {
+                Base* pOld = pNextPeer;
+                pNextPeer = pWidget;
+                if (pOld) pNextPeer->SetNextWidget(pOld);
+            }
+            
+            void AddChild(_In_ Base* pWidget);
+
+            virtual void Render() = 0;
         };
 
-        /*!
-         * @brief Creates a new checkbox widget, for boolean values.
-         * 
-         * @param [in] pLabel The label for the widget (short, left hand name)
-         * @param [in] pValueName The name for the boolean value stored in `config`
-         * @param [in] pDescription Longer description of what it does (right hand text)
-         * @param [in] u8Flags Additional flags for the widget, can be WIDGET_DEBUG, WIDGET_WARNING, or WIDGET_INFO
-         * @param [in] pFlagText Text that goes along with the icon shown by u8Flags
-         * @return Element_t 
-         */
-        Element_t Checkbox(_In_ const char* pLabel, _In_ const char* pValueName, _In_opt_ const char* pDescription = NULL, _In_opt_ uint8_t u8Flags = 0, _In_opt_ const char* pFlagText = NULL);
-    };
-};
+        class Checkbox : public Base {
+        private:
+            bool* pValue = NULL;
+        
+        public:
+            Checkbox(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription = NULL);
 
-/*!
- * @brief The structure of pages/widgets displayed in the UI.
- * @details Vector of pages, each with a name and elements. Populated by GUI::Setup, which should be called before adding any custom elements. Look at GUI::Setup to see page indexes and how contents are formatted.
- * @see GUI::Setup
- */
-extern std::vector<std::pair<const char*, std::vector<GUI::Widgets::Element_t>>> elements;
+            void Render() override;
+        };
+    };
+
+    /*!
+     * @brief The structure of pages/widgets displayed in the UI.
+     * @details Vector of pages, each with a name and elements. Populated by GUI::Setup, which should be called before adding any custom elements. Look at GUI::Setup to see page indexes and how contents are formatted.
+     * @see GUI::Setup
+     */
+    extern std::vector<std::pair<const char*, WidgetClasses::Base*>> Widgets;
+};
