@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-12
+ * @date 2026-03-15
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -47,7 +47,7 @@ std::vector<std::pair<const char*, std::vector<GUI::Widgets::Element_t>>> elemen
 
 // Widgets
 namespace Renderer {
-	bool Checkbox(_In_ const char* label, _In_ bool* pValue, _In_ const char* pDescription = NULL, _In_ uint8_t flags = 0, _In_ const char* ftext = NULL);
+	void __stdcall Checkbox(_In_ GUI::Widgets::Element_t& element);
 }
 
 // Opens file dialogue
@@ -133,10 +133,7 @@ void DrawGUI() {
 		if (u8CurrentCategory < elements.size()) {
 			std::vector<GUI::Widgets::Element_t> items = elements[u8CurrentCategory].second;
 			for (GUI::Widgets::Element_t& item : items) {
-				switch (item.Type) {
-				case GUI::Widgets::ElemCheckbox:
-					Renderer::Checkbox(item.pLabel, reinterpret_cast<bool*>(item.pValue), item.pDescription, item.u8Flags, item.pFlagText);
-				}
+				item.pRenderer(item);
 			}
 		}
 
@@ -545,7 +542,7 @@ void GUI::Setup() {
 
 GUI::Widgets::Element_t GUI::Widgets::Checkbox(_In_ const char* pLabel, _In_ const char* pValueName, _In_opt_ const char* pDescription, _In_opt_ uint8_t u8Flags, _In_opt_ const char* pFlagText) {
 	return {
-		ElemCheckbox,
+		Renderer::Checkbox,
 		&std::get<bool>(config[pValueName]),
 		pLabel,
 		pDescription,
@@ -605,9 +602,8 @@ void LeaveWidget(uint8_t flags = 0, const char* ftext = NULL) {
 	ImGui::Dummy(ImVec2(0, 0));
 }
 
-bool Renderer::Checkbox(const char* label, bool* pValue, const char* pDescription, uint8_t flags, const char* ftext) {
-	RenderWidgetContainer(pDescription);
-	bool v = ImGui::Checkbox(label, pValue);
-	LeaveWidget(flags, ftext);
-	return v;
+void __stdcall Renderer::Checkbox(_In_ GUI::Widgets::Element_t& element) {
+	RenderWidgetContainer(element.pDescription);
+	ImGui::Checkbox(element.pLabel, reinterpret_cast<bool*>(element.pValue));
+	LeaveWidget(element.u8Flags, element.pFlagText);
 }

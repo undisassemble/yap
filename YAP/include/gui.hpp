@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI definitions
  * @version 0.0.0
- * @date 2026-03-12
+ * @date 2026-03-15
  * @copyright MIT License
  */
 
@@ -50,13 +50,8 @@ namespace GUI {
      * @brief For use in creating custom UI pages/options
      */
     namespace Widgets {
-
-        enum ElementType_t : uint8_t {
-        	ElemCheckbox
-        };
-
         struct Element_t {
-        	ElementType_t Type;
+        	void (__stdcall* pRenderer)(_In_ Element_t&);
         	void* pValue;
         	const char* pLabel;
         	const char* pDescription;
