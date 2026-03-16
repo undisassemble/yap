@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI definitions
  * @version 0.0.0
- * @date 2026-03-15
+ * @date 2026-03-16
  * @copyright MIT License
  */
 
@@ -74,7 +74,8 @@ namespace GUI {
                 pNextPeer = pWidget;
                 if (pOld) pNextPeer->SetNextWidget(pOld);
             }
-            
+
+            void AddNextWidget(_In_ Base* pWidget);
             void AddChild(_In_ Base* pWidget);
 
             void RenderWidgetContainer(_In_ int iHeight = -1);

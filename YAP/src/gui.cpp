@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-15
+ * @date 2026-03-16
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -517,6 +517,10 @@ void GUI::Setup() {
 		}
 #endif
 	};
+
+	// Packing
+	RELIB_ASSERT(strcmp(Widgets[0].first, ICON_BOX_ARCHIVE " Packing") == 0);
+	Widgets[0].second->AddNextWidget(new WidgetClasses::Checkbox("Anti-Dump", "Packing.bAntiDump", "Bla"));
 }
 
 
@@ -524,6 +528,30 @@ void GUI::Setup() {
 
 
 /***** WIDGETS ******/
+
+void WidgetClasses::Base::AddNextWidget(_In_ Base* pWidget) {
+	if (!pNextPeer) {
+		pNextPeer = pWidget;
+		return;
+	}
+	Base* pNext = pNextPeer;
+	while (pNext->GetNextWidget()) {
+		pNext = pNext->GetNextWidget();
+	}
+	pNext->pNextPeer = pWidget;
+}
+
+void WidgetClasses::Base::AddChild(_In_ Base* pWidget) {
+	if (!pChildren) {
+		pChildren = pWidget;
+		return;
+	}
+	Base* pChild = pChildren;
+	while (pChild->GetNextWidget()) {
+		pChild = pChild->GetNextWidget();
+	}
+	pChild->AddNextWidget(pWidget);
+}
 
 void DebugWarning() {
 	ImGui::SameLine();
