@@ -498,7 +498,7 @@ void GUI::Setup() {
 	Widgets = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
-			new WidgetClasses::Checkbox("Enabled", NULL),
+			new WidgetClasses::Checkbox("Enabled", "Packing.bEnabled", "Packer enable description and stuff"),
 		},
 		{ ICON_CODE " Reassembly", NULL },
 		{ ICON_GEARS " Advanced", NULL },
@@ -525,19 +525,6 @@ void GUI::Setup() {
 
 /***** WIDGETS ******/
 
-WidgetClasses::Checkbox::Checkbox(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription) {
-	this->pLabel = pLabel;
-	this->pDescription = pDescription;
-	pValue = &std::get<bool>(config[pConfigName]);
-}
-
-void WidgetClasses::Checkbox::Render() {
-	ImGui::Checkbox(pLabel, pValue);
-};
-
-
-/***** RENDERER *****/
-
 void DebugWarning() {
 	ImGui::SameLine();
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
@@ -562,24 +549,49 @@ void FeatureInfo(_In_ const char* text = NULL) {
 	if (text) ImGui::SetItemTooltip("%s", text);
 }
 
-void RenderWidgetContainer(_In_ const char* pDescription) {
-	ImVec2 tl = ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetCursorScreenPos().y);
-	ImVec2 br = ImVec2(iGuiWidth - tl.x - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] + tl.x : 0), tl.y + ImGui::GetFrameHeight() + ImGui::GetStyle().FramePadding.y * 2);
-	ImGui::GetWindowDrawList()->AddRectFilled(tl, br, ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)), ImGui::GetStyle().FrameRounding);
-	if (pDescription) {
-		br.y = tl.y + (br.y - tl.y - ImGui::GetTextLineHeight()) / 2;
-		tl = ImGui::CalcTextSize(pDescription);
-		br.x -= ImGui::GetStyle().FramePadding.x + tl.x;
-		ImGui::GetWindowDrawList()->AddText(br, ImGui::GetColorU32(ImGuiCol_Text), pDescription);
+void WidgetClasses::Base::RenderWidgetContainer(_In_ int iHeight) {
+	if (~u8Flags & WIDGET_IS_CHILD) {
+		if (iHeight < 0) {
+			int nChildren = 1;
+			Base* pChild = this->GetChildren();
+			while (pChild) {
+				nChildren++;
+				pChild = pChild->GetNextWidget();
+			}
+			iHeight = ImGui::GetFrameHeight() * nChildren + ImGui::GetStyle().FramePadding.y * 2;
+		}
+
+		ImVec2 tl = ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetCursorScreenPos().y);
+		ImVec2 br = ImVec2(iGuiWidth - tl.x - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] + tl.x : 0), tl.y + iHeight);
+		ImGui::GetWindowDrawList()->AddRectFilled(tl, br, ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)), ImGui::GetStyle().FrameRounding);
 	}
 	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().FramePadding.x);
 }
 
-void LeaveWidget(uint8_t flags = 0, const char* ftext = NULL) {
-	if (flags & WIDGET_DEBUG) { DebugWarning(); }
-	if (flags & WIDGET_WARNING) { FeatureWarning(ftext); }
-	if (flags & WIDGET_INFO) { FeatureInfo(ftext); }
+void WidgetClasses::Base::RenderDescription() {
+	if (!pDescription) return;
+	ImVec2 tpos = ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] + ImGui::GetStyle().WindowPadding.x : 0) - ImGui::CalcTextSize(pDescription).x, ImGui::GetCursorScreenPos().y + ImGui::GetStyle().FramePadding.y);
+	ImGui::GetWindowDrawList()->AddText(tpos, ImGui::GetColorU32(ImGuiCol_Text), pDescription);
+}
+
+void WidgetClasses::Base::EndWidgetRender() {
+	if (u8Flags & WIDGET_DEBUG) { DebugWarning(); }
+	if (u8Flags & WIDGET_WARNING) { FeatureWarning(pFlagText); }
+	if (u8Flags & WIDGET_INFO) { FeatureInfo(pFlagText); }
 	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 	ImGui::Dummy(ImVec2(0, 0));
 }
+
+WidgetClasses::Checkbox::Checkbox(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription) {
+	this->pLabel = pLabel;
+	this->pDescription = pDescription;
+	pValue = &std::get<bool>(config[pConfigName]);
+}
+
+void WidgetClasses::Checkbox::Render() {
+	RenderWidgetContainer();
+	RenderDescription();
+	ImGui::Checkbox(pLabel, pValue);
+	EndWidgetRender();
+};

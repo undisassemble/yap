@@ -18,6 +18,7 @@
 #define WIDGET_DEBUG 1
 #define WIDGET_WARNING 2
 #define WIDGET_INFO 4
+#define WIDGET_IS_CHILD 8
 
 namespace GUI {
     /*!
@@ -62,9 +63,10 @@ namespace GUI {
         public:
             inline Base* GetNextWidget() { return pNextPeer; }
             inline Base* GetChildren() { return pChildren; }
-            inline void DebugWarning() { u8Flags = WIDGET_DEBUG; pFlagText = "TODO"; }
-            inline void FeatureWarning(_In_ const char* pText) { u8Flags = WIDGET_WARNING; pFlagText = pText; }
-            inline void FeatureInfo(_In_ const char* pText) { u8Flags = WIDGET_INFO; pFlagText = pText; }
+            inline void DebugWarning() { u8Flags |= WIDGET_DEBUG; }
+            inline void FeatureWarning(_In_ const char* pText) { u8Flags |= WIDGET_WARNING; pFlagText = pText; }
+            inline void FeatureInfo(_In_ const char* pText) { u8Flags |= WIDGET_INFO; pFlagText = pText; }
+            inline void SetIsChild() { u8Flags |= WIDGET_IS_CHILD; }
             inline void RemoveNextWidget() { if (pNextPeer) pNextPeer = pNextPeer->GetNextWidget(); }
             
             inline void SetNextWidget(_In_ Base* pWidget) {
@@ -75,7 +77,10 @@ namespace GUI {
             
             void AddChild(_In_ Base* pWidget);
 
+            void RenderWidgetContainer(_In_ int iHeight = -1);
+            void RenderDescription();
             virtual void Render() = 0;
+            void EndWidgetRender();
         };
 
         class Checkbox : public Base {
