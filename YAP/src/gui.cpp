@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-16
+ * @date 2026-03-17
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -128,9 +128,14 @@ void DrawGUI() {
 		ImGui::BeginChild("#TabContents", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetStyle().WindowPadding.y - ImGui::GetCursorPosY()));
 		
 		if (u8CurrentCategory < Widgets.size()) {
-			WidgetClasses::Base* pItem = Widgets[u8CurrentCategory].second;
-			while (pItem != NULL) {
+			WidgetClasses::Base *pChild, *pItem = Widgets[u8CurrentCategory].second;
+			while (pItem) {
 				pItem->Render();
+				pChild = pItem->GetChildren();
+				while (pChild) {
+					pChild->Render();
+					pChild = pChild->GetNextWidget();
+				}
 				pItem = pItem->GetNextWidget();
 			}
 		}
@@ -495,10 +500,11 @@ int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
 }
 
 void GUI::Setup() {
+	using namespace WidgetClasses;
 	Widgets = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
-			new WidgetClasses::Checkbox("Enabled", "Packing.bEnabled", "Packer enable description and stuff"),
+			new Checkbox("Enabled", "Packing.bEnabled", "Packer enable description and stuff"),
 		},
 		{ ICON_CODE " Reassembly", NULL },
 		{ ICON_GEARS " Advanced", NULL },
@@ -520,7 +526,14 @@ void GUI::Setup() {
 
 	// Packing
 	RELIB_ASSERT(strcmp(Widgets[0].first, ICON_BOX_ARCHIVE " Packing") == 0);
-	Widgets[0].second->AddNextWidget(new WidgetClasses::Checkbox("Anti-Dump", "Packing.bAntiDump", "Bla"));
+	Widgets[0].second->AddNextWidget(
+		(new Checkbox("Anti-Dump", "Packing.bAntiDump", "Bla"))->WithChildren(
+			3,
+			new Checkbox("Child 1", "Packing.bEnableMasquerade", "The first child"),
+			new Checkbox("Child 2", "Packing.bNukeHeaders", "The second child"),
+			new Checkbox("Child 3", "Packing.bMitigateSideloading", "The third child")
+		)
+	);
 }
 
 
@@ -542,6 +555,7 @@ void WidgetClasses::Base::AddNextWidget(_In_ Base* pWidget) {
 }
 
 void WidgetClasses::Base::AddChild(_In_ Base* pWidget) {
+	pWidget->SetIsChild();
 	if (!pChildren) {
 		pChildren = pWidget;
 		return;
@@ -551,6 +565,16 @@ void WidgetClasses::Base::AddChild(_In_ Base* pWidget) {
 		pChild = pChild->GetNextWidget();
 	}
 	pChild->AddNextWidget(pWidget);
+}
+
+WidgetClasses::Base* WidgetClasses::Base::WithChildren(_In_ uint32_t u8NumChildren, ...) {
+	va_list args;
+	va_start(args, u8NumChildren);
+	for (int i = 0; i < u8NumChildren; i++) {
+		AddChild(va_arg(args, Base*));
+	}
+	va_end(args);
+	return this;
 }
 
 void DebugWarning() {
@@ -586,14 +610,14 @@ void WidgetClasses::Base::RenderWidgetContainer(_In_ int iHeight) {
 				nChildren++;
 				pChild = pChild->GetNextWidget();
 			}
-			iHeight = ImGui::GetFrameHeight() * nChildren + ImGui::GetStyle().FramePadding.y * 2;
+			iHeight = ImGui::GetFrameHeight() * nChildren + ImGui::GetStyle().ItemSpacing.y * (nChildren - 1) + ImGui::GetStyle().FramePadding.y * 2;
 		}
 
 		ImVec2 tl = ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetCursorScreenPos().y);
 		ImVec2 br = ImVec2(iGuiWidth - tl.x - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] + tl.x : 0), tl.y + iHeight);
 		ImGui::GetWindowDrawList()->AddRectFilled(tl, br, ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)), ImGui::GetStyle().FrameRounding);
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 	}
-	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().FramePadding.x);
 }
 
@@ -607,8 +631,10 @@ void WidgetClasses::Base::EndWidgetRender() {
 	if (u8Flags & WIDGET_DEBUG) { DebugWarning(); }
 	if (u8Flags & WIDGET_WARNING) { FeatureWarning(pFlagText); }
 	if (u8Flags & WIDGET_INFO) { FeatureInfo(pFlagText); }
-	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
-	ImGui::Dummy(ImVec2(0, 0));
+	if (u8Flags & WIDGET_IS_CHILD ? !pNextPeer : !pChildren) {
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
+		ImGui::Dummy(ImVec2(0, 0));
+	}
 }
 
 WidgetClasses::Checkbox::Checkbox(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription) {

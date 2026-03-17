@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI definitions
  * @version 0.0.0
- * @date 2026-03-16
+ * @date 2026-03-17
  * @copyright MIT License
  */
 
@@ -77,6 +77,7 @@ namespace GUI {
 
             void AddNextWidget(_In_ Base* pWidget);
             void AddChild(_In_ Base* pWidget);
+            Base* WithChildren(_In_ uint32_t u8NumChildren, ...);
 
             void RenderWidgetContainer(_In_ int iHeight = -1);
             void RenderDescription();
