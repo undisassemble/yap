@@ -20,6 +20,7 @@
 #define WIDGET_INFO 4
 #define WIDGET_IS_CHILD 8
 #define WIDGET_SHOW_CHILDREN 16
+#define WIDGET_DISABLED_CHILDREN 32
 
 namespace GUI {
     /*!
@@ -70,6 +71,7 @@ namespace GUI {
             inline void SetIsChild() { u8Flags |= WIDGET_IS_CHILD; }
             inline void RemoveNextWidget() { if (pNextPeer) pNextPeer = pNextPeer->GetNextWidget(); }
             inline bool ShouldShowChildren() { return u8Flags & WIDGET_SHOW_CHILDREN; }
+            inline bool AreChildrenDisabled() { return u8Flags & WIDGET_DISABLED_CHILDREN; }
 
             inline void SetNextWidget(_In_ Base* pWidget) {
                 Base* pOld = pNextPeer;

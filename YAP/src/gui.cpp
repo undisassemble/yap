@@ -132,11 +132,13 @@ void DrawGUI() {
 			while (pItem) {
 				pItem->Render();
 				if (pItem->ShouldShowChildren()) {
+					ImGui::BeginDisabled(pItem->AreChildrenDisabled());
 					pChild = pItem->GetChildren();
 					while (pChild) {
 						pChild->Render();
 						pChild = pChild->GetNextWidget();
 					}
+					ImGui::EndDisabled();
 				}
 				pItem = pItem->GetNextWidget();
 			}
@@ -615,6 +617,9 @@ void WidgetClasses::Base::RenderWidgetContainer(_In_ int iHeight) {
 				}
 			}
 			iHeight = ImGui::GetFrameHeight() * nChildren + ImGui::GetStyle().ItemSpacing.y * (nChildren - 1) + ImGui::GetStyle().FramePadding.y * 2;
+			if (nChildren > 1 && u8Flags & WIDGET_SHOW_CHILDREN) {
+				iHeight += ImGui::GetStyle().ItemSpacing.y + 1;
+			}
 		}
 
 		ImVec2 tl = ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetCursorScreenPos().y);
@@ -636,12 +641,11 @@ void WidgetClasses::Base::RenderWidgetContainer(_In_ int iHeight) {
 			}
 			if (ImGui::IsItemHovered()) {
 				float fOpacity = ImGui::IsMouseDown(ImGuiMouseButton_Left) ? 0.4f : 0.2f;
-				ImGui::GetWindowDrawList()->AddRectFilled(tl, ImVec2(tl.x + fButtonSize, tl.y + fButtonSize), ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, fOpacity)), ImGui::GetStyle().FrameRounding);
+				ImGui::GetWindowDrawList()->AddRectFilled(tl, ImVec2(tl.x + fButtonSize, tl.y + fButtonSize), ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, fOpacity)), ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTopLeft | (u8Flags & WIDGET_SHOW_CHILDREN ? 0 : ImDrawFlags_RoundCornersBottomLeft));
 			}
 			CursorPos.x += fButtonSize;
 			ImGui::SetCursorPos(CursorPos);
 		}
-
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 	}
 	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().FramePadding.x);
@@ -657,7 +661,9 @@ void WidgetClasses::Base::EndWidgetRender() {
 	if (u8Flags & WIDGET_DEBUG) { DebugWarning(); }
 	if (u8Flags & WIDGET_WARNING) { FeatureWarning(pFlagText); }
 	if (u8Flags & WIDGET_INFO) { FeatureInfo(pFlagText); }
-	if (u8Flags & WIDGET_IS_CHILD ? !pNextPeer : !pChildren) {
+	if (~u8Flags & WIDGET_IS_CHILD && pChildren && u8Flags & WIDGET_SHOW_CHILDREN) {
+		ImGui::Separator();
+	} else if (u8Flags & WIDGET_IS_CHILD ? !pNextPeer : !pChildren) {
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 		ImGui::Dummy(ImVec2(0, 0));
 	}
@@ -667,11 +673,14 @@ WidgetClasses::Checkbox::Checkbox(_In_ const char* pLabel, _In_ const char* pCon
 	this->pLabel = pLabel;
 	this->pDescription = pDescription;
 	pValue = &std::get<bool>(config[pConfigName]);
+	if (!*pValue) u8Flags |= WIDGET_DISABLED_CHILDREN;
 }
 
 void WidgetClasses::Checkbox::Render() {
 	RenderWidgetContainer();
 	RenderDescription();
-	ImGui::Checkbox(pLabel, pValue);
+	if (ImGui::Checkbox(pLabel, pValue)) {
+		u8Flags ^= WIDGET_DISABLED_CHILDREN;
+	}
 	EndWidgetRender();
 };
