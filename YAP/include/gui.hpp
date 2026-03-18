@@ -82,11 +82,18 @@ namespace GUI {
             void AddNextWidget(_In_ Base* pWidget);
             void AddChild(_In_ Base* pWidget);
             Base* WithChildren(_In_ uint32_t u8NumChildren, ...);
+            Base* FollowedBy(_In_ uint32_t u8NumPeers, ...);
 
             void RenderWidgetContainer(_In_ int iHeight = -1);
             void RenderDescription();
             virtual void Render() = 0;
             void EndWidgetRender();
+        };
+
+        class Category : public Base {
+        public:
+            Category(_In_ const char* pLabel, _In_ const char* pDescription, _In_ bool bStartOpen = false);
+            void Render() override;
         };
 
         class Checkbox : public Base {
@@ -95,7 +102,6 @@ namespace GUI {
         
         public:
             Checkbox(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription = NULL);
-
             void Render() override;
         };
     };

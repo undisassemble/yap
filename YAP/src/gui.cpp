@@ -531,7 +531,7 @@ void GUI::Setup() {
 	// Packing
 	RELIB_ASSERT(strcmp(Widgets[0].first, ICON_BOX_ARCHIVE " Packing") == 0);
 	Widgets[0].second->AddNextWidget(
-		(new Checkbox("Anti-Dump", "Packing.bAntiDump", "Bla"))->WithChildren(
+		(new Category("Test", "Test category"))->WithChildren(
 			3,
 			new Checkbox("Child 1", "Packing.bEnableMasquerade", "The first child"),
 			new Checkbox("Child 2", "Packing.bNukeHeaders", "The second child"),
@@ -546,7 +546,9 @@ void GUI::Setup() {
 
 /***** WIDGETS ******/
 
-void WidgetClasses::Base::AddNextWidget(_In_ Base* pWidget) {
+using namespace WidgetClasses;
+
+void Base::AddNextWidget(_In_ Base* pWidget) {
 	if (!pNextPeer) {
 		pNextPeer = pWidget;
 		return;
@@ -558,7 +560,7 @@ void WidgetClasses::Base::AddNextWidget(_In_ Base* pWidget) {
 	pNext->pNextPeer = pWidget;
 }
 
-void WidgetClasses::Base::AddChild(_In_ Base* pWidget) {
+void Base::AddChild(_In_ Base* pWidget) {
 	pWidget->SetIsChild();
 	if (!pChildren) {
 		pChildren = pWidget;
@@ -571,11 +573,21 @@ void WidgetClasses::Base::AddChild(_In_ Base* pWidget) {
 	pChild->AddNextWidget(pWidget);
 }
 
-WidgetClasses::Base* WidgetClasses::Base::WithChildren(_In_ uint32_t u8NumChildren, ...) {
+Base* Base::WithChildren(_In_ uint32_t u8NumChildren, ...) {
 	va_list args;
 	va_start(args, u8NumChildren);
 	for (int i = 0; i < u8NumChildren; i++) {
 		AddChild(va_arg(args, Base*));
+	}
+	va_end(args);
+	return this;
+}
+
+Base* Base::FollowedBy(_In_ uint32_t u8NumPeers, ...) {
+	va_list args;
+	va_start(args, u8NumPeers);
+	for (int i = 0; i < u8NumPeers; i++) {
+		AddNextWidget(va_arg(args, Base*));
 	}
 	va_end(args);
 	return this;
@@ -605,7 +617,7 @@ void FeatureInfo(_In_ const char* text = NULL) {
 	if (text) ImGui::SetItemTooltip("%s", text);
 }
 
-void WidgetClasses::Base::RenderWidgetContainer(_In_ int iHeight) {
+void Base::RenderWidgetContainer(_In_ int iHeight) {
 	if (~u8Flags & WIDGET_IS_CHILD) {
 		if (iHeight < 0) {
 			int nChildren = 1;
@@ -651,13 +663,13 @@ void WidgetClasses::Base::RenderWidgetContainer(_In_ int iHeight) {
 	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().FramePadding.x);
 }
 
-void WidgetClasses::Base::RenderDescription() {
+void Base::RenderDescription() {
 	if (!pDescription) return;
 	ImVec2 tpos = ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] + ImGui::GetStyle().WindowPadding.x : 0) - ImGui::CalcTextSize(pDescription).x, ImGui::GetCursorScreenPos().y + ImGui::GetStyle().FramePadding.y);
 	ImGui::GetWindowDrawList()->AddText(tpos, ImGui::GetColorU32(ImGuiCol_Text), pDescription);
 }
 
-void WidgetClasses::Base::EndWidgetRender() {
+void Base::EndWidgetRender() {
 	if (u8Flags & WIDGET_DEBUG) { DebugWarning(); }
 	if (u8Flags & WIDGET_WARNING) { FeatureWarning(pFlagText); }
 	if (u8Flags & WIDGET_INFO) { FeatureInfo(pFlagText); }
@@ -669,14 +681,14 @@ void WidgetClasses::Base::EndWidgetRender() {
 	}
 }
 
-WidgetClasses::Checkbox::Checkbox(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription) {
+Checkbox::Checkbox(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription) {
 	this->pLabel = pLabel;
 	this->pDescription = pDescription;
 	pValue = &std::get<bool>(config[pConfigName]);
 	if (!*pValue) u8Flags |= WIDGET_DISABLED_CHILDREN;
 }
 
-void WidgetClasses::Checkbox::Render() {
+void Checkbox::Render() {
 	RenderWidgetContainer();
 	RenderDescription();
 	if (ImGui::Checkbox(pLabel, pValue)) {
@@ -684,3 +696,19 @@ void WidgetClasses::Checkbox::Render() {
 	}
 	EndWidgetRender();
 };
+
+Category::Category(_In_ const char* pLabel, _In_ const char* pDescription, _In_ bool bStartOpen) {
+	this->pLabel = pLabel;
+	this->pDescription = pDescription;
+	if (bStartOpen) u8Flags |= WIDGET_SHOW_CHILDREN;
+}
+
+void Category::Render() {
+	RenderWidgetContainer();
+	RenderDescription();
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (ImGui::GetFrameHeight() - ImGui::GetTextLineHeight()) / 2);
+	ImGui::Text("%s", pLabel);
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (ImGui::GetFrameHeight() - ImGui::GetTextLineHeight()) / 2 - ImGui::GetStyle().ItemSpacing.y);
+	ImGui::Dummy(ImVec2(0, 0));
+	EndWidgetRender();
+}
