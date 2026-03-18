@@ -116,6 +116,16 @@ namespace GUI {
             Slider(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ int nMin, _In_ int nMax, _In_ const char* pDescription = NULL, _In_ const char* pFormat = "%d");
             void Render() override;
         };
+
+        class Dropdown : public Base {
+        private:
+            int* pValue = NULL;
+            const char* pItems = NULL;
+        
+        public:
+            Dropdown(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pItems, _In_ const char* pDescription = NULL);
+            void Render() override;
+        };
     };
 
     /*!

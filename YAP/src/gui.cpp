@@ -508,7 +508,7 @@ void GUI::Setup() {
 	Widgets = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
-			new Slider("Test", "Packing.iCompressionLevel", 0, 9, "Thoih"),
+			new Dropdown("Test", "Packing.iImmitate", "One\0Two\0Three\0", "fhuewguhiweghiou"),
 		},
 		{ ICON_CODE " Reassembly", NULL },
 		{ ICON_GEARS " Advanced", NULL },
@@ -729,5 +729,22 @@ void Slider::Render() {
 	RenderDescription();
 	ImGui::PushItemWidth(fGuiScale * 200);
 	ImGui::SliderInt(pLabel, pValue, nMin, nMax, pFormat);
+	EndWidgetRender();
+}
+
+
+Dropdown::Dropdown(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pItems, _In_ const char* pDescription) {
+	RELIB_ASSERT(config.contains(pConfigName));
+	this->pLabel = pLabel;
+	this->pValue = &std::get<int>(config[pConfigName]);
+	this->pItems = pItems;
+	this->pDescription = pDescription;
+}
+
+void Dropdown::Render() {
+	RenderWidgetContainer();
+	RenderDescription();
+	ImGui::PushItemWidth(fGuiScale * 200);
+	ImGui::Combo(pLabel, pValue, pItems);
 	EndWidgetRender();
 }
