@@ -3,13 +3,13 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2026-03-12
+ * @date 2026-03-17
  * @copyright MIT License
  */
 
 #include "util.hpp"
 
-std::unordered_map<const char*, std::variant<bool, int, Buffer, uint64_t>> config;
+std::unordered_map<std::string_view, std::variant<bool, int, Buffer, uint64_t>> config;
 
 void LoadDefaultConfig() {
 	config["Packing.bEnabled"] = false;

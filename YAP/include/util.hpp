@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2026-03-11
+ * @date 2026-03-17
  * @copyright MIT License
  */
 
@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <unordered_map>
 #include <variant>
+#include <string>
 #include "version.hpp"
 #include "relib/relib.hpp"
 
@@ -112,7 +113,7 @@ DWORD WINAPI Begin(void* args);
 extern Data_t Data;
 extern HANDLE hLogFile;
 extern HANDLE hStdOut;
-extern std::unordered_map<const char*, std::variant<bool, int, Buffer, uint64_t>> config;
+extern std::unordered_map<std::string_view, std::variant<bool, int, Buffer, uint64_t>> config;
 
 uint64_t rand64();
 
