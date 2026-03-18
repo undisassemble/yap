@@ -131,10 +131,12 @@ void DrawGUI() {
 			WidgetClasses::Base *pChild, *pItem = Widgets[u8CurrentCategory].second;
 			while (pItem) {
 				pItem->Render();
-				pChild = pItem->GetChildren();
-				while (pChild) {
-					pChild->Render();
-					pChild = pChild->GetNextWidget();
+				if (pItem->ShouldShowChildren()) {
+					pChild = pItem->GetChildren();
+					while (pChild) {
+						pChild->Render();
+						pChild = pChild->GetNextWidget();
+					}
 				}
 				pItem = pItem->GetNextWidget();
 			}
@@ -605,10 +607,12 @@ void WidgetClasses::Base::RenderWidgetContainer(_In_ int iHeight) {
 	if (~u8Flags & WIDGET_IS_CHILD) {
 		if (iHeight < 0) {
 			int nChildren = 1;
-			Base* pChild = this->GetChildren();
-			while (pChild) {
-				nChildren++;
-				pChild = pChild->GetNextWidget();
+			if (u8Flags & WIDGET_SHOW_CHILDREN) {
+				Base* pChild = this->GetChildren();
+				while (pChild) {
+					nChildren++;
+					pChild = pChild->GetNextWidget();
+				}
 			}
 			iHeight = ImGui::GetFrameHeight() * nChildren + ImGui::GetStyle().ItemSpacing.y * (nChildren - 1) + ImGui::GetStyle().FramePadding.y * 2;
 		}
@@ -616,6 +620,28 @@ void WidgetClasses::Base::RenderWidgetContainer(_In_ int iHeight) {
 		ImVec2 tl = ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetCursorScreenPos().y);
 		ImVec2 br = ImVec2(iGuiWidth - tl.x - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] + tl.x : 0), tl.y + iHeight);
 		ImGui::GetWindowDrawList()->AddRectFilled(tl, br, ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)), ImGui::GetStyle().FrameRounding);
+
+		// Dropdown button
+		if (pChildren) {
+			char id[256] = { 0 };
+			snprintf(id, sizeof(id), "0x%pInvisButton", this);
+			float fButtonSize = ImGui::GetFrameHeight() + ImGui::GetStyle().FramePadding.y * 2;
+			ImVec2 ArrowPos = ImGui::GetCursorScreenPos();
+			ArrowPos.x += (fButtonSize - ImGui::GetFontSize()) / 2;
+			ArrowPos.y += (fButtonSize - ImGui::GetFontSize()) / 2;
+			ImGui::RenderArrow(ImGui::GetWindowDrawList(), ArrowPos, ImGui::GetColorU32(ImGuiCol_Text), (u8Flags & WIDGET_SHOW_CHILDREN) ? ImGuiDir_Down : ImGuiDir_Right);
+			ImVec2 CursorPos = ImGui::GetCursorPos();
+			if (ImGui::InvisibleButton(id, ImVec2(fButtonSize, fButtonSize))) {
+				u8Flags ^= WIDGET_SHOW_CHILDREN;
+			}
+			if (ImGui::IsItemHovered()) {
+				float fOpacity = ImGui::IsMouseDown(ImGuiMouseButton_Left) ? 0.4f : 0.2f;
+				ImGui::GetWindowDrawList()->AddRectFilled(tl, ImVec2(tl.x + fButtonSize, tl.y + fButtonSize), ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, fOpacity)), ImGui::GetStyle().FrameRounding);
+			}
+			CursorPos.x += fButtonSize;
+			ImGui::SetCursorPos(CursorPos);
+		}
+
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 	}
 	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().FramePadding.x);
