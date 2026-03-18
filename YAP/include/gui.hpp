@@ -126,6 +126,30 @@ namespace GUI {
             Dropdown(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pItems, _In_ const char* pDescription = NULL);
             void Render() override;
         };
+
+        class InputText : public Base {
+        private:
+            Buffer* pBuf = NULL;
+            ImGuiInputTextFlags Flags = 0;
+
+        public:
+            InputText(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription = NULL, _In_ ImGuiInputTextFlags Flags = 0);
+            void Render() override;
+        };
+
+        class InputScalar : public Base {
+        private:
+            ImGuiDataType Type = 0;
+            void* pValue = NULL;
+            void* pStep = NULL;
+            void* pStepFast = NULL;
+            const char* pFormat = NULL;
+            ImGuiInputTextFlags Flags = 0;
+        
+        public:
+            InputScalar(_In_ const char* pLabel, _In_ ImGuiDataType Type, _In_ const char* pConfigName, _In_ const char* pDescription = NULL, _In_ void* pStep = NULL, _In_ void* pStepFast = NULL, _In_ const char* pFormat = NULL, _In_ ImGuiInputTextFlags Flags = 0);
+            void Render() override;
+        };
     };
 
     /*!

@@ -508,7 +508,7 @@ void GUI::Setup() {
 	Widgets = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
-			new Dropdown("Test", "Packing.iImmitate", "One\0Two\0Three\0", "fhuewguhiweghiou"),
+			new InputText("ergerg", "Packing.sMasquerade", "wefjijiowefjioefijo"),
 		},
 		{ ICON_CODE " Reassembly", NULL },
 		{ ICON_GEARS " Advanced", NULL },
@@ -746,5 +746,41 @@ void Dropdown::Render() {
 	RenderDescription();
 	ImGui::PushItemWidth(fGuiScale * 200);
 	ImGui::Combo(pLabel, pValue, pItems);
+	EndWidgetRender();
+}
+
+InputText::InputText(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription, _In_ ImGuiInputTextFlags Flags) {
+	RELIB_ASSERT(config.contains(pConfigName));
+	this->pLabel = pLabel;
+	this->pBuf = &std::get<Buffer>(config[pConfigName]);
+	this->pDescription = pDescription;
+	this->Flags = Flags;
+}
+
+void InputText::Render() {
+	RenderWidgetContainer();
+	RenderDescription();
+	ImGui::PushItemWidth(fGuiScale * 200);
+	ImGui::InputText(pLabel, (char*)pBuf->Data(), pBuf->Size(), Flags);
+	EndWidgetRender();
+}
+
+InputScalar::InputScalar(_In_ const char* pLabel, _In_ ImGuiDataType Type, _In_ const char* pConfigName, _In_ const char* pDescription, _In_ void* pStep, _In_ void* pStepFast, _In_ const char* pFormat, _In_ ImGuiInputTextFlags Flags) {
+	RELIB_ASSERT(config.contains(pConfigName));
+	this->pLabel = pLabel;
+	this->Type = Type;
+	this->pValue = Type == ImGuiDataType_U64 ? (void*)&std::get<uint64_t>(config[pConfigName]) : (void*)&std::get<int>(config[pConfigName]);
+	this->pDescription = pDescription;
+	this->pStep = pStep;
+	this->pStepFast = pStepFast;
+	this->pFormat = pFormat;
+	this->Flags = Flags;
+}
+
+void InputScalar::Render() {
+	RenderWidgetContainer();
+	RenderDescription();
+	ImGui::PushItemWidth(fGuiScale * 200);
+	ImGui::InputScalar(pLabel, Type, pValue, pStep, pStepFast, pFormat, Flags);
 	EndWidgetRender();
 }
