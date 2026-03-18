@@ -92,7 +92,7 @@ namespace GUI {
 
         class Category : public Base {
         public:
-            Category(_In_ const char* pLabel, _In_ const char* pDescription, _In_ bool bStartOpen = false);
+            Category(_In_ const char* pLabel, _In_ const char* pDescription = NULL, _In_ bool bStartOpen = false);
             void Render() override;
         };
 
@@ -102,6 +102,18 @@ namespace GUI {
         
         public:
             Checkbox(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription = NULL);
+            void Render() override;
+        };
+
+        class Slider : public Base {
+        private:
+            int* pValue = NULL;
+            int nMin = 0;
+            int nMax = 0;
+            const char* pFormat = NULL;
+
+        public:
+            Slider(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ int nMin, _In_ int nMax, _In_ const char* pDescription = NULL, _In_ const char* pFormat = "%d");
             void Render() override;
         };
     };

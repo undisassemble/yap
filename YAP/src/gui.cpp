@@ -508,7 +508,7 @@ void GUI::Setup() {
 	Widgets = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
-			new Checkbox("Enabled", "Packing.bEnabled", "Packer enable description and stuff"),
+			new Slider("Test", "Packing.iCompressionLevel", 0, 9, "Thoih"),
 		},
 		{ ICON_CODE " Reassembly", NULL },
 		{ ICON_GEARS " Advanced", NULL },
@@ -682,6 +682,7 @@ void Base::EndWidgetRender() {
 }
 
 Checkbox::Checkbox(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ const char* pDescription) {
+	RELIB_ASSERT(config.contains(pConfigName));
 	this->pLabel = pLabel;
 	this->pDescription = pDescription;
 	pValue = &std::get<bool>(config[pConfigName]);
@@ -710,5 +711,23 @@ void Category::Render() {
 	ImGui::Text("%s", pLabel);
 	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (ImGui::GetFrameHeight() - ImGui::GetTextLineHeight()) / 2 - ImGui::GetStyle().ItemSpacing.y);
 	ImGui::Dummy(ImVec2(0, 0));
+	EndWidgetRender();
+}
+
+Slider::Slider(_In_ const char* pLabel, _In_ const char* pConfigName, _In_ int nMin, _In_ int nMax, _In_ const char* pDescription, _In_ const char* pFormat) {
+	RELIB_ASSERT(config.contains(pConfigName));
+	this->pLabel = pLabel;
+	this->pValue = &std::get<int>(config[pConfigName]);
+	this->nMin = nMin;
+	this->nMax = nMax;
+	this->pDescription = pDescription;
+	this->pFormat = pFormat;
+}
+
+void Slider::Render() {
+	RenderWidgetContainer();
+	RenderDescription();
+	ImGui::PushItemWidth(fGuiScale * 200);
+	ImGui::SliderInt(pLabel, pValue, nMin, nMax, pFormat);
 	EndWidgetRender();
 }
