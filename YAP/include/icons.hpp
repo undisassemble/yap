@@ -25,6 +25,8 @@
 #define ICON_BOX                  "\xEF\x91\xA6" // F466
 #define ICON_BOX_OPEN             "\xEF\x92\x9E" // F49E
 #define ICON_PALETTE              "\xEF\x94\xBF" // F53F
+#define ICON_WINDOW_CLOSE         "\xEF\x80\x8D" // F00D
+#define ICON_WINDOW_MINIMIZE      "\xEF\x81\xA8" // F068
 
 static const unsigned int icons_compressed_size = 245474;
 static const unsigned int icons_compressed_data[245476/4] =

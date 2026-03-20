@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-17
+ * @date 2026-03-19
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -31,7 +31,6 @@ int iGuiHeight = 560;
 float fGuiScale = 1.f;
 ImGuiWindow* pImGuiWindow = NULL;
 extern Asm* pAssembly;
-const ImWchar range[] = { 0xE005, 0xF8FF, 0 };
 ImVec4 fBgColTopLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 ImVec4 fBgColTopRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 ImVec4 fBgColBotLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
@@ -80,33 +79,55 @@ void DrawGUI() {
 	// Dont do anything if window is not shown
 	if (!bOpen || bMinimized) return;
 	
-	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 	ImGui::GetBackgroundDrawList()->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(iGuiWidth, iGuiHeight), ImGui::GetColorU32(fBgColTopLeft), ImGui::GetColorU32(fBgColTopRight), ImGui::GetColorU32(fBgColBotRight), ImGui::GetColorU32(fBgColBotLeft));
 
 	// Menu bar
-	if (ImGui::BeginMenuBar()) {
-		ImGui::Text("Yet Another Packer    |");
-		if (ImGui::BeginMenu("File")) {
-			if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
-			if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
-			if (!Data.ConfigPath[0]) ImGui::BeginDisabled();
-			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveConfig(); }
-			if (!Data.ConfigPath[0]) ImGui::EndDisabled();
-			if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("About")) {
-			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
-			if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open Website")) { ShellExecuteA(Data.hWnd, "open", "https://undisassemble.dev/yap", NULL, NULL, 0); }
-			if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
-			ImGui::EndMenu();
-		}
-		//ImGui::SetCursorPos(ImVec2((width - ImGui::CalcTextSize("Yet Another Packer").x) / 2, 0));
-		//ImGui::Text("Yet Another Packer");
-		if (ImGui::CollapseButton(ImGui::GetCurrentWindow()->GetID("#COLLAPSE"), ImVec2(iGuiWidth - 48 * fGuiScale, 3))) { ImGui::GetCurrentWindow()->Collapsed = !ImGui::GetCurrentWindow()->Collapsed; }
-		if (ImGui::CloseButton(ImGui::GetCurrentWindow()->GetID("#CLOSE"), ImVec2(iGuiWidth - 26 * fGuiScale, 3))) { bOpen = false; }
-		ImGui::EndMenuBar();
+	ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(0, 0), ImVec2(ImGui::GetWindowWidth(), 25), ImGui::GetColorU32(ImGuiCol_MenuBarBg));
+	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetStyle().WindowPadding.x, (25 - ImGui::GetTextLineHeight()) / 2), ImGui::GetColorU32(ImGuiCol_Text), "Yet Another Packer");
+	
+	// Close button
+	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowWidth() - 40, 0));
+	if (ImGui::InvisibleButton("WindowClose", ImVec2(40, 25))) {
+		bOpen = false;
+	} else if (ImGui::IsItemHovered()) {
+		ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowWidth() - 40, 0), ImVec2(ImGui::GetWindowWidth(), 25), ImGui::GetColorU32(ImVec4(188, 0, 0, 255)));
 	}
+	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetWindowWidth() - 40 + (40 - ImGui::CalcTextSize(ICON_WINDOW_CLOSE).x) / 2, 1 + (25 - ImGui::GetTextLineHeight()) / 2), ImGui::GetColorU32(ImGuiCol_Text), ICON_WINDOW_CLOSE);
+	
+	// Minimize button
+	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowWidth() - 80, 0));
+	if (ImGui::InvisibleButton("WindowMinimize", ImVec2(40, 25))) {
+		ImGui::GetCurrentWindow()->Collapsed = true;
+	} else if (ImGui::IsItemHovered()) {
+		ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowWidth() - 80, 0), ImVec2(ImGui::GetWindowWidth() - 40, 25), ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)));
+	}
+	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetWindowWidth() - 80 + (40 - ImGui::CalcTextSize(ICON_WINDOW_MINIMIZE).x) / 2, 1 + (25 - ImGui::GetTextLineHeight()) / 2), ImGui::GetColorU32(ImGuiCol_Text), ICON_WINDOW_MINIMIZE);
+
+	ImGui::SetCursorPosY(25 + ImGui::GetStyle().WindowPadding.y);
+	// if (ImGui::BeginMenuBar()) {
+	// 	ImGui::Text("Yet Another Packer    |");
+	// 	if (ImGui::BeginMenu("File")) {
+	// 		if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
+	// 		if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
+	// 		if (!Data.ConfigPath[0]) ImGui::BeginDisabled();
+	// 		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveConfig(); }
+	// 		if (!Data.ConfigPath[0]) ImGui::EndDisabled();
+	// 		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
+	// 		ImGui::EndMenu();
+	// 	}
+	// 	if (ImGui::BeginMenu("About")) {
+	// 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
+	// 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open Website")) { ShellExecuteA(Data.hWnd, "open", "https://undisassemble.dev/yap", NULL, NULL, 0); }
+	// 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
+	// 		ImGui::EndMenu();
+	// 	}
+	// 	//ImGui::SetCursorPos(ImVec2((width - ImGui::CalcTextSize("Yet Another Packer").x) / 2, 0));
+	// 	//ImGui::Text("Yet Another Packer");
+	// 	if (ImGui::CollapseButton(ImGui::GetCurrentWindow()->GetID("#COLLAPSE"), ImVec2(iGuiWidth - 48 * fGuiScale, 3))) { ImGui::GetCurrentWindow()->Collapsed = !ImGui::GetCurrentWindow()->Collapsed; }
+	// 	if (ImGui::CloseButton(ImGui::GetCurrentWindow()->GetID("#CLOSE"), ImVec2(iGuiWidth - 26 * fGuiScale, 3))) { bOpen = false; }
+	// 	ImGui::EndMenuBar();
+	// }
 	
 	// Configuration menu
 	if (!Data.bRunning) {
@@ -127,6 +148,16 @@ void DrawGUI() {
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y);
 		ImGui::BeginChild("#TabContents", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetStyle().WindowPadding.y - ImGui::GetCursorPosY()));
 		
+		#ifdef _DEBUG
+		if (u8CurrentCategory == 3) { // Style editor (temp)
+			ImGui::ColorEdit4("Background Gradient Bottom Left", (float*)&fBgColBotLeft);
+			ImGui::ColorEdit4("Background Gradient Bottom Right", (float*)&fBgColBotRight);
+			ImGui::ColorEdit4("Background Gradient Top Left", (float*)&fBgColTopLeft);
+			ImGui::ColorEdit4("Background Gradient Top Right", (float*)&fBgColTopRight);
+			ImGui::ShowStyleEditor();
+		} else
+		#endif
+
 		if (u8CurrentCategory < Widgets.size()) {
 			WidgetClasses::Base *pChild, *pItem = Widgets[u8CurrentCategory].second;
 			while (pItem) {
@@ -142,19 +173,7 @@ void DrawGUI() {
 				}
 				pItem = pItem->GetNextWidget();
 			}
-		}
-
-		// #ifdef _DEBUG
-		// else if (u8CurrentCategory == 3) { // Style editor
-		// 	ImGui::ColorEdit4("Background Gradient Bottom Left", (float*)&fBgColBotLeft);
-		// 	ImGui::ColorEdit4("Background Gradient Bottom Right", (float*)&fBgColBotRight);
-		// 	ImGui::ColorEdit4("Background Gradient Top Left", (float*)&fBgColTopLeft);
-		// 	ImGui::ColorEdit4("Background Gradient Top Right", (float*)&fBgColTopRight);
-		// 	ImGui::ShowStyleEditor();
-		// }
-		// #endif
-
-		else {
+		} else {
 			ImGui::Text("I don't know how but this broke, tried to load tab %hhu which doesn't exist", u8CurrentCategory);
 		}
 
@@ -399,7 +418,7 @@ bool GUI::Begin() {
 	ImFontConfig config;
 	config.MergeMode = true;
 	config.GlyphMinAdvanceX = 16.f;
-	io.Fonts->AddFontFromMemoryCompressedTTF(icons_compressed_data, icons_compressed_size, 16 * fGuiScale, &config, range);
+	io.Fonts->AddFontFromMemoryCompressedTTF(icons_compressed_data, icons_compressed_size, 16 * fGuiScale, &config);
 
 	// Create window
 	glfwWindowHint(GLFW_RESIZABLE, 0);
@@ -508,7 +527,34 @@ void GUI::Setup() {
 	Widgets = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
-			new InputText("ergerg", "Packing.sMasquerade", "wefjijiowefjioefijo"),
+			(new InputText("Text input", "Packing.sMasquerade", "wefjijiowefjioefijo"))->FollowedBy(
+				15,
+				(new Category("Test", "Test category"))->WithChildren(
+					3,
+					new Checkbox("Child 1", "Packing.bEnableMasquerade", "The first child"),
+					new Checkbox("Child 2", "Packing.bNukeHeaders", "The second child"),
+					new Checkbox("Child 3", "Packing.bMitigateSideloading", "The third child")
+				),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
+				new Dropdown("A droppy downy", "Packing.iImmitate", "One\0Two\0Four\0Trhee\0", "Waot"),
+				new Slider("Slidey", "Packing.iCompressionLevel", 1, 9, "IOFuiefhufe"),
+				(new Checkbox("ioerguioerg", "Packing.bEnabled", "Image i put a description here"))->WithChildren(
+					3,
+					new Checkbox("Child 1", "Packing.bEnableMasquerade", "The first child"),
+					new Checkbox("Child 2", "Packing.bNukeHeaders", "The second child"),
+					new Checkbox("Child 3", "Packing.bMitigateSideloading", "The third child")
+				),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
+				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here")
+			)
 		},
 		{ ICON_CODE " Reassembly", NULL },
 		{ ICON_GEARS " Advanced", NULL },
@@ -527,17 +573,6 @@ void GUI::Setup() {
 		}
 #endif
 	};
-
-	// Packing
-	RELIB_ASSERT(strcmp(Widgets[0].first, ICON_BOX_ARCHIVE " Packing") == 0);
-	Widgets[0].second->AddNextWidget(
-		(new Category("Test", "Test category"))->WithChildren(
-			3,
-			new Checkbox("Child 1", "Packing.bEnableMasquerade", "The first child"),
-			new Checkbox("Child 2", "Packing.bNukeHeaders", "The second child"),
-			new Checkbox("Child 3", "Packing.bMitigateSideloading", "The third child")
-		)
-	);
 }
 
 
@@ -547,6 +582,8 @@ void GUI::Setup() {
 /***** WIDGETS ******/
 
 using namespace WidgetClasses;
+
+#define GetScrollbarSpace() (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetStyle().WindowPadding.x + ImGui::GetCurrentWindow()->ScrollbarSizes[0] : 0)
 
 void Base::AddNextWidget(_In_ Base* pWidget) {
 	if (!pNextPeer) {
@@ -635,7 +672,7 @@ void Base::RenderWidgetContainer(_In_ int iHeight) {
 		}
 
 		ImVec2 tl = ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetCursorScreenPos().y);
-		ImVec2 br = ImVec2(iGuiWidth - tl.x - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] + tl.x : 0), tl.y + iHeight);
+		ImVec2 br = ImVec2(iGuiWidth - tl.x - GetScrollbarSpace(), tl.y + iHeight);
 		ImGui::GetWindowDrawList()->AddRectFilled(tl, br, ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)), ImGui::GetStyle().FrameRounding);
 
 		// Dropdown button
@@ -665,7 +702,7 @@ void Base::RenderWidgetContainer(_In_ int iHeight) {
 
 void Base::RenderDescription() {
 	if (!pDescription) return;
-	ImVec2 tpos = ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetCurrentWindow()->ScrollbarSizes[0] + ImGui::GetStyle().WindowPadding.x : 0) - ImGui::CalcTextSize(pDescription).x, ImGui::GetCursorScreenPos().y + ImGui::GetStyle().FramePadding.y);
+	ImVec2 tpos = ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - GetScrollbarSpace() - ImGui::CalcTextSize(pDescription).x, ImGui::GetCursorScreenPos().y + ImGui::GetStyle().FramePadding.y);
 	ImGui::GetWindowDrawList()->AddText(tpos, ImGui::GetColorU32(ImGuiCol_Text), pDescription);
 }
 
@@ -674,8 +711,11 @@ void Base::EndWidgetRender() {
 	if (u8Flags & WIDGET_WARNING) { FeatureWarning(pFlagText); }
 	if (u8Flags & WIDGET_INFO) { FeatureInfo(pFlagText); }
 	if (~u8Flags & WIDGET_IS_CHILD && pChildren && u8Flags & WIDGET_SHOW_CHILDREN) {
-		ImGui::Separator();
-	} else if (u8Flags & WIDGET_IS_CHILD ? !pNextPeer : !pChildren) {
+		ImVec2 l1 = ImVec2(ImGui::GetCursorScreenPos().x, ImGui::GetCursorScreenPos().y);
+		ImVec2 l2 = ImVec2(l1.x + iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - GetScrollbarSpace(), l1.y + 1);
+		ImGui::GetWindowDrawList()->AddRectFilled(l1, l2, ImGui::GetColorU32(ImGuiCol_Separator));
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y + 1);
+	} else if (u8Flags & WIDGET_IS_CHILD ? !pNextPeer : !(pChildren && u8Flags & WIDGET_SHOW_CHILDREN)) {
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 		ImGui::Dummy(ImVec2(0, 0));
 	}
