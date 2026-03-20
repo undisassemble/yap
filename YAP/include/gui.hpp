@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI definitions
  * @version 0.0.0
- * @date 2026-03-17
+ * @date 2026-03-20
  * @copyright MIT License
  */
 
@@ -65,9 +65,9 @@ namespace GUI {
         public:
             inline Base* GetNextWidget() { return pNextPeer; }
             inline Base* GetChildren() { return pChildren; }
-            inline void DebugWarning() { u8Flags |= WIDGET_DEBUG; }
-            inline void FeatureWarning(_In_ const char* pText) { u8Flags |= WIDGET_WARNING; pFlagText = pText; }
-            inline void FeatureInfo(_In_ const char* pText) { u8Flags |= WIDGET_INFO; pFlagText = pText; }
+            inline Base* DebugWarning() { u8Flags |= WIDGET_DEBUG; return this; }
+            inline Base* FeatureWarning(_In_ const char* pText) { u8Flags |= WIDGET_WARNING; pFlagText = pText; return this; }
+            inline Base* FeatureInfo(_In_ const char* pText) { u8Flags |= WIDGET_INFO; pFlagText = pText; return this; }
             inline void SetIsChild() { u8Flags |= WIDGET_IS_CHILD; }
             inline void RemoveNextWidget() { if (pNextPeer) pNextPeer = pNextPeer->GetNextWidget(); }
             inline bool ShouldShowChildren() { return u8Flags & WIDGET_SHOW_CHILDREN; }

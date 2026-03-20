@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-19
+ * @date 2026-03-20
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -23,6 +23,7 @@
 #include "imgui_impl_opengl3.h"
 #include "relib/asm.hpp"
 #include <Zycore/Zycore.h>
+#include <array>
 
 // Globals
 bool bMinimized = false, bOpen = true, bInitialized = false;
@@ -235,111 +236,22 @@ void DrawGUI() {
 			
 			ImGui::Text("%s", CurrentModal.pText);
 
-			// Beautiful, isnt it?
-			switch (CurrentModal.uType & MB_TYPEMASK) {
-			case MB_OKCANCEL:
-				if (ImGui::Button("OK")) {
+			// Modal buttons
+			const std::vector<std::pair<const char*, UINT>> modals[] = {
+				{ { "OK", IDOK } }, // MB_OK
+				{ { "OK", IDOK }, { "Cancel", IDCANCEL } }, // MB_OKCANCEL
+				{ { "Abort", IDABORT }, { "Retry", IDRETRY }, { "Ignore", IDIGNORE } }, // MB_ABORTRETRYIGNORE
+				{ { "Yes", IDYES }, { "No", IDNO }, { "Cancel", IDCANCEL } }, // MB_YESNOCANCEL
+				{ { "Yes", IDYES }, { "No", IDNO } }, // MB_YESNO
+				{ { "Retry", IDRETRY }, { "Cancel", IDCANCEL } }, // MB_RETRYCANCEL
+				{ { "Cancel", IDCANCEL }, { "Try Again", IDTRYAGAIN }, { "Continue", IDCONTINUE } }, // MB_CANCELTRYCONTINUE
+			};
+			RELIB_ASSERT((CurrentModal.uType & MB_TYPEMASK) < countof(modals));
+			for (std::pair<const char*, UINT> btn : modals[CurrentModal.uType & MB_TYPEMASK]) {
+				if (ImGui::Button(btn.first)) {
 					ImGui::CloseCurrentPopup();
 					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDOK;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Cancel")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDCANCEL;
-				}
-				break;
-			case MB_YESNO:
-				if (ImGui::Button("Yes")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDYES;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("No")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDNO;
-				}
-				break;
-			case MB_YESNOCANCEL:
-				if (ImGui::Button("Yes")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDYES;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("No")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDNO;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Cancel")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDCANCEL;
-				}
-				break;
-			case MB_RETRYCANCEL:
-				if (ImGui::Button("Retry")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDRETRY;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Cancel")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDCANCEL;
-				}
-				break;
-			case MB_CANCELTRYCONTINUE:
-				if (ImGui::Button("Cancel")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDCANCEL;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Try Again")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDTRYAGAIN;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Continue")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDCONTINUE;
-				}
-				break;
-			case MB_ABORTRETRYIGNORE:
-				if (ImGui::Button("Abort")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDABORT;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Retry")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDRETRY;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Ignore")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDIGNORE;
-				}
-				break;
-			case MB_OK:
-				__fallthrough;
-			default:
-				if (ImGui::Button("OK")) {
-					ImGui::CloseCurrentPopup();
-					CurrentModal.pText = NULL;
-					CurrentModal.uType = IDOK;
+					CurrentModal.uType = btn.second;
 				}
 			}
 			ImGui::EndPopup();
@@ -527,37 +439,65 @@ void GUI::Setup() {
 	Widgets = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
-			(new InputText("Text input", "Packing.sMasquerade", "wefjijiowefjioefijo"))->FollowedBy(
-				15,
-				(new Category("Test", "Test category"))->WithChildren(
-					3,
-					new Checkbox("Child 1", "Packing.bEnableMasquerade", "The first child"),
-					new Checkbox("Child 2", "Packing.bNukeHeaders", "The second child"),
-					new Checkbox("Child 3", "Packing.bMitigateSideloading", "The third child")
+			(new Checkbox("Enable Packer", "Packing.bEnabled", "Wraps the original binary with a custom loader"))->WithChildren(
+				1,
+				new Checkbox("Don't pack resources", "Packing.bDontCompressRsrc", "Preserves everything in the resource directory, keeping details such as icons and privileges")
+			)->FollowedBy(
+				16,
+				new Slider("Depth", "Packing.iEncodingCounts", 1, 10, "Number of times the application should be packed, slow"),
+				new Slider("Compression level", "Packing.iCompressionLevel", 1, 9, "How compressed the binary should be"),
+				new Slider("Mutation level", "Packing.iMutationLevel", 1, 5, "The amount of garbage that should be generated, slow"),
+				new Checkbox("Hide Import Address Table", "Packing.bHideIAT", "Hides imported functions from static analysis tools"),
+				new Checkbox("API emulation", "Packing.bAPIEmulation", "Replaces some WINAPI functions with custom alternatives"),
+				new Checkbox("Delayed entry point", "Packing.bDelayedEntry", "Changes the behavior of the entry point before it is run"),
+				new Checkbox("DLL sideloading mitigations", "Packing.bMitigateSideloading", "Prioritizes DLLs in Windows directories, loading those first instead of DLLs placed in the local directory"),
+				new Checkbox("Only load Microsoft signed DLLs", "Packing.bOnlyLoadMicrosoft", "Only allows DLLs that have been signed by Microsoft to be loaded"),
+				new Checkbox("Direct syscalls", "Packing.bDirectSyscalls", "Skips some WINAPI functions and makes syscalls directly, may break with Windows updates"),
+				(new Checkbox("Anti-dump", "Packing.bAntiDump", "Attempts to prevent the process from being dumped"))->FeatureInfo("If enabled, you must use GetSelf() instead of GetModuleHandleA(NULL) to get the applications base address."),
+				new Checkbox("Anti-debug", "Packing.bAntiDebug", "Prevent debuggers from attaching to the process"),
+				(new Checkbox("Anti-VM", "Packing.bAntiVM", "Dont run the app if running in a virtual machine"))->WithChildren(
+					1,
+					new Checkbox("Allow Hyper-V", "Packing.bAllowHyperV", "Still run if the only detected VM is MS Hyper-V")
 				),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
-				new Dropdown("A droppy downy", "Packing.iImmitate", "One\0Two\0Four\0Trhee\0", "Waot"),
-				new Slider("Slidey", "Packing.iCompressionLevel", 1, 9, "IOFuiefhufe"),
-				(new Checkbox("ioerguioerg", "Packing.bEnabled", "Image i put a description here"))->WithChildren(
-					3,
-					new Checkbox("Child 1", "Packing.bEnableMasquerade", "The first child"),
-					new Checkbox("Child 2", "Packing.bNukeHeaders", "The second child"),
-					new Checkbox("Child 3", "Packing.bMitigateSideloading", "The third child")
+				new Dropdown("Immitate packer", "Packing.iImmitate", "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0", "Changes some details about the packed binary to make it look like another packer"),
+				(new Checkbox("Process masquerading", "Packing.bEnableMasquerade", "Makes the packed executable appear as a different process"))->WithChildren(
+					1,
+					new InputText(" ", "Packing.sMasquerade", "Process path (shorter is better)")
 				),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here"),
-				new Checkbox("Checkboxerino", "Packing.bEnabled", "Image i put a description here")
+				(new Checkbox("Mark critical (requires admin)", "Packing.bMarkCritical", "Marks the process as critical, causing a bluescreen on crash"))->DebugWarning(),
+				new InputText("Leave a message", "Packing.sMessage", "Embed a message in the output binary for anyone looking :)")
 			)
 		},
-		{ ICON_CODE " Reassembly", NULL },
-		{ ICON_GEARS " Advanced", NULL },
+		{
+			ICON_CODE " Reassembly",
+			(new Checkbox("Enable Reassembler", "Reassembly.bEnabled", "Disassembles your application, and assembles a new modified version"))->FollowedBy(
+				5,
+				new Slider("Mutation level", "Reassembly.iMutationLevel", 0, 5, "How much garbage code should be inserted between real code (slow)"),
+				new Checkbox("Instruction substitution", "Reassembly.bSubstitution", "Replaces some existing instructions with other, more complicated alternatives"),
+				new Checkbox("Remove useless data", "Reassembly.bRemoveData", "Removes some data from the PE headers"),
+				new Checkbox("Strip debug symbols", "Reassembly.bStrip", "Remove debugging information from the PE"),
+				new Checkbox("Strip DOS stub", "Reassembly.bStripDOSStub", "Remove DOS stub from the PE")
+			)
+		},
+		{
+			ICON_GEARS " Advanced",
+			(new Category("Packer"))->WithChildren(
+				7,
+				new Checkbox("Fake symbol table", "Advanced.bFakeSymbols"),
+				(new Checkbox("Mutate", "Advanced.bMutateAssembly"))->FeatureWarning("Disabling will make unpacking easier"),
+				(new Checkbox("Substitute", "Advanced.bEnableSubstitution"))->FeatureWarning("Disabling will make unpacking easier"),
+				new Checkbox("Semi-random section names", "Advanced.bSemiRandomSecNames"),
+				new Checkbox("Full-random section names", "Advanced.bTrueRandomSecNames"),
+				new InputText("Section 1 name", "Advanced.sSec1Name"),
+				new InputText("Section 2 name", "Advanced.sSec2Name")
+			)->FollowedBy(
+				1,
+				(new Category("Reassembler"))->WithChildren(
+					1,
+					new InputScalar("Rebase image", ImGuiDataType_U64, "Advanced.u64Rebase", "Changes images prefered base address (0 to disable)", NULL, NULL, "%p", ImGuiInputTextFlags_CharsHexadecimal)
+				)
+			)
+		},
 #ifdef _DEBUG
 		{
 			ICON_PALETTE " Style Editor",

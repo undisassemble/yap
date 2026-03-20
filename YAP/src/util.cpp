@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2026-03-17
+ * @date 2026-03-20
  * @copyright MIT License
  */
 
@@ -44,8 +44,8 @@ void LoadDefaultConfig() {
 	config["Reassembly.bStripDOSStub"] = false;
 	config["Reassembly.bSubstitution"] = false;
 	config["Reassembly.iMutationLevel"] = 0;
-	config["Reassembly.u64Rebase"] = (uint64_t)0;
-
+	
+	config["Advanced.u64Rebase"] = (uint64_t)0;
 	config["Advanced.bTrueRandomSecNames"] = false;
 	config["Advanced.bSemiRandomSecNames"] = true;
 	config["Advanced.bFakeSymbols"] = true;
