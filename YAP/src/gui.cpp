@@ -104,6 +104,9 @@ void UpdateBackground() {
 		item.second.z = fIntensity * std::get<int>(settings["Style.Accent.iB"]) / 255.f;
 		item.second.w = 1.f;
 	}
+
+	ImGui::GetStyle().Colors[ImGuiCol_SliderGrab] = ImGui::GetStyle().Colors[ImGuiCol_SliderGrabActive] = ImGui::GetStyle().Colors[ImGuiCol_CheckMark] = ImColor(std::get<int>(settings["Style.Accent.iR"]), std::get<int>(settings["Style.Accent.iG"]), std::get<int>(settings["Style.Accent.iB"]), 180);
+	ImGui::GetStyle().Colors[ImGuiCol_SliderGrabActive].w = 1.f;
 }
 
 void DrawGUI() {
@@ -134,11 +137,11 @@ void DrawGUI() {
 		};
 		for (std::pair<ImVec2, ImVec4&> item : items) {
 			float dist = sqrt(pow(item.first.x - r.x, 2) + pow(item.first.y - r.y, 2));
-			item.second.x = (fRadius * 2 - dist) / (fRadius * 2);
+			item.second.x = std::get<int>(settings["Style.Accent.iIntensity"]) * (fRadius * 2 - dist) / (fRadius * 200);
 			dist = sqrt(pow(item.first.x - g.x, 2) + pow(item.first.y - g.y, 2));
-			item.second.y = (fRadius * 2 - dist) / (fRadius * 2);
+			item.second.y = std::get<int>(settings["Style.Accent.iIntensity"]) * (fRadius * 2 - dist) / (fRadius * 200);
 			dist = sqrt(pow(item.first.x - b.x, 2) + pow(item.first.y - b.y, 2));
-			item.second.z = (fRadius * 2 - dist) / (fRadius * 2);
+			item.second.z = std::get<int>(settings["Style.Accent.iIntensity"]) * (fRadius * 2 - dist) / (fRadius * 200);
 		}
 	}
 	
@@ -184,6 +187,7 @@ void DrawGUI() {
 					{ "Cyan", ImVec4(57, 162, 172, 0) },
 					{ "Green", ImVec4(45, 148, 82, 0) },
 					{ "Yellow", ImVec4(148, 158, 41, 0) },
+					{ "Orange", ImVec4(143, 93, 7, 0) },
 					{ "Red", ImVec4(146, 36, 36, 0) },
 					{ "Pink", ImVec4(126, 52, 116, 0) },
 				};
@@ -384,34 +388,31 @@ bool GUI::Begin() {
 
 	// Setup style
 	ImGuiStyle& style = ImGui::GetStyle();
-	style.Colors[ImGuiCol_WindowBg] = ImColor(25, 25, 25, 0);
-	style.Colors[ImGuiCol_PopupBg] = ImColor(20, 20, 20, 240);
-	style.Colors[ImGuiCol_FrameBg] = ImColor(40, 40, 40, 255);
-    style.Colors[ImGuiCol_FrameBgHovered] = ImColor(60, 60, 60, 255);
-    style.Colors[ImGuiCol_FrameBgActive] = ImColor(75, 75, 75, 255);
-	style.Colors[ImGuiCol_TitleBg] = ImColor(25, 25, 25, 255);
-    style.Colors[ImGuiCol_TitleBgActive] = ImColor(25, 25, 25, 255);
-	style.Colors[ImGuiCol_MenuBarBg] = ImColor(35, 35, 35, 255);
+	style.Colors[ImGuiCol_WindowBg] = ImColor(0, 0, 0, 0);
+	style.Colors[ImGuiCol_PopupBg] = ImColor(35, 35, 35, 240);
+	style.Colors[ImGuiCol_FrameBg] = ImColor(20, 20, 20, 180);
+    style.Colors[ImGuiCol_FrameBgHovered] = ImColor(25, 25, 25, 180);
+    style.Colors[ImGuiCol_FrameBgActive] = ImColor(30, 30, 30, 180);
+	style.Colors[ImGuiCol_MenuBarBg] = ImColor(40, 40, 40, 220);
+	style.Colors[ImGuiCol_ScrollbarBg] = ImColor(0, 0, 0, 0);
 	style.Colors[ImGuiCol_ScrollbarGrab] = ImColor(75, 75, 75, 255);
     style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImColor(100, 100, 100, 255);
     style.Colors[ImGuiCol_ScrollbarGrabActive] = ImColor(130, 130, 130, 255);
     style.Colors[ImGuiCol_CheckMark] = ImColor(100, 100, 100, 255);
     style.Colors[ImGuiCol_SliderGrab] = ImColor(75, 75, 75, 255);
     style.Colors[ImGuiCol_SliderGrabActive] = ImColor(100, 100, 100, 255);
-    style.Colors[ImGuiCol_Button] = ImColor(40, 40, 40, 255);
-    style.Colors[ImGuiCol_ButtonHovered] = ImColor(60, 60, 60, 255);
-    style.Colors[ImGuiCol_ButtonActive] = ImColor(80, 80, 80, 255);
-	style.Colors[ImGuiCol_TabHovered] = ImColor(60, 60, 60, 255);
-    style.Colors[ImGuiCol_Tab] = ImColor(40, 40, 40, 255);
-    style.Colors[ImGuiCol_TabSelected] = ImColor(60, 60, 60, 255);
-    style.Colors[ImGuiCol_Header] = ImColor(40, 40, 40, 255);
-    style.Colors[ImGuiCol_HeaderHovered] = ImColor(60, 60, 60, 255);
-    style.Colors[ImGuiCol_HeaderActive] = ImColor(80, 80, 80, 255);
-	style.WindowRounding = 10.0f;
-	style.WindowBorderSize = 0.0f;
-	style.FrameRounding = 5.0f;
-	style.GrabMinSize = 10.0f;
-	style.GrabRounding = 5.0f;
+    style.Colors[ImGuiCol_Button] = ImColor(40, 40, 40, 220);
+    style.Colors[ImGuiCol_ButtonHovered] = ImColor(60, 60, 60, 220);
+    style.Colors[ImGuiCol_ButtonActive] = ImColor(80, 80, 80, 220);
+    style.Colors[ImGuiCol_Header] = ImColor(40, 40, 40, 220);
+    style.Colors[ImGuiCol_HeaderHovered] = ImColor(60, 60, 60, 220);
+    style.Colors[ImGuiCol_HeaderActive] = ImColor(80, 80, 80, 220);
+	style.WindowRounding = 0.f;
+	style.WindowBorderSize = 0.f;
+	style.FrameRounding = 5.f;
+	style.GrabMinSize = 10.f;
+	style.GrabRounding = 5.f;
+	style.PopupRounding = 5.f;
 
 	// Scaling
 	int x, y, mon_x, mon_y;
@@ -719,7 +720,7 @@ void Base::RenderWidgetContainer(_In_ int iHeight) {
 
 		ImVec2 tl = ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetCursorScreenPos().y);
 		ImVec2 br = ImVec2(iGuiWidth - tl.x - GetScrollbarSpace(), tl.y + iHeight);
-		ImGui::GetWindowDrawList()->AddRectFilled(tl, br, ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)), ImGui::GetStyle().FrameRounding);
+		ImGui::GetWindowDrawList()->AddRectFilled(tl, br, ImGui::GetColorU32(ImGuiCol_Button), ImGui::GetStyle().FrameRounding);
 
 		// Dropdown button
 		if (pChild) {
@@ -735,8 +736,7 @@ void Base::RenderWidgetContainer(_In_ int iHeight) {
 				u8Flags ^= WIDGET_SHOW_CHILDREN;
 			}
 			if (ImGui::IsItemHovered()) {
-				float fOpacity = ImGui::IsMouseDown(ImGuiMouseButton_Left) ? 0.4f : 0.2f;
-				ImGui::GetWindowDrawList()->AddRectFilled(tl, ImVec2(tl.x + fButtonSize, tl.y + fButtonSize), ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, fOpacity)), ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTopLeft | (u8Flags & WIDGET_SHOW_CHILDREN ? 0 : ImDrawFlags_RoundCornersBottomLeft));
+				ImGui::GetWindowDrawList()->AddRectFilled(tl, ImVec2(tl.x + fButtonSize, tl.y + fButtonSize), ImGui::GetColorU32(ImGui::IsMouseDown(ImGuiMouseButton_Left) ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered), ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTopLeft | (u8Flags & WIDGET_SHOW_CHILDREN ? 0 : ImDrawFlags_RoundCornersBottomLeft));
 			}
 			CursorPos.x += fButtonSize;
 			ImGui::SetCursorPos(CursorPos);
