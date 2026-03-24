@@ -23,7 +23,6 @@
 #include "imgui_impl_opengl3.h"
 #include "relib/asm.hpp"
 #include <Zycore/Zycore.h>
-#include <array>
 
 // Globals
 bool bMinimized = false, bOpen = true, bInitialized = false;
@@ -76,6 +75,21 @@ bool GUI::OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilt
 	return bRet;
 }
 
+bool ToolbarDropdown(_In_ const char* pName, _In_ float fTextHeight, _In_ const char* pId = NULL) {
+	bool bRet = false;
+	ImVec2 pos = ImGui::GetCursorScreenPos();
+	ImVec2 size = ImVec2(ImGui::CalcTextSize(pName).x + fTextHeight * 2, 25); // fTextHeight being used instead of FramePadding to keep consistency with top/bottom padding
+	ImGui::SetCursorScreenPos(pos);
+	if ((bRet = ImGui::InvisibleButton(pId ? pId : pName, size))) {
+		ImGui::GetForegroundDrawList()->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(ImGuiCol_FrameBgActive));
+	} else if (ImGui::IsItemHovered()) {
+		ImGui::GetForegroundDrawList()->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(ImGuiCol_FrameBgHovered));
+	}
+	ImGui::GetForegroundDrawList()->AddText(ImVec2(pos.x + fTextHeight, fTextHeight), ImGui::GetColorU32(ImGuiCol_Text), pName);
+	ImGui::SetCursorScreenPos(ImVec2(pos.x + size.x, pos.y));
+	return bRet;
+}
+
 void DrawGUI() {
 	// Dont do anything if window is not shown
 	if (!bOpen || bMinimized) return;
@@ -83,10 +97,46 @@ void DrawGUI() {
 	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 	ImGui::GetBackgroundDrawList()->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(iGuiWidth, iGuiHeight), ImGui::GetColorU32(fBgColTopLeft), ImGui::GetColorU32(fBgColTopRight), ImGui::GetColorU32(fBgColBotRight), ImGui::GetColorU32(fBgColBotLeft));
 
-	// Menu bar
+	// Menu bar + title
+	float fTextHeight = (25 - ImGui::GetTextLineHeight()) / 2;
 	ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(0, 0), ImVec2(ImGui::GetWindowWidth(), 25), ImGui::GetColorU32(ImGuiCol_MenuBarBg));
-	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetStyle().WindowPadding.x, (25 - ImGui::GetTextLineHeight()) / 2), ImGui::GetColorU32(ImGuiCol_Text), "Yet Another Packer");
+	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetStyle().WindowPadding.x, fTextHeight), ImGui::GetColorU32(ImGuiCol_Text), "Yet Another Packer   |");
 	
+	// File button
+	ImGui::SetCursorScreenPos(ImVec2(ImGui::CalcTextSize("Yet Another Packer   |   ").x, 0));
+	ImVec2 PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, 25);
+	if (ToolbarDropdown("File", fTextHeight, "FileBtn")) ImGui::OpenPopup("FilePopup");
+	if (ImGui::BeginPopup("FilePopup")) {
+		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
+		if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
+ 		if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
+ 		if (!Data.ConfigPath[0]) ImGui::BeginDisabled();
+ 		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveConfig(); }
+ 		if (!Data.ConfigPath[0]) ImGui::EndDisabled();
+ 		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
+		ImGui::EndPopup();
+	}
+
+	// Settings button
+	PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, 25);
+	if (ToolbarDropdown("Settings", fTextHeight, "SettingsBtn")) ImGui::OpenPopup("SettingsPopup");
+	if (ImGui::BeginPopup("SettingsPopup")) {
+		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
+		ImGui::Text("Settings go here");
+		ImGui::EndPopup();
+	}
+
+	// About button
+	PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, 25);
+	if (ToolbarDropdown("About", fTextHeight, "AboutBtn")) ImGui::OpenPopup("AboutPopup");
+	if (ImGui::BeginPopup("AboutPopup")) {
+		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
+		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
+		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open Website")) { ShellExecuteA(Data.hWnd, "open", "https://undisassemble.dev/yap", NULL, NULL, 0); }
+		if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }	
+		ImGui::EndPopup();
+	}
+
 	// Close button
 	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowWidth() - 40, 0));
 	if (ImGui::InvisibleButton("WindowClose", ImVec2(40, 25))) {
@@ -94,7 +144,7 @@ void DrawGUI() {
 	} else if (ImGui::IsItemHovered()) {
 		ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowWidth() - 40, 0), ImVec2(ImGui::GetWindowWidth(), 25), ImGui::GetColorU32(ImVec4(188, 0, 0, 255)));
 	}
-	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetWindowWidth() - 40 + (40 - ImGui::CalcTextSize(ICON_WINDOW_CLOSE).x) / 2, 1 + (25 - ImGui::GetTextLineHeight()) / 2), ImGui::GetColorU32(ImGuiCol_Text), ICON_WINDOW_CLOSE);
+	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetWindowWidth() - 40 + (40 - ImGui::CalcTextSize(ICON_WINDOW_CLOSE).x) / 2, 1 + fTextHeight), ImGui::GetColorU32(ImGuiCol_Text), ICON_WINDOW_CLOSE);
 	
 	// Minimize button
 	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowWidth() - 80, 0));
@@ -103,32 +153,9 @@ void DrawGUI() {
 	} else if (ImGui::IsItemHovered()) {
 		ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowWidth() - 80, 0), ImVec2(ImGui::GetWindowWidth() - 40, 25), ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)));
 	}
-	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetWindowWidth() - 80 + (40 - ImGui::CalcTextSize(ICON_WINDOW_MINIMIZE).x) / 2, 1 + (25 - ImGui::GetTextLineHeight()) / 2), ImGui::GetColorU32(ImGuiCol_Text), ICON_WINDOW_MINIMIZE);
+	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetWindowWidth() - 80 + (40 - ImGui::CalcTextSize(ICON_WINDOW_MINIMIZE).x) / 2, 1 + fTextHeight), ImGui::GetColorU32(ImGuiCol_Text), ICON_WINDOW_MINIMIZE);
 
 	ImGui::SetCursorPosY(25 + ImGui::GetStyle().WindowPadding.y);
-	// if (ImGui::BeginMenuBar()) {
-	// 	ImGui::Text("Yet Another Packer    |");
-	// 	if (ImGui::BeginMenu("File")) {
-	// 		if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
-	// 		if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
-	// 		if (!Data.ConfigPath[0]) ImGui::BeginDisabled();
-	// 		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveConfig(); }
-	// 		if (!Data.ConfigPath[0]) ImGui::EndDisabled();
-	// 		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
-	// 		ImGui::EndMenu();
-	// 	}
-	// 	if (ImGui::BeginMenu("About")) {
-	// 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
-	// 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open Website")) { ShellExecuteA(Data.hWnd, "open", "https://undisassemble.dev/yap", NULL, NULL, 0); }
-	// 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
-	// 		ImGui::EndMenu();
-	// 	}
-	// 	//ImGui::SetCursorPos(ImVec2((width - ImGui::CalcTextSize("Yet Another Packer").x) / 2, 0));
-	// 	//ImGui::Text("Yet Another Packer");
-	// 	if (ImGui::CollapseButton(ImGui::GetCurrentWindow()->GetID("#COLLAPSE"), ImVec2(iGuiWidth - 48 * fGuiScale, 3))) { ImGui::GetCurrentWindow()->Collapsed = !ImGui::GetCurrentWindow()->Collapsed; }
-	// 	if (ImGui::CloseButton(ImGui::GetCurrentWindow()->GetID("#CLOSE"), ImVec2(iGuiWidth - 26 * fGuiScale, 3))) { bOpen = false; }
-	// 	ImGui::EndMenuBar();
-	// }
 	
 	// Configuration menu
 	if (!Data.bRunning) {
