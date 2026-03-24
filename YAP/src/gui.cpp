@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-23
+ * @date 2026-03-24
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -35,6 +35,7 @@ ImVec4 fBgColTopLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 ImVec4 fBgColTopRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 ImVec4 fBgColBotLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 ImVec4 fBgColBotRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
+float fR = 0, fG = std::numbers::pi * 2.f / 3.f, fB = fG * 2.f, fRadius;
 uint8_t u8CurrentCategory = 0;
 Buffer VersionString;
 struct {
@@ -86,9 +87,62 @@ bool ToolbarDropdown(_In_ const char* pName, _In_ float fTextHeight, _In_ const 
 	return bRet;
 }
 
+void UpdateBackground() {
+	float fRadians = std::numbers::pi * (float)std::get<int>(settings["Style.iGradientAngle"]) / 180.f;
+	ImVec2 ColorPosition = ImVec2(std::cos(fRadians) * fRadius, std::sin(fRadians) * fRadius);
+	ColorPosition.x += iGuiWidth / 2.f;
+	ColorPosition.y += iGuiHeight / 2.f;
+
+	std::vector<std::pair<ImVec2, ImVec4&>> items = {
+		{ ImVec2(0, 0), fBgColTopLeft },
+		{ ImVec2(iGuiWidth, 0), fBgColTopRight },
+		{ ImVec2(0, iGuiHeight), fBgColBotLeft },
+		{ ImVec2(iGuiWidth, iGuiHeight), fBgColBotRight }
+	};
+	for (std::pair<ImVec2, ImVec4&> item : items) {
+		float dist = sqrt(pow(item.first.x - ColorPosition.x, 2) + pow(item.first.y - ColorPosition.y, 2));
+		float fIntensity = (fRadius * 2 - dist) / (fRadius * 2);
+		item.second.x = fIntensity * std::get<int>(settings["Style.Accent.iR"]) / 255.f;
+		item.second.y = fIntensity * std::get<int>(settings["Style.Accent.iG"]) / 255.f;
+		item.second.z = fIntensity * std::get<int>(settings["Style.Accent.iB"]) / 255.f;
+	}
+}
+
 void DrawGUI() {
 	// Dont do anything if window is not shown
 	if (!bOpen || bMinimized) return;
+
+	// Party mode
+	if (std::get<bool>(settings["Style.bPartyMode"])) {
+		ImVec2 r = ImVec2(std::cos(fR) * fRadius, std::sin(fR) * fRadius);
+		ImVec2 g = ImVec2(std::cos(fG) * fRadius, std::sin(fG) * fRadius);
+		ImVec2 b = ImVec2(std::cos(fB) * fRadius, std::sin(fB) * fRadius);
+		fR = (fR + std::numbers::pi / 180.f);
+		while (fR > 2 * std::numbers::pi) fR -= 2 * std::numbers::pi;
+		fG = (fG + std::numbers::pi / 180.f);
+		while (fG > 2 * std::numbers::pi) fG -= 2 * std::numbers::pi;
+		fB = (fB + std::numbers::pi / 180.f);
+		while (fB > 2 * std::numbers::pi) fB -= 2 * std::numbers::pi;
+
+		r = ImVec2(r.x + iGuiWidth / 2.f, r.y + iGuiHeight / 2.f);
+		g = ImVec2(g.x + iGuiWidth / 2.f, g.y + iGuiHeight / 2.f);
+		b = ImVec2(b.x + iGuiWidth / 2.f, b.y + iGuiHeight / 2.f);
+
+		std::vector<std::pair<ImVec2, ImVec4&>> items = {
+			{ ImVec2(0, 0), fBgColTopLeft },
+			{ ImVec2(iGuiWidth, 0), fBgColTopRight },
+			{ ImVec2(0, iGuiHeight), fBgColBotLeft },
+			{ ImVec2(iGuiWidth, iGuiHeight), fBgColBotRight }
+		};
+		for (std::pair<ImVec2, ImVec4&> item : items) {
+			float dist = sqrt(pow(item.first.x - r.x, 2) + pow(item.first.y - r.y, 2));
+			item.second.x = (fRadius * 2 - dist) / (fRadius * 2);
+			dist = sqrt(pow(item.first.x - g.x, 2) + pow(item.first.y - g.y, 2));
+			item.second.y = (fRadius * 2 - dist) / (fRadius * 2);
+			dist = sqrt(pow(item.first.x - b.x, 2) + pow(item.first.y - b.y, 2));
+			item.second.z = (fRadius * 2 - dist) / (fRadius * 2);
+		}
+	}
 	
 	ImGui::Begin("Yet Another Packer", &bOpen, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 	ImGui::GetBackgroundDrawList()->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(iGuiWidth, iGuiHeight), ImGui::GetColorU32(fBgColTopLeft), ImGui::GetColorU32(fBgColTopRight), ImGui::GetColorU32(fBgColBotRight), ImGui::GetColorU32(fBgColBotLeft));
@@ -118,7 +172,18 @@ void DrawGUI() {
 	if (ToolbarDropdown("Settings", fTextHeight, "SettingsBtn")) ImGui::OpenPopup("SettingsPopup");
 	if (ImGui::BeginPopup("SettingsPopup")) {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
-		ImGui::Text("Settings go here");
+		if (ImGui::BeginMenu("Style")) {
+			if (ImGui::SliderInt("Gradient Angle", &std::get<int>(settings["Style.iGradientAngle"]), 0, 359)) UpdateBackground();
+			if (ImGui::SliderInt("R", &std::get<int>(settings["Style.Accent.iR"]), 0, 255)) UpdateBackground();
+			if (ImGui::SliderInt("G", &std::get<int>(settings["Style.Accent.iG"]), 0, 255)) UpdateBackground();
+			if (ImGui::SliderInt("B", &std::get<int>(settings["Style.Accent.iB"]), 0, 255)) UpdateBackground();
+			ImGui::Separator();
+			if (ImGui::BeginMenu("Presets")) {
+				if (ImGui::MenuItem("Party Mode", NULL, &std::get<bool>(settings["Style.bPartyMode"]))) UpdateBackground();
+				ImGui::EndMenu();
+			}
+			ImGui::EndMenu();
+		}
 		ImGui::EndPopup();
 	}
 
@@ -302,6 +367,7 @@ bool GUI::Begin() {
 	io.IniFilename = NULL;
 
 	// Setup style
+	UpdateBackground();
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.Colors[ImGuiCol_WindowBg] = ImColor(25, 25, 25, 0);
 	style.Colors[ImGuiCol_PopupBg] = ImColor(20, 20, 20, 240);
@@ -344,6 +410,7 @@ bool GUI::Begin() {
 	style.ScaleAllSizes(fGuiScale);
 	iGuiWidth *= fGuiScale;
 	iGuiHeight *= fGuiScale;
+	fRadius = sqrt(iGuiWidth * iGuiWidth + iGuiHeight * iGuiHeight);
 
 	// Setup fonts
 	io.Fonts->Clear();

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2026-03-17
+ * @date 2026-03-24
  * @copyright MIT License
  */
 
@@ -114,6 +114,7 @@ extern Data_t Data;
 extern HANDLE hLogFile;
 extern HANDLE hStdOut;
 extern std::unordered_map<std::string_view, std::variant<bool, int, Buffer, uint64_t>> config;
+extern std::unordered_map<std::string_view, std::variant<bool, int>> settings;
 
 uint64_t rand64();
 
@@ -130,6 +131,7 @@ int Modal(_In_ char* pText, _In_ char* pTitle = "Error", _In_ UINT uType = MB_OK
 void LoadDefaultConfig();
 bool LoadConfig();
 bool SaveConfig();
+bool LoadSettings();
 
 template <typename T, typename __parent>
 T child_cast(__parent p) {

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2026-03-12
+ * @date 2026-03-24
  * @copyright MIT License
  */
 
@@ -87,6 +87,7 @@ int main(int argc, char** argv) {
 	}
 	RegisterDefaultSubstitutions();
 	LoadDefaultConfig();
+	LoadSettings();
 	GUI::Setup();
 	
 	// Look for - commands

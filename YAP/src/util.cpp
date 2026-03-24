@@ -3,13 +3,25 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2026-03-20
+ * @date 2026-03-24
  * @copyright MIT License
  */
 
 #include "util.hpp"
 
 std::unordered_map<std::string_view, std::variant<bool, int, Buffer, uint64_t>> config;
+std::unordered_map<std::string_view, std::variant<bool, int>> settings;
+
+bool LoadSettings() {
+	settings["Style.iGradientAngle"] = 315;
+	settings["Style.Accent.iR"] = 0;
+	settings["Style.Accent.iG"] = 0;
+	settings["Style.Accent.iB"] = 0;
+	settings["Style.bPartyMode"] = false;
+	
+	// TODO: Load from a file
+	return true;
+}
 
 void LoadDefaultConfig() {
 	config["Packing.bEnabled"] = false;
