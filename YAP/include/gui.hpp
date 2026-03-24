@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI definitions
  * @version 0.0.0
- * @date 2026-03-20
+ * @date 2026-03-23
  * @copyright MIT License
  */
 
@@ -55,34 +55,23 @@ namespace GUI {
          */
         class Base {
         protected:
-            Base* pNextPeer = NULL;
-            Base* pChildren = NULL;
+            Base* pChild = NULL;
             const char* pLabel = NULL;
             const char* pDescription = NULL;
             uint8_t u8Flags = 0;
             const char* pFlagText = NULL;
         
         public:
-            inline Base* GetNextWidget() { return pNextPeer; }
-            inline Base* GetChildren() { return pChildren; }
+            inline Base* GetChild() { return pChild; }
             inline Base* DebugWarning() { u8Flags |= WIDGET_DEBUG; return this; }
             inline Base* FeatureWarning(_In_ const char* pText) { u8Flags |= WIDGET_WARNING; pFlagText = pText; return this; }
             inline Base* FeatureInfo(_In_ const char* pText) { u8Flags |= WIDGET_INFO; pFlagText = pText; return this; }
             inline void SetIsChild() { u8Flags |= WIDGET_IS_CHILD; }
-            inline void RemoveNextWidget() { if (pNextPeer) pNextPeer = pNextPeer->GetNextWidget(); }
             inline bool ShouldShowChildren() { return u8Flags & WIDGET_SHOW_CHILDREN; }
             inline bool AreChildrenDisabled() { return u8Flags & WIDGET_DISABLED_CHILDREN; }
 
-            inline void SetNextWidget(_In_ Base* pWidget) {
-                Base* pOld = pNextPeer;
-                pNextPeer = pWidget;
-                if (pOld) pNextPeer->SetNextWidget(pOld);
-            }
-
-            void AddNextWidget(_In_ Base* pWidget);
             void AddChild(_In_ Base* pWidget);
             Base* WithChildren(_In_ uint32_t u8NumChildren, ...);
-            Base* FollowedBy(_In_ uint32_t u8NumPeers, ...);
 
             void RenderWidgetContainer(_In_ int iHeight = -1);
             void RenderDescription();
@@ -157,5 +146,5 @@ namespace GUI {
      * @details Vector of pages, each with a name and elements. Populated by GUI::Setup, which should be called before adding any custom elements. Look at GUI::Setup to see page indexes and how contents are formatted.
      * @see GUI::Setup
      */
-    extern std::vector<std::pair<const char*, WidgetClasses::Base*>> Widgets;
+    extern std::vector<std::pair<const char*, std::vector<WidgetClasses::Base*>>> Widgets;
 };

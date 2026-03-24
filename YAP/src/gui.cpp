@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-20
+ * @date 2026-03-23
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -45,7 +45,7 @@ struct {
 
 using namespace GUI;
 
-std::vector<std::pair<const char*, WidgetClasses::Base*>> GUI::Widgets;
+std::vector<std::pair<const char*, std::vector<WidgetClasses::Base*>>> GUI::Widgets;
 
 // Opens file dialogue
 bool GUI::OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo) {
@@ -160,19 +160,17 @@ void DrawGUI() {
 		#endif
 
 		if (u8CurrentCategory < Widgets.size()) {
-			WidgetClasses::Base *pChild, *pItem = Widgets[u8CurrentCategory].second;
-			while (pItem) {
+			WidgetClasses::Base *pChild;
+			for (WidgetClasses::Base* pItem : Widgets[u8CurrentCategory].second) {
 				pItem->Render();
 				if (pItem->ShouldShowChildren()) {
 					ImGui::BeginDisabled(pItem->AreChildrenDisabled());
-					pChild = pItem->GetChildren();
-					while (pChild) {
+					pChild = pItem;
+					while ((pChild = pChild->GetChild())) {
 						pChild->Render();
-						pChild = pChild->GetNextWidget();
 					}
 					ImGui::EndDisabled();
 				}
-				pItem = pItem->GetNextWidget();
 			}
 		} else {
 			ImGui::Text("I don't know how but this broke, tried to load tab %hhu which doesn't exist", u8CurrentCategory);
@@ -439,11 +437,11 @@ void GUI::Setup() {
 	Widgets = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
-			(new Checkbox("Enable Packer", "Packing.bEnabled", "Wraps the original binary with a custom loader"))->WithChildren(
-				1,
-				new Checkbox("Don't pack resources", "Packing.bDontCompressRsrc", "Preserves everything in the resource directory, keeping details such as icons and privileges")
-			)->FollowedBy(
-				16,
+			{
+				(new Checkbox("Enable Packer", "Packing.bEnabled", "Wraps the original binary with a custom loader"))->WithChildren(
+					1,
+					new Checkbox("Don't pack resources", "Packing.bDontCompressRsrc", "Preserves everything in the resource directory, keeping details such as icons and privileges")
+				),
 				new Slider("Depth", "Packing.iEncodingCounts", 1, 10, "Number of times the application should be packed, slow"),
 				new Slider("Compression level", "Packing.iCompressionLevel", 1, 9, "How compressed the binary should be"),
 				new Slider("Mutation level", "Packing.iMutationLevel", 1, 5, "The amount of garbage that should be generated, slow"),
@@ -466,37 +464,37 @@ void GUI::Setup() {
 				),
 				(new Checkbox("Mark critical (requires admin)", "Packing.bMarkCritical", "Marks the process as critical, causing a bluescreen on crash"))->DebugWarning(),
 				new InputText("Leave a message", "Packing.sMessage", "Embed a message in the output binary for anyone looking :)")
-			)
+			}
 		},
 		{
 			ICON_CODE " Reassembly",
-			(new Checkbox("Enable Reassembler", "Reassembly.bEnabled", "Disassembles your application, and assembles a new modified version"))->FollowedBy(
-				5,
+			{
+				new Checkbox("Enable Reassembler", "Reassembly.bEnabled", "Disassembles your application, and assembles a new modified version"),
 				new Slider("Mutation level", "Reassembly.iMutationLevel", 0, 5, "How much garbage code should be inserted between real code (slow)"),
 				new Checkbox("Instruction substitution", "Reassembly.bSubstitution", "Replaces some existing instructions with other, more complicated alternatives"),
 				new Checkbox("Remove useless data", "Reassembly.bRemoveData", "Removes some data from the PE headers"),
 				new Checkbox("Strip debug symbols", "Reassembly.bStrip", "Remove debugging information from the PE"),
 				new Checkbox("Strip DOS stub", "Reassembly.bStripDOSStub", "Remove DOS stub from the PE")
-			)
+			}
 		},
 		{
 			ICON_GEARS " Advanced",
-			(new Category("Packer"))->WithChildren(
-				7,
-				new Checkbox("Fake symbol table", "Advanced.bFakeSymbols"),
-				(new Checkbox("Mutate", "Advanced.bMutateAssembly"))->FeatureWarning("Disabling will make unpacking easier"),
-				(new Checkbox("Substitute", "Advanced.bEnableSubstitution"))->FeatureWarning("Disabling will make unpacking easier"),
-				new Checkbox("Semi-random section names", "Advanced.bSemiRandomSecNames"),
-				new Checkbox("Full-random section names", "Advanced.bTrueRandomSecNames"),
-				new InputText("Section 1 name", "Advanced.sSec1Name"),
-				new InputText("Section 2 name", "Advanced.sSec2Name")
-			)->FollowedBy(
-				1,
+			{
+				(new Category("Packer"))->WithChildren(
+					7,
+					new Checkbox("Fake symbol table", "Advanced.bFakeSymbols"),
+					(new Checkbox("Mutate", "Advanced.bMutateAssembly"))->FeatureWarning("Disabling will make unpacking easier"),
+					(new Checkbox("Substitute", "Advanced.bEnableSubstitution"))->FeatureWarning("Disabling will make unpacking easier"),
+					new Checkbox("Semi-random section names", "Advanced.bSemiRandomSecNames"),
+					new Checkbox("Full-random section names", "Advanced.bTrueRandomSecNames"),
+					new InputText("Section 1 name", "Advanced.sSec1Name"),
+					new InputText("Section 2 name", "Advanced.sSec2Name")
+				),
 				(new Category("Reassembler"))->WithChildren(
 					1,
 					new InputScalar("Rebase image", ImGuiDataType_U64, "Advanced.u64Rebase", "Changes images prefered base address (0 to disable)", NULL, NULL, "%p", ImGuiInputTextFlags_CharsHexadecimal)
 				)
-			)
+			}
 		},
 #ifdef _DEBUG
 		{
@@ -525,29 +523,17 @@ using namespace WidgetClasses;
 
 #define GetScrollbarSpace() (ImGui::GetScrollMaxY() > 0.f ? ImGui::GetStyle().WindowPadding.x + ImGui::GetCurrentWindow()->ScrollbarSizes[0] : 0)
 
-void Base::AddNextWidget(_In_ Base* pWidget) {
-	if (!pNextPeer) {
-		pNextPeer = pWidget;
-		return;
-	}
-	Base* pNext = pNextPeer;
-	while (pNext->GetNextWidget()) {
-		pNext = pNext->GetNextWidget();
-	}
-	pNext->pNextPeer = pWidget;
-}
-
 void Base::AddChild(_In_ Base* pWidget) {
 	pWidget->SetIsChild();
-	if (!pChildren) {
-		pChildren = pWidget;
+	if (!pChild) {
+		pChild = pWidget;
 		return;
 	}
-	Base* pChild = pChildren;
-	while (pChild->GetNextWidget()) {
-		pChild = pChild->GetNextWidget();
+	Base* pParent = pChild;
+	while (pParent->GetChild()) {
+		pParent = pParent->GetChild();
 	}
-	pChild->AddNextWidget(pWidget);
+	pChild->AddChild(pWidget);
 }
 
 Base* Base::WithChildren(_In_ uint32_t u8NumChildren, ...) {
@@ -555,16 +541,6 @@ Base* Base::WithChildren(_In_ uint32_t u8NumChildren, ...) {
 	va_start(args, u8NumChildren);
 	for (int i = 0; i < u8NumChildren; i++) {
 		AddChild(va_arg(args, Base*));
-	}
-	va_end(args);
-	return this;
-}
-
-Base* Base::FollowedBy(_In_ uint32_t u8NumPeers, ...) {
-	va_list args;
-	va_start(args, u8NumPeers);
-	for (int i = 0; i < u8NumPeers; i++) {
-		AddNextWidget(va_arg(args, Base*));
 	}
 	va_end(args);
 	return this;
@@ -599,10 +575,9 @@ void Base::RenderWidgetContainer(_In_ int iHeight) {
 		if (iHeight < 0) {
 			int nChildren = 1;
 			if (u8Flags & WIDGET_SHOW_CHILDREN) {
-				Base* pChild = this->GetChildren();
-				while (pChild) {
+				Base* p = this;
+				while ((p = p->GetChild())) {
 					nChildren++;
-					pChild = pChild->GetNextWidget();
 				}
 			}
 			iHeight = ImGui::GetFrameHeight() * nChildren + ImGui::GetStyle().ItemSpacing.y * (nChildren - 1) + ImGui::GetStyle().FramePadding.y * 2;
@@ -616,7 +591,7 @@ void Base::RenderWidgetContainer(_In_ int iHeight) {
 		ImGui::GetWindowDrawList()->AddRectFilled(tl, br, ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)), ImGui::GetStyle().FrameRounding);
 
 		// Dropdown button
-		if (pChildren) {
+		if (pChild) {
 			char id[256] = { 0 };
 			snprintf(id, sizeof(id), "0x%pInvisButton", this);
 			float fButtonSize = ImGui::GetFrameHeight() + ImGui::GetStyle().FramePadding.y * 2;
@@ -650,12 +625,12 @@ void Base::EndWidgetRender() {
 	if (u8Flags & WIDGET_DEBUG) { DebugWarning(); }
 	if (u8Flags & WIDGET_WARNING) { FeatureWarning(pFlagText); }
 	if (u8Flags & WIDGET_INFO) { FeatureInfo(pFlagText); }
-	if (~u8Flags & WIDGET_IS_CHILD && pChildren && u8Flags & WIDGET_SHOW_CHILDREN) {
+	if (~u8Flags & WIDGET_IS_CHILD && pChild && u8Flags & WIDGET_SHOW_CHILDREN) {
 		ImVec2 l1 = ImVec2(ImGui::GetCursorScreenPos().x, ImGui::GetCursorScreenPos().y);
 		ImVec2 l2 = ImVec2(l1.x + iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - GetScrollbarSpace(), l1.y + 1);
 		ImGui::GetWindowDrawList()->AddRectFilled(l1, l2, ImGui::GetColorU32(ImGuiCol_Separator));
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y + 1);
-	} else if (u8Flags & WIDGET_IS_CHILD ? !pNextPeer : !(pChildren && u8Flags & WIDGET_SHOW_CHILDREN)) {
+	} else if (~u8Flags & WIDGET_IS_CHILD || ~u8Flags & WIDGET_SHOW_CHILDREN) {
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 		ImGui::Dummy(ImVec2(0, 0));
 	}
