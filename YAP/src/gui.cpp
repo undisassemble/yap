@@ -62,12 +62,7 @@ bool GUI::OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilt
 		FileName.Flags |= OFN_FILEMUSTEXIST;
 
 	// Open dialogue
-	bool bRet = false;
-	if (bSaveTo) {
-		bRet = GetSaveFileName(&FileName);
-	} else {
-		bRet = GetOpenFileName(&FileName);
-	}
+	bool bRet = bSaveTo ? GetSaveFileName(&FileName) : GetOpenFileName(&FileName);
 
 	// Return
 	if (pFileNameOffset && bRet) {
@@ -104,16 +99,16 @@ void DrawGUI() {
 	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetStyle().WindowPadding.x, fTextHeight), ImGui::GetColorU32(ImGuiCol_Text), "Yet Another Packer   |");
 	
 	// File button
-	ImGui::SetCursorScreenPos(ImVec2(ImGui::CalcTextSize("Yet Another Packer   |   ").x, 0));
+	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetStyle().WindowPadding.x + ImGui::CalcTextSize("Yet Another Packer   |  ").x, 0));
 	ImVec2 PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, 25);
 	if (ToolbarDropdown("File", fTextHeight, "FileBtn")) ImGui::OpenPopup("FilePopup");
 	if (ImGui::BeginPopup("FilePopup")) {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
 		if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
  		if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
- 		if (!Data.ConfigPath[0]) ImGui::BeginDisabled();
+		ImGui::BeginDisabled(!Data.ConfigPath[0]);
  		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveConfig(); }
- 		if (!Data.ConfigPath[0]) ImGui::EndDisabled();
+ 		ImGui::EndDisabled();
  		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
 		ImGui::EndPopup();
 	}
