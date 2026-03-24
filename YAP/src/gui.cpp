@@ -31,11 +31,8 @@ int iGuiHeight = 560;
 float fGuiScale = 1.f;
 ImGuiWindow* pImGuiWindow = NULL;
 extern Asm* pAssembly;
-ImVec4 fBgColTopLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
-ImVec4 fBgColTopRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
-ImVec4 fBgColBotLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
-ImVec4 fBgColBotRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
-float fR = 0, fG = std::numbers::pi * 2.f / 3.f, fB = fG * 2.f, fRadius;
+ImVec4 fBgColTopLeft, fBgColTopRight, fBgColBotLeft, fBgColBotRight;
+float fRadius, fR = 0, fG = std::numbers::pi * 2.f / 3.f, fB = fG * 2.f;
 uint8_t u8CurrentCategory = 0;
 Buffer VersionString;
 struct {
@@ -101,10 +98,11 @@ void UpdateBackground() {
 	};
 	for (std::pair<ImVec2, ImVec4&> item : items) {
 		float dist = sqrt(pow(item.first.x - ColorPosition.x, 2) + pow(item.first.y - ColorPosition.y, 2));
-		float fIntensity = (fRadius * 2 - dist) / (fRadius * 2);
+		float fIntensity = std::get<int>(settings["Style.Accent.iIntensity"]) * (fRadius * 2 - dist) / (fRadius * 200);
 		item.second.x = fIntensity * std::get<int>(settings["Style.Accent.iR"]) / 255.f;
 		item.second.y = fIntensity * std::get<int>(settings["Style.Accent.iG"]) / 255.f;
 		item.second.z = fIntensity * std::get<int>(settings["Style.Accent.iB"]) / 255.f;
+		item.second.w = 1.f;
 	}
 }
 
@@ -174,11 +172,29 @@ void DrawGUI() {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
 		if (ImGui::BeginMenu("Style")) {
 			if (ImGui::SliderInt("Gradient Angle", &std::get<int>(settings["Style.iGradientAngle"]), 0, 359)) UpdateBackground();
+			if (ImGui::SliderInt("Intensity", &std::get<int>(settings["Style.Accent.iIntensity"]), 0, 100)) UpdateBackground();
 			if (ImGui::SliderInt("R", &std::get<int>(settings["Style.Accent.iR"]), 0, 255)) UpdateBackground();
 			if (ImGui::SliderInt("G", &std::get<int>(settings["Style.Accent.iG"]), 0, 255)) UpdateBackground();
 			if (ImGui::SliderInt("B", &std::get<int>(settings["Style.Accent.iB"]), 0, 255)) UpdateBackground();
 			ImGui::Separator();
 			if (ImGui::BeginMenu("Presets")) {
+				std::vector<std::pair<const char*, ImVec4>> presets = {
+					{ "Lavender", ImVec4(88, 46, 122, 0) },
+					{ "Blue", ImVec4(20, 113, 167, 0) },
+					{ "Cyan", ImVec4(57, 162, 172, 0) },
+					{ "Green", ImVec4(45, 148, 82, 0) },
+					{ "Yellow", ImVec4(148, 158, 41, 0) },
+					{ "Red", ImVec4(146, 36, 36, 0) },
+					{ "Pink", ImVec4(126, 52, 116, 0) },
+				};
+				for (std::pair<const char*, ImVec4> preset : presets) {
+					if (ImGui::MenuItem(preset.first)) {
+						settings["Style.Accent.iR"] = (int)preset.second.x;
+						settings["Style.Accent.iG"] = (int)preset.second.y;
+						settings["Style.Accent.iB"] = (int)preset.second.z;
+						UpdateBackground();
+					}
+				}
 				if (ImGui::MenuItem("Party Mode", NULL, &std::get<bool>(settings["Style.bPartyMode"]))) UpdateBackground();
 				ImGui::EndMenu();
 			}
@@ -367,7 +383,6 @@ bool GUI::Begin() {
 	io.IniFilename = NULL;
 
 	// Setup style
-	UpdateBackground();
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.Colors[ImGuiCol_WindowBg] = ImColor(25, 25, 25, 0);
 	style.Colors[ImGuiCol_PopupBg] = ImColor(20, 20, 20, 240);
@@ -411,6 +426,7 @@ bool GUI::Begin() {
 	iGuiWidth *= fGuiScale;
 	iGuiHeight *= fGuiScale;
 	fRadius = sqrt(iGuiWidth * iGuiWidth + iGuiHeight * iGuiHeight);
+	UpdateBackground();
 
 	// Setup fonts
 	io.Fonts->Clear();
