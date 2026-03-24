@@ -36,6 +36,7 @@ ImVec4 fBgColTopRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 ImVec4 fBgColBotLeft = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 ImVec4 fBgColBotRight = ImVec4(25.f / 255.f, 25.f / 255.f, 25.f / 255.f, 1.f);
 uint8_t u8CurrentCategory = 0;
+Buffer VersionString;
 struct {
 	char* pTitle = NULL;
 	char* pText = NULL;
@@ -133,7 +134,8 @@ void DrawGUI() {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open Website")) { ShellExecuteA(Data.hWnd, "open", "https://undisassemble.dev/yap", NULL, NULL, 0); }
-		if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }	
+		if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
+		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Version")) { Modal((char*)VersionString.Data(), ICON_CIRCLE_INFO " Version", MB_OK); }
 		ImGui::EndPopup();
 	}
 
@@ -369,6 +371,30 @@ bool GUI::Begin() {
 	glfwSwapInterval(1);
 	ImGui_ImplGlfw_InitForOpenGL(pWindow, true);
 	ImGui_ImplOpenGL3_Init();
+
+	// Set version string
+	VersionString.Allocate(2048);
+	snprintf(
+		(char*)VersionString.Data(),
+		VersionString.Size(),
+		"YAP: " __YAP_VERSION__
+		"\nReLib: " __RELIB_VERSION__
+		"\nLZMA: 24.07"
+		"\nImGui: " IMGUI_VERSION
+		"\nZydis: %lld.%lld.%lld"
+		"\nZycore: %lld.%lld.%lld" 
+		"\nAsmJit: %d.%d.%d"
+		"\nGLFW: %s"
+		"\nOpenGL: %s"
+		"\nBuild: " __YAP_BUILD__
+		"\nTime: " __DATE__ " @ " __TIME__,
+		ZYDIS_VERSION_MAJOR(ZYDIS_VERSION), ZYDIS_VERSION_MINOR(ZYDIS_VERSION), ZYDIS_VERSION_PATCH(ZYDIS_VERSION),
+		ZYCORE_VERSION_MAJOR(ZYCORE_VERSION), ZYCORE_VERSION_MINOR(ZYCORE_VERSION), ZYCORE_VERSION_PATCH(ZYCORE_VERSION),
+		ASMJIT_LIBRARY_VERSION_MAJOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_MINOR(ASMJIT_LIBRARY_VERSION), ASMJIT_LIBRARY_VERSION_PATCH(ASMJIT_LIBRARY_VERSION),
+		glfwGetVersionString(),
+		glGetString(GL_VERSION)
+	);
+	VersionString.Allocate(strlen((char*)VersionString.Data()) + 1);
 
 	// Main loop
 	while (bOpen && !glfwWindowShouldClose(pWindow)) {
