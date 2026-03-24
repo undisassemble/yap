@@ -72,7 +72,7 @@ bool GUI::OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilt
 bool ToolbarDropdown(_In_ const char* pName, _In_ float fTextHeight, _In_ const char* pId = NULL) {
 	bool bRet = false;
 	ImVec2 pos = ImGui::GetCursorScreenPos();
-	ImVec2 size = ImVec2(ImGui::CalcTextSize(pName).x + fTextHeight * 2, 25); // fTextHeight being used instead of FramePadding to keep consistency with top/bottom padding
+	ImVec2 size = ImVec2(ImGui::CalcTextSize(pName).x + fTextHeight * 2, 25 * fGuiScale); // fTextHeight being used instead of FramePadding to keep consistency with top/bottom padding
 	ImGui::SetCursorScreenPos(pos);
 	if ((bRet = ImGui::InvisibleButton(pId ? pId : pName, size))) {
 		ImGui::GetForegroundDrawList()->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(ImGuiCol_FrameBgActive));
@@ -149,13 +149,13 @@ void DrawGUI() {
 	ImGui::GetBackgroundDrawList()->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(iGuiWidth, iGuiHeight), ImGui::GetColorU32(fBgColTopLeft), ImGui::GetColorU32(fBgColTopRight), ImGui::GetColorU32(fBgColBotRight), ImGui::GetColorU32(fBgColBotLeft));
 
 	// Menu bar + title
-	float fTextHeight = (25 - ImGui::GetTextLineHeight()) / 2;
-	ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(0, 0), ImVec2(ImGui::GetWindowWidth(), 25), ImGui::GetColorU32(ImGuiCol_MenuBarBg));
+	float fMenuBarHeight = 25 * fGuiScale, fTextHeight = (fMenuBarHeight - ImGui::GetTextLineHeight()) / 2;
+	ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(0, 0), ImVec2(ImGui::GetWindowWidth(), fMenuBarHeight), ImGui::GetColorU32(ImGuiCol_MenuBarBg));
 	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetStyle().WindowPadding.x, fTextHeight), ImGui::GetColorU32(ImGuiCol_Text), "Yet Another Packer   |");
 	
 	// File button
 	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetStyle().WindowPadding.x + ImGui::CalcTextSize("Yet Another Packer   |  ").x, 0));
-	ImVec2 PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, 25);
+	ImVec2 PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, fMenuBarHeight);
 	if (ToolbarDropdown("File", fTextHeight, "FileBtn")) ImGui::OpenPopup("FilePopup");
 	if (ImGui::BeginPopup("FilePopup")) {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
@@ -169,7 +169,7 @@ void DrawGUI() {
 	}
 
 	// Settings button
-	PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, 25);
+	PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, fMenuBarHeight);
 	if (ToolbarDropdown("Settings", fTextHeight, "SettingsBtn")) ImGui::OpenPopup("SettingsPopup");
 	if (ImGui::BeginPopup("SettingsPopup")) {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
@@ -208,7 +208,7 @@ void DrawGUI() {
 	}
 
 	// About button
-	PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, 25);
+	PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, fMenuBarHeight);
 	if (ToolbarDropdown("About", fTextHeight, "AboutBtn")) ImGui::OpenPopup("AboutPopup");
 	if (ImGui::BeginPopup("AboutPopup")) {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
@@ -220,24 +220,25 @@ void DrawGUI() {
 	}
 
 	// Close button
-	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowWidth() - 40, 0));
-	if (ImGui::InvisibleButton("WindowClose", ImVec2(40, 25))) {
+	float fBtnWidth = 40 * fGuiScale;
+	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowWidth() - fBtnWidth, 0));
+	if (ImGui::InvisibleButton("WindowClose", ImVec2(fBtnWidth, fMenuBarHeight))) {
 		bOpen = false;
 	} else if (ImGui::IsItemHovered()) {
-		ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowWidth() - 40, 0), ImVec2(ImGui::GetWindowWidth(), 25), ImGui::GetColorU32(ImVec4(188, 0, 0, 255)));
+		ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowWidth() - fBtnWidth, 0), ImVec2(ImGui::GetWindowWidth(), fMenuBarHeight), ImGui::GetColorU32(ImVec4(188, 0, 0, 255)));
 	}
-	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetWindowWidth() - 40 + (40 - ImGui::CalcTextSize(ICON_WINDOW_CLOSE).x) / 2, 1 + fTextHeight), ImGui::GetColorU32(ImGuiCol_Text), ICON_WINDOW_CLOSE);
+	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetWindowWidth() - fBtnWidth + (fBtnWidth - ImGui::CalcTextSize(ICON_WINDOW_CLOSE).x) / 2, fGuiScale + fTextHeight), ImGui::GetColorU32(ImGuiCol_Text), ICON_WINDOW_CLOSE);
 	
 	// Minimize button
-	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowWidth() - 80, 0));
-	if (ImGui::InvisibleButton("WindowMinimize", ImVec2(40, 25))) {
+	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowWidth() - fBtnWidth * 2, 0));
+	if (ImGui::InvisibleButton("WindowMinimize", ImVec2(fBtnWidth, fMenuBarHeight))) {
 		ImGui::GetCurrentWindow()->Collapsed = true;
 	} else if (ImGui::IsItemHovered()) {
-		ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowWidth() - 80, 0), ImVec2(ImGui::GetWindowWidth() - 40, 25), ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)));
+		ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(ImGui::GetWindowWidth() - fBtnWidth * 2, 0), ImVec2(ImGui::GetWindowWidth() - fBtnWidth, fMenuBarHeight), ImGui::GetColorU32(ImVec4(0.7f, 0.7f, 0.7f, 0.2f)));
 	}
-	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetWindowWidth() - 80 + (40 - ImGui::CalcTextSize(ICON_WINDOW_MINIMIZE).x) / 2, 1 + fTextHeight), ImGui::GetColorU32(ImGuiCol_Text), ICON_WINDOW_MINIMIZE);
+	ImGui::GetForegroundDrawList()->AddText(ImVec2(ImGui::GetWindowWidth() - fBtnWidth * 2 + (fBtnWidth - ImGui::CalcTextSize(ICON_WINDOW_MINIMIZE).x) / 2, fGuiScale + fTextHeight), ImGui::GetColorU32(ImGuiCol_Text), ICON_WINDOW_MINIMIZE);
 
-	ImGui::SetCursorPosY(25 + ImGui::GetStyle().WindowPadding.y);
+	ImGui::SetCursorPosY(fMenuBarHeight + ImGui::GetStyle().WindowPadding.y);
 	
 	// Configuration menu
 	if (!Data.bRunning) {
