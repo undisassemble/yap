@@ -79,6 +79,15 @@ namespace GUI {
             void EndWidgetRender();
         };
 
+        class Custom : public Base {
+        private:
+            void (__stdcall* pCallback)(Custom*) = NULL;
+
+        public:
+            inline Custom(void (__stdcall* pCallback)(Custom*)) { this->pCallback = pCallback; }
+            inline void Render() override { pCallback(this); }
+        };
+
         class Category : public Base {
         public:
             Category(_In_ const char* pLabel, _In_ const char* pDescription = NULL, _In_ bool bStartOpen = false);
@@ -153,7 +162,7 @@ namespace GUI {
              * 
              * @param pFormat Formatted string
              */
-            Text(_In_ char* pFormat, _In_ ...);
+            Text(_In_ const char* pFormat, _In_ ...);
 
             void Render() override;
         };

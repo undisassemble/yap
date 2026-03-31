@@ -629,6 +629,23 @@ void GUI::Setup() {
 				)
 			}
 		},
+		{
+			ICON_SHIELD_HALVED " Protect",
+			{
+				new Custom([](Custom* me) -> void {
+					float fDiff = (ImGui::GetFrameHeight() - ImGui::GetTextLineHeight()) / 2.f;
+					me->RenderWidgetContainer();
+					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + fDiff);
+					ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
+					ImGui::Text(" " ICON_TRIANGLE_EXCLAMATION);
+					ImGui::PopStyleColor();
+					ImGui::SameLine();
+					ImGui::Text("Nothing in this section will save with the rest of your project.");
+					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + fDiff);
+					me->EndWidgetRender();
+				})
+			}
+		},
 #ifdef _DEBUG
 		{
 			ICON_BUG " Debug",
@@ -878,7 +895,7 @@ Text::Text(_In_ char* pText) {
 	this->pText = pText;
 }
 
-Text::Text(_In_ char* pFormat, _In_ ...) {
+Text::Text(_In_ const char* pFormat, _In_ ...) {
 	pText = reinterpret_cast<char*>(malloc(2048));
 	va_list args;
 	va_start(args, pFormat);
