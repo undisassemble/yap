@@ -764,7 +764,7 @@ void Base::EndWidgetRender() {
 		ImVec2 l2 = ImVec2(l1.x + iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - GetScrollbarSpace(), l1.y + 1);
 		ImGui::GetWindowDrawList()->AddRectFilled(l1, l2, ImGui::GetColorU32(ImGuiCol_Separator));
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y + 1);
-	} else if (~u8Flags & WIDGET_IS_CHILD || ~u8Flags & WIDGET_SHOW_CHILDREN) {
+	} else if ((u8Flags & WIDGET_IS_CHILD) ? !pChild : ~u8Flags & WIDGET_SHOW_CHILDREN) {
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
 		ImGui::Dummy(ImVec2(0, 0));
 	}
