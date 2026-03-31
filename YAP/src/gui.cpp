@@ -258,16 +258,6 @@ void DrawGUI() {
 		// Category contents
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y);
 		ImGui::BeginChild("#TabContents", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetStyle().WindowPadding.y - ImGui::GetCursorPosY()));
-		
-		#ifdef _DEBUG
-		if (u8CurrentCategory == 3) { // Style editor (temp)
-			ImGui::ColorEdit4("Background Gradient Bottom Left", (float*)&fBgColBotLeft);
-			ImGui::ColorEdit4("Background Gradient Bottom Right", (float*)&fBgColBotRight);
-			ImGui::ColorEdit4("Background Gradient Top Left", (float*)&fBgColTopLeft);
-			ImGui::ColorEdit4("Background Gradient Top Right", (float*)&fBgColTopRight);
-			ImGui::ShowStyleEditor();
-		} else
-		#endif
 
 		if (u8CurrentCategory < Widgets.size()) {
 			WidgetClasses::Base *pChild;
@@ -630,12 +620,6 @@ void GUI::Setup() {
 			}
 		},
 #ifdef _DEBUG
-		{
-			ICON_PALETTE " Style Editor",
-			{
-
-			}
-		},
 		{
 			ICON_BUG " Debug",
 			{
