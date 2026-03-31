@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI definitions
  * @version 0.0.0
- * @date 2026-03-23
+ * @date 2026-03-31
  * @copyright MIT License
  */
 
@@ -137,6 +137,24 @@ namespace GUI {
         
         public:
             InputScalar(_In_ const char* pLabel, _In_ ImGuiDataType Type, _In_ const char* pConfigName, _In_ const char* pDescription = NULL, _In_ void* pStep = NULL, _In_ void* pStepFast = NULL, _In_ const char* pFormat = NULL, _In_ ImGuiInputTextFlags Flags = 0);
+            void Render() override;
+        };
+
+        class Text : public Base {
+        private:
+            char* pText = NULL;
+        
+        public:
+            Text(_In_ char* pText);
+
+            /*!
+             * @brief Draw formatted text
+             * @warning Does not update, will use whatever that value is at the time.
+             * 
+             * @param pFormat Formatted string
+             */
+            Text(_In_ char* pFormat, _In_ ...);
+
             void Render() override;
         };
     };

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-24
+ * @date 2026-03-31
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -623,7 +623,17 @@ void GUI::Setup() {
 		{
 			ICON_BUG " Debug",
 			{
-
+				new Checkbox("Dump disassembly", "Debug.bDumpAsm"),
+				new Checkbox("Dump raw sections", "Debug.bDumpSections"),
+				new Checkbox("Dump function ranges", "Debug.bDumpFunctions"),
+				new Checkbox("Generate breakpoints", "Debug.bGenerateBreakpoints"),
+				new Checkbox("Generate NOP markings", "Debug.bGenerateMarks"),
+				new Checkbox("Disable relocations", "Debug.bDisableRelocations"),
+				new Checkbox("Strict mutation", "Debug.bStrictMutation"),
+				new Checkbox("Skip disassembly validation", "Debug.bSkipDisasmValidation"),
+				new Text("DecodedInstruction reduction: %lld bytes (%.2f%%)", (int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction), 100.f * (int64_t)((int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction)) / (int64_t)sizeof(ZydisDecodedInstruction)),
+				new Text("DecodedOperand reduction: %lld bytes (%.2f%%)", (int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand), 100.f * (int64_t)((int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand)) / (int64_t)sizeof(ZydisDecodedOperand)),
+				new Text("Total memory reduction (per line): %lld bytes (%.2f%%)", (int64_t)(sizeof(DecodedOperand) * 4 + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) * 4 + sizeof(ZydisDecodedInstruction)), 100.f * (int64_t)((sizeof(DecodedOperand) * 4 + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) * 4 + sizeof(ZydisDecodedInstruction))) / (int64_t)(sizeof(Line) - sizeof(DecodedInstruction) - sizeof(DecodedOperand) * 4 + sizeof(ZydisDecodedInstruction) + sizeof(ZydisDecodedOperand) * 4))
 			}
 		}
 #endif
@@ -853,5 +863,27 @@ void InputScalar::Render() {
 	RenderDescription();
 	ImGui::PushItemWidth(fGuiScale * 200);
 	ImGui::InputScalar(pLabel, Type, pValue, pStep, pStepFast, pFormat, Flags);
+	EndWidgetRender();
+}
+
+Text::Text(_In_ char* pText) {
+	this->pText = pText;
+}
+
+Text::Text(_In_ char* pFormat, _In_ ...) {
+	pText = reinterpret_cast<char*>(malloc(2048));
+	va_list args;
+	va_start(args, pFormat);
+	int n = vsnprintf(pText, 2048, pFormat, args);
+	va_end(args);
+	pText = reinterpret_cast<char*>(realloc(pText, n));
+}
+
+void Text::Render() {
+	RenderWidgetContainer();
+	float fDiff = (ImGui::GetFrameHeight() - ImGui::GetTextLineHeight()) / 2.f;
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + fDiff);
+	ImGui::Text("%s", pText);
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + fDiff);
 	EndWidgetRender();
 }
