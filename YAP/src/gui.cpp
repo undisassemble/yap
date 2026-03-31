@@ -557,6 +557,16 @@ int Modal(_In_ char* pText, _In_ char* pTitle, _In_ UINT uType) {
 
 void GUI::Setup() {
 	using namespace WidgetClasses;
+
+	int64_t i64DiffInstruction = (int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction);
+	float fPctDiffInstruction = (100.f * i64DiffInstruction) / (int64_t)sizeof(ZydisDecodedInstruction);
+	
+	int64_t i64DiffOperand = (int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand);
+	float fPctDiffOperand = (100.f * i64DiffOperand) / (int64_t)sizeof(ZydisDecodedOperand);
+	
+	int64_t i64TotalDiff = i64DiffOperand * 4 + i64DiffInstruction;
+	float fPctDiffTotal = (100.f * i64TotalDiff) / (int64_t)(sizeof(Line) - i64TotalDiff);
+
 	Widgets = {
 		{
 			ICON_BOX_ARCHIVE " Packing",
@@ -631,9 +641,7 @@ void GUI::Setup() {
 				new Checkbox("Disable relocations", "Debug.bDisableRelocations"),
 				new Checkbox("Strict mutation", "Debug.bStrictMutation"),
 				new Checkbox("Skip disassembly validation", "Debug.bSkipDisasmValidation"),
-				new Text("DecodedInstruction reduction: %lld bytes (%.2f%%)", (int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction), 100.f * (int64_t)((int64_t)sizeof(DecodedInstruction) - sizeof(ZydisDecodedInstruction)) / (int64_t)sizeof(ZydisDecodedInstruction)),
-				new Text("DecodedOperand reduction: %lld bytes (%.2f%%)", (int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand), 100.f * (int64_t)((int64_t)sizeof(DecodedOperand) - sizeof(ZydisDecodedOperand)) / (int64_t)sizeof(ZydisDecodedOperand)),
-				new Text("Total memory reduction (per line): %lld bytes (%.2f%%)", (int64_t)(sizeof(DecodedOperand) * 4 + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) * 4 + sizeof(ZydisDecodedInstruction)), 100.f * (int64_t)((sizeof(DecodedOperand) * 4 + sizeof(DecodedInstruction)) - (sizeof(ZydisDecodedOperand) * 4 + sizeof(ZydisDecodedInstruction))) / (int64_t)(sizeof(Line) - sizeof(DecodedInstruction) - sizeof(DecodedOperand) * 4 + sizeof(ZydisDecodedInstruction) + sizeof(ZydisDecodedOperand) * 4))
+				new Text("DecodedInstruction reduction: %lld bytes (%.2f%%)\nDecodedOperand reduction: %lld bytes (%.2f%%)\nTotal memory reduction (per line): %lld bytes (%.2f%%)", i64DiffInstruction, fPctDiffInstruction, i64DiffOperand, fPctDiffOperand, i64TotalDiff, fPctDiffTotal)
 			}
 		}
 #endif
@@ -876,14 +884,12 @@ Text::Text(_In_ char* pFormat, _In_ ...) {
 	va_start(args, pFormat);
 	int n = vsnprintf(pText, 2048, pFormat, args);
 	va_end(args);
-	pText = reinterpret_cast<char*>(realloc(pText, n));
+	pText = reinterpret_cast<char*>(realloc(pText, n + 1));
 }
 
 void Text::Render() {
-	RenderWidgetContainer();
-	float fDiff = (ImGui::GetFrameHeight() - ImGui::GetTextLineHeight()) / 2.f;
-	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + fDiff);
+	ImVec2 size = ImGui::CalcTextSize(pText);
+	RenderWidgetContainer(size.y + ImGui::GetStyle().FramePadding.y * 2);
 	ImGui::Text("%s", pText);
-	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + fDiff);
 	EndWidgetRender();
 }
