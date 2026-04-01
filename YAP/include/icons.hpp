@@ -4,29 +4,30 @@
 // This is from https://github.com/FortAwesome/Font-Awesome/blob/6.x/webfonts/fa-solid-900.ttf, created by FontAwesome
 // License: https://github.com/FortAwesome/Font-Awesome/blob/6.x/LICENSE.txt
 
-#define ICON_FILE_SHIELD          "\xEE\x93\xB0" // E4F0
-#define ICON_FILE                 "\xEF\x80\x96" // F016
-#define ICON_DOWNLOAD             "\xEF\x80\x99" // F019
-#define ICON_CIRCLE_QUESTION      "\xEF\x81\x99" // F059
-#define ICON_CIRCLE_INFO          "\xEF\x81\x9A" // F05A
-#define ICON_CIRCLE_EXCLAMATION   "\xEF\x81\xAA" // F06A
-#define ICON_TRIANGLE_EXCLAMATION "\xEF\x81\xB1" // F071
-#define ICON_FOLDER_OPEN          "\xEF\x81\xBC" // F07C
-#define ICON_GEARS                "\xEF\x82\x85" // F085
-#define ICON_FLOPPY_DISK          "\xEF\x83\x87" // F0C7
-#define ICON_CODE                 "\xEF\x84\xA1" // F121
-#define ICON_SHIELD               "\xEF\x84\xB2" // F132
-#define ICON_SUN                  "\xEF\x86\x85" // F185
-#define ICON_MOON                 "\xEF\x86\x86" // F186
-#define ICON_BOX_ARCHIVE          "\xEF\x86\x87" // F187
-#define ICON_BUG                  "\xEF\x86\x88" // F188
-#define ICON_MICROCHIP            "\xEF\x8B\x9B" // F2DB
-#define ICON_SHIELD_HALVED        "\xEF\x8F\xAD" // F3ED
-#define ICON_BOX                  "\xEF\x91\xA6" // F466
-#define ICON_BOX_OPEN             "\xEF\x92\x9E" // F49E
-#define ICON_PALETTE              "\xEF\x94\xBF" // F53F
-#define ICON_WINDOW_CLOSE         "\xEF\x80\x8D" // F00D
-#define ICON_WINDOW_MINIMIZE      "\xEF\x81\xA8" // F068
+#define ICON_FILE_SHIELD          "\xEE\x93\xB0" // e4f0
+#define ICON_FILE                 "\xEF\x80\x96" // f016
+#define ICON_DOWNLOAD             "\xEF\x80\x99" // f019
+#define ICON_CIRCLE_QUESTION      "\xEF\x81\x99" // f059
+#define ICON_CIRCLE_INFO          "\xEF\x81\x9A" // f05a
+#define ICON_CIRCLE_EXCLAMATION   "\xEF\x81\xAA" // f06a
+#define ICON_TRIANGLE_EXCLAMATION "\xEF\x81\xB1" // f071
+#define ICON_FOLDER_OPEN          "\xEF\x81\xBC" // f07c
+#define ICON_GEARS                "\xEF\x82\x85" // f085
+#define ICON_FLOPPY_DISK          "\xEF\x83\x87" // f0c7
+#define ICON_CODE                 "\xEF\x84\xA1" // f121
+#define ICON_SHIELD               "\xEF\x84\xB2" // f132
+#define ICON_SUN                  "\xEF\x86\x85" // f185
+#define ICON_MOON                 "\xEF\x86\x86" // f186
+#define ICON_BOX_ARCHIVE          "\xEF\x86\x87" // f187
+#define ICON_BUG                  "\xEF\x86\x88" // f188
+#define ICON_MICROCHIP            "\xEF\x8B\x9B" // f2db
+#define ICON_SHIELD_HALVED        "\xEF\x8F\xAD" // f3ed
+#define ICON_BOX                  "\xEF\x91\xA6" // f466
+#define ICON_BOX_OPEN             "\xEF\x92\x9E" // f49e
+#define ICON_PALETTE              "\xEF\x94\xBF" // f53f
+#define ICON_WINDOW_CLOSE         "\xEF\x80\x8D" // f00d
+#define ICON_WINDOW_MINIMIZE      "\xEF\x81\xA8" // f068
+#define ICON_CHECK_CIRCLE         "\xEF\x81\x98" // f058
 
 static const unsigned int icons_compressed_size = 245474;
 static const unsigned int icons_compressed_data[245476/4] =

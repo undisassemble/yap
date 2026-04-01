@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2026-03-24
+ * @date 2026-03-31
  * @copyright MIT License
  */
 
@@ -98,6 +98,7 @@ enum State_t : BYTE {
 struct Data_t {
 	char ConfigPath[MAX_PATH] = { 0 };
 	char SaveFileName[MAX_PATH] = { 0 };
+	Buffer Target = Buffer(MAX_PATH), Output = Buffer(MAX_PATH);
 	float fTotalProgress = 0.f;
 	float fTaskProgress = 0.f;
 	char* sTask = NULL;

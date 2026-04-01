@@ -47,7 +47,7 @@ namespace GUI {
      * @retval true Success.
      * @retval false Failure.
      */
-    bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo);
+    bool OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ const char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo);
 
     namespace WidgetClasses {
         /*!
@@ -163,6 +163,19 @@ namespace GUI {
              * @param pFormat Formatted string
              */
             Text(_In_ const char* pFormat, _In_ ...);
+
+            void Render() override;
+        };
+
+        class FilePicker : public Base {
+        private:
+            Buffer* pPath;
+            const char* pFilter = NULL;
+            bool bSaveTo = false, bPrevCheck = false;
+            bool (__stdcall* pValidate)(const char*) = NULL;
+
+        public:
+            FilePicker(_In_ const char* pLabel, _In_ Buffer* pHolder, _In_ const char* pDescription = NULL, _In_ const char* pFilter = "All Files\0*.*\0", _In_ bool bSaveTo = false, _In_opt_ bool (__stdcall* pValidate)(const char*) = NULL);
 
             void Render() override;
         };

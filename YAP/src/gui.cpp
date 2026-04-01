@@ -46,7 +46,7 @@ using namespace GUI;
 std::vector<std::pair<const char*, std::vector<WidgetClasses::Base*>>> GUI::Widgets;
 
 // Opens file dialogue
-bool GUI::OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo) {
+bool GUI::OpenFileDialogue(_Out_ char* pOut, _In_ size_t szOut, _In_ const char* pFilter, _Out_opt_ WORD* pFileNameOffset, _In_ bool bSaveTo) {
 	// Initialize struct
 	OPENFILENAME FileName = { 0 };
 	FileName.lStructSize = sizeof(OPENFILENAME);
@@ -643,7 +643,16 @@ void GUI::Setup() {
 					ImGui::Text("Nothing in this section will save with the rest of your project.");
 					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + fDiff);
 					me->EndWidgetRender();
-				})
+				}),
+				new FilePicker("Target", &Data.Target, "Source binary to protect", "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", false, [](const char* pPath) -> bool {
+					HANDLE hFile = CreateFileA(pPath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+					if (!hFile || hFile == INVALID_HANDLE_VALUE) return false;
+					WORD word = 0;
+					if (!ReadFile(hFile, &word, sizeof(WORD), NULL, NULL)) word = 0;
+					CloseHandle(hFile);
+					return word == IMAGE_DOS_SIGNATURE;
+				}),
+				new FilePicker("Output", &Data.Output, "Destination binary", "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", true)
 			}
 		},
 #ifdef _DEBUG
@@ -908,5 +917,43 @@ void Text::Render() {
 	ImVec2 size = ImGui::CalcTextSize(pText);
 	RenderWidgetContainer(size.y + ImGui::GetStyle().FramePadding.y * 2);
 	ImGui::Text("%s", pText);
+	EndWidgetRender();
+}
+
+FilePicker::FilePicker(_In_ const char* pLabel, _In_ Buffer* pHolder, _In_ const char* pDescription, _In_ const char* pFilter, _In_ bool bSaveTo, _In_opt_ bool (__stdcall* pValidate)(const char*)) {
+	this->pLabel = pLabel;
+	this->pPath = pHolder;
+	this->pDescription = pDescription;
+	this->pFilter = pFilter;
+	this->bSaveTo = bSaveTo;
+	this->pValidate = pValidate;
+}
+
+void FilePicker::Render() {
+	RenderWidgetContainer();
+	RenderDescription();
+	bool bCheck = false;
+	ImGui::PushID(this);
+	ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_FrameBg));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetColorU32(ImGuiCol_FrameBgHovered));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetColorU32(ImGuiCol_FrameBgActive));
+	if (ImGui::Button("...")) {
+		bCheck = OpenFileDialogue(reinterpret_cast<char*>(pPath->Data()), pPath->Size(), pFilter, NULL, bSaveTo);
+	}
+	ImGui::PopStyleColor(3);
+	ImGui::PopID();
+	ImGui::SameLine();
+	ImGui::PushItemWidth(fGuiScale * 200);
+	bCheck |= ImGui::InputText(pLabel, reinterpret_cast<char*>(pPath->Data()), pPath->Size());
+
+	if (bCheck && pValidate) {
+		bPrevCheck = pValidate(reinterpret_cast<const char*>(pPath->Data()));
+	}
+
+	if (pValidate) {
+		ImGui::SameLine();
+		ImGui::TextColored(bPrevCheck ? ImColor(39, 180, 39, 255) : ImColor(200, 39, 39, 255), bPrevCheck ? ICON_CHECK_CIRCLE : ICON_CIRCLE_EXCLAMATION);
+	}
+
 	EndWidgetRender();
 }
