@@ -97,7 +97,6 @@ enum State_t : BYTE {
 
 struct Data_t {
 	char ConfigPath[MAX_PATH] = { 0 };
-	char SaveFileName[MAX_PATH] = { 0 };
 	Buffer Target = Buffer(MAX_PATH), Output = Buffer(MAX_PATH);
 	float fTotalProgress = 0.f;
 	float fTaskProgress = 0.f;

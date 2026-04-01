@@ -179,6 +179,16 @@ namespace GUI {
 
             void Render() override;
         };
+
+        class Button : public Base {
+        private:
+            void (__stdcall* pCallback)() = NULL;
+        
+        public:
+            Button(_In_ const char* pLabel, _In_ void (__stdcall* pCallback)(), _In_ const char* pDescription = NULL);
+
+            void Render() override;
+        };
     };
 
     /*!

@@ -314,21 +314,15 @@ void DrawGUI() {
 		if (ImGui::BeginPopupModal(CurrentModal.pTitle, NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 			switch (CurrentModal.uType & MB_ICONMASK) {
 			case MB_ICONERROR:
-				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(228, 83, 83, 255));
-				ImGui::Text(ICON_CIRCLE_EXCLAMATION);
-				ImGui::PopStyleColor();
+				ImGui::TextColored(ImColor(228, 83, 83, 255), ICON_CIRCLE_EXCLAMATION);
 				ImGui::SameLine();
 				break;
 			case MB_ICONINFORMATION:
-				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(152, 205, 253, 255));
-				ImGui::Text(ICON_CIRCLE_INFO);
-				ImGui::PopStyleColor();
+				ImGui::TextColored(ImColor(152, 205, 253, 255), ICON_CIRCLE_INFO);
 				ImGui::SameLine();
 				break;
 			case MB_ICONWARNING:
-				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
-				ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
-				ImGui::PopStyleColor();
+				ImGui::TextColored(ImColor(227, 185, 104, 255), ICON_TRIANGLE_EXCLAMATION);
 				ImGui::SameLine();
 			}
 			
@@ -652,7 +646,18 @@ void GUI::Setup() {
 					CloseHandle(hFile);
 					return word == IMAGE_DOS_SIGNATURE;
 				}),
-				new FilePicker("Output", &Data.Output, "Destination binary", "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", true)
+				new FilePicker("Output", &Data.Output, "Destination binary", "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", true),
+				new Button(ICON_SHIELD_HALVED " Begin", []() -> void {
+					pAssembly = new Asm(reinterpret_cast<char*>(Data.Target.Data()));
+					if (pAssembly->Status) {
+						Modal("Unable to parse binary\n", "Error", MB_OK | MB_ICONERROR);
+						LOG(Failed, MODULE_YAP, "Failed to parse binary (%d)\n", pAssembly->Status);
+						delete pAssembly;
+						pAssembly = NULL;
+					} else {
+						CreateThread(0, 0, ::Begin, 0, 0, 0);
+					}
+				}, "Begin protection")
 			}
 		},
 #ifdef _DEBUG
@@ -709,25 +714,19 @@ Base* Base::WithChildren(_In_ uint32_t u8NumChildren, ...) {
 
 void DebugWarning() {
 	ImGui::SameLine();
-	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
-	ImGui::Text(ICON_BUG);
-	ImGui::PopStyleColor();
+	ImGui::TextColored(ImColor(227, 185, 104, 255), ICON_BUG);
 	ImGui::SetItemTooltip("This feature is experimental, use with caution!");
 }
 
 void FeatureWarning(_In_ const char* text = NULL) {
 	ImGui::SameLine();
-	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(227, 185, 104, 255));
-	ImGui::Text(ICON_TRIANGLE_EXCLAMATION);
-	ImGui::PopStyleColor();
+	ImGui::TextColored(ImColor(227, 185, 104, 255), ICON_TRIANGLE_EXCLAMATION);
 	if (text) ImGui::SetItemTooltip("%s", text);
 }
 
 void FeatureInfo(_In_ const char* text = NULL) {
 	ImGui::SameLine();
-	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(152, 205, 253, 255));
-	ImGui::Text(ICON_CIRCLE_INFO);
-	ImGui::PopStyleColor();
+	ImGui::TextColored(ImColor(152, 205, 253, 255), ICON_CIRCLE_INFO);
 	if (text) ImGui::SetItemTooltip("%s", text);
 }
 
@@ -955,5 +954,22 @@ void FilePicker::Render() {
 		ImGui::TextColored(bPrevCheck ? ImColor(39, 180, 39, 255) : ImColor(200, 39, 39, 255), bPrevCheck ? ICON_CHECK_CIRCLE : ICON_CIRCLE_EXCLAMATION);
 	}
 
+	EndWidgetRender();
+}
+
+Button::Button(_In_ const char* pLabel, _In_ void (__stdcall* pCallback)(), _In_ const char* pDescription) {
+	this->pLabel = pLabel;
+	this->pCallback = pCallback;
+	this->pDescription = pDescription;
+}
+
+void Button::Render() {
+	RenderWidgetContainer();
+	RenderDescription();
+	ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_FrameBg));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetColorU32(ImGuiCol_FrameBgHovered));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetColorU32(ImGuiCol_FrameBgActive));
+	if (ImGui::Button(pLabel)) pCallback();
+	ImGui::PopStyleColor(3);
 	EndWidgetRender();
 }

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2026-03-24
+ * @date 2026-03-31
  * @copyright MIT License
  */
 
@@ -229,8 +229,8 @@ DWORD WINAPI Begin(void* args) {
 			pAssembly->StripDosStub();
 			pAssembly->FixHeaders();
 		}
-		if (std::get<uint64_t>(config["Reassembly.Rebase"])) {
-			pAssembly->RebaseImage(std::get<uint64_t>(config["u64Reassembly.Rebase"]));
+		if (std::get<uint64_t>(config["Advanced.u64Rebase"])) {
+			pAssembly->RebaseImage(std::get<uint64_t>(config["Advanced.u64Rebase"]));
 		}
 	}
 
@@ -253,24 +253,25 @@ DWORD WINAPI Begin(void* args) {
 	LOG(Success, MODULE_YAP, "All modules passed\n");
 	if (Data.hWnd) {
 		do {
-			while (!GUI::OpenFileDialogue(Data.SaveFileName, MAX_PATH, "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, true)) {
-				if (Modal("Failed to get save file name", "Error", MB_RETRYCANCEL | MB_ICONERROR) == IDCANCEL) {
-					Data.bUserCancelled = true;
-					break;
-				}
-			}
-			if (!pAssembly->ProduceBinary(Data.SaveFileName)) {
+			if (!pAssembly->ProduceBinary(reinterpret_cast<char*>(Data.Output.Data()))) {
 				Modal("Failed to save file", "Error", MB_OK | MB_ICONERROR);
 				LOG(Failed, MODULE_YAP, "Failed to save file\n");
 				goto th_exit;
 			} else {
 				break;
 			}
+
+			while (!GUI::OpenFileDialogue(reinterpret_cast<char*>(Data.Output.Data()), Data.Output.Size(), "Binaries\0*.exe;*.dll;*.sys\0All Files\0*.*\0", NULL, true)) {
+				if (Modal("Failed to get save file name", "Error", MB_RETRYCANCEL | MB_ICONERROR) == IDCANCEL) {
+					Data.bUserCancelled = true;
+					break;
+				}
+			}
 		} while (!Data.bUserCancelled);
 		if (Data.bUserCancelled) {
 			LOG(Info, MODULE_YAP, "User cancelled\n");
 		} else {
-			LOG(Info, MODULE_YAP, "Saved to: %s\n", Data.SaveFileName);
+			LOG(Info, MODULE_YAP, "Saved to: %s\n", Data.Output.Data());
 		}
 	} else {
 		if (!pAssembly->ProduceBinary(reinterpret_cast<char*>(args))) {
