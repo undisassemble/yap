@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2026-03-24
+ * @date 2026-04-02
  * @copyright MIT License
  */
 
@@ -11,6 +11,14 @@
 
 std::unordered_map<std::string_view, std::variant<bool, int, Buffer, uint64_t>> config;
 std::unordered_map<std::string_view, std::variant<bool, int>> settings;
+
+namespace ConfigTypes {
+	const BYTE Unknown = 0;
+	const BYTE Bool = 1;
+	const BYTE Int = 2;
+	const BYTE Buffer = 3;
+	const BYTE UInt64 = 4;
+};
 
 bool LoadSettings() {
 	settings["Style.iGradientAngle"] = 60;
@@ -107,7 +115,24 @@ bool SaveConfig() {
 	WriteFile(hFile, &ver, sizeof(DWORD), NULL, NULL);
 
 	// Write data
-	// TODO
+	void* pData;
+	for (auto item : config) {
+		// Write name
+		WriteFile(hFile, item.first.data(), item.first.length() + 1, NULL, NULL);
+
+		// Write data
+		#define WRITE_CONFIG(primitive, id) else if ((pData = std::get_if<primitive>(&config[item.first]))) { WriteFile(hFile, &id, 1, NULL, NULL); WriteFile(hFile, pData, sizeof(primitive), NULL, NULL); }
+		if ((pData = std::get_if<Buffer>(&config[item.first]))) {
+			WriteFile(hFile, &ConfigTypes::Buffer, 1, NULL, NULL);
+			size_t sz = reinterpret_cast<Buffer*>(pData)->Size();
+			WriteFile(hFile, &sz, sizeof(sz), NULL, NULL);
+			WriteFile(hFile, reinterpret_cast<Buffer*>(pData)->Data(), sz, NULL, NULL);
+		}
+		WRITE_CONFIG(bool, ConfigTypes::Bool)
+		WRITE_CONFIG(int, ConfigTypes::Int)
+		WRITE_CONFIG(uint64_t, ConfigTypes::UInt64)
+		#undef WRITE_CONFIG
+	}
 	
 	CloseHandle(hFile);
 	LOG(Success, MODULE_YAP, "Saved project to %s\n", Data.ConfigPath);

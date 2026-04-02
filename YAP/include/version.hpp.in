@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Version information
  * @version 0.0.0
- * @date 2025-09-18
+ * @date 2026-04-02
  * @copyright MIT License
  */
 
@@ -14,7 +14,7 @@
 #define __YAP_VERSION_MASK_MAJOR__ 0x000000FF
 #define __YAP_VERSION_MASK_MINOR__ 0x0000FF00
 #define __YAP_VERSION_MASK_PATCH__ 0x00FF0000
-#define __YAP_CONFIG_VERSION__ 0 // Only changes when .yaproj file format changes
+#define __YAP_CONFIG_VERSION__ 1 // Only changes when .yaproj file format changes
 #ifdef _DEBUG
 #define __YAP_BUILD__ "DEBUG"
 #define DEBUG_ONLY(x) x
