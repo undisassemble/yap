@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-03-31
+ * @date 2026-04-20
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -155,7 +155,7 @@ void DrawGUI() {
 	
 	// File button
 	ImGui::SetCursorScreenPos(ImVec2(ImGui::GetStyle().WindowPadding.x + ImGui::CalcTextSize("Yet Another Packer   |  ").x, 0));
-	ImVec2 PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, fMenuBarHeight);
+	ImVec2 PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, fMenuBarHeight + ImGui::GetStyle().ItemSpacing.y);
 	if (ToolbarDropdown("File", fTextHeight, "FileBtn")) ImGui::OpenPopup("FilePopup");
 	if (ImGui::BeginPopup("FilePopup")) {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
@@ -169,7 +169,7 @@ void DrawGUI() {
 	}
 
 	// Settings button
-	PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, fMenuBarHeight);
+	PopupPos.x = ImGui::GetCursorScreenPos().x;
 	if (ToolbarDropdown("Settings", fTextHeight, "SettingsBtn")) ImGui::OpenPopup("SettingsPopup");
 	if (ImGui::BeginPopup("SettingsPopup")) {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
@@ -208,7 +208,7 @@ void DrawGUI() {
 	}
 
 	// About button
-	PopupPos = ImVec2(ImGui::GetCursorScreenPos().x, fMenuBarHeight);
+	PopupPos.x = ImGui::GetCursorScreenPos().x;
 	if (ToolbarDropdown("About", fTextHeight, "AboutBtn")) ImGui::OpenPopup("AboutPopup");
 	if (ImGui::BeginPopup("AboutPopup")) {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
