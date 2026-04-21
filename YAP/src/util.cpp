@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2026-04-02
+ * @date 2026-04-20
  * @copyright MIT License
  */
 
@@ -12,6 +12,7 @@
 std::unordered_map<std::string_view, std::variant<bool, int, Buffer, uint64_t>> config;
 std::unordered_map<std::string_view, std::variant<bool, int>> settings;
 
+#define MAX_BUF_SIZE 4096
 namespace ConfigTypes {
 	const BYTE Unknown = 0;
 	const BYTE Bool = 1;
@@ -116,15 +117,23 @@ bool SaveConfig() {
 
 	// Write data
 	void* pData;
+	DWORD sz;
 	for (auto item : config) {
 		// Write name
-		WriteFile(hFile, item.first.data(), item.first.length() + 1, NULL, NULL);
+		sz = item.first.length() + 1;
+		WriteFile(hFile, &sz, sizeof(DWORD), NULL, NULL);
+		WriteFile(hFile, item.first.data(), sz, NULL, NULL);
 
 		// Write data
 		#define WRITE_CONFIG(primitive, id) else if ((pData = std::get_if<primitive>(&config[item.first]))) { WriteFile(hFile, &id, 1, NULL, NULL); WriteFile(hFile, pData, sizeof(primitive), NULL, NULL); }
 		if ((pData = std::get_if<Buffer>(&config[item.first]))) {
 			WriteFile(hFile, &ConfigTypes::Buffer, 1, NULL, NULL);
 			size_t sz = reinterpret_cast<Buffer*>(pData)->Size();
+			if (sz > MAX_BUF_SIZE) {
+				LOG(Failed, MODULE_YAP, "Buffer %s too large to save, was %llu when maximum accepted is %llu\n", item.first.data(), sz, MAX_BUF_SIZE);
+				CloseHandle(hFile);
+				return false;
+			}
 			WriteFile(hFile, &sz, sizeof(sz), NULL, NULL);
 			WriteFile(hFile, reinterpret_cast<Buffer*>(pData)->Data(), sz, NULL, NULL);
 		}
@@ -176,7 +185,58 @@ bool LoadConfig() {
 	}
 
 	// Read data
-	// TODO
+	DWORD strsz;
+	Buffer buf, str;
+	BYTE type;
+	bool b;
+	int i;
+	uint64_t u64;
+	size_t sz;
+	while (ReadFile(hFile, &strsz, sizeof(DWORD), &ver, NULL) && ver == sizeof(DWORD)) { // Re-using ver
+		// Read string name
+		// I can guarentee that this leaks memory, but im too lazy to fix this for now
+		if (strsz > MAX_PATH) {
+			LOG(Failed, MODULE_YAP, "Config string name is too long, %u bytes when maximum permitted is %u.\n", strsz, MAX_PATH);
+			CloseHandle(hFile);
+			return false;
+		}
+		str.Allocate(strsz);
+		ReadFile(hFile, str.Data(), str.Size(), NULL, NULL);
+		str.Data()[str.Size() - 1] = 0;
+
+		// Read data
+		ReadFile(hFile, &type, sizeof(BYTE), NULL, NULL);
+		switch (type) {
+		case ConfigTypes::Bool:
+			ReadFile(hFile, &b, sizeof(bool), NULL, NULL);
+			config[std::string_view(reinterpret_cast<char*>(str.Data()))] = b;
+			break;
+		case ConfigTypes::Int:
+			ReadFile(hFile, &i, sizeof(int), NULL, NULL);
+			config[std::string_view(reinterpret_cast<char*>(str.Data()))] = i;
+			break;
+		case ConfigTypes::Buffer:
+			ReadFile(hFile, &sz, sizeof(size_t), NULL, NULL);
+			if (sz > MAX_BUF_SIZE) {
+				LOG(Failed, MODULE_YAP, "Buffer size is too large, was %llu bytes when maximum allowed is %llu\n", sz, MAX_BUF_SIZE);
+				CloseHandle(hFile);
+				return false;
+			}
+			buf.Allocate(sz);
+			ReadFile(hFile, buf.Data(), sz, NULL, NULL);
+			config[std::string_view(reinterpret_cast<char*>(str.Data()))] = buf;
+			buf = Buffer();
+			break;
+		case ConfigTypes::UInt64:
+			ReadFile(hFile, &u64, sizeof(uint64_t), NULL, NULL);
+			config[std::string_view(reinterpret_cast<char*>(str.Data()))] = u64;
+			break;
+		default:
+			LOG(Failed, MODULE_YAP, "Unknown type: %hhu\n", type);
+			CloseHandle(hFile);
+			return false;
+		}
+	}
 	
 	CloseHandle(hFile);
 	LOG(Success, MODULE_YAP, "Loaded %s\n", Data.ConfigPath);

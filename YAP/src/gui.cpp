@@ -159,12 +159,29 @@ void DrawGUI() {
 	if (ToolbarDropdown("File", fTextHeight, "FileBtn")) ImGui::OpenPopup("FilePopup");
 	if (ImGui::BeginPopup("FilePopup")) {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
-		if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
- 		if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false); LoadConfig(); }
+		if (ImGui::MenuItem(ICON_FILE " New", "Ctrl + N")) {
+			OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
+			if (!SaveConfig()) {
+				Modal("Failed to load config", "Error", MB_OK | MB_ICONERROR);
+			}
+		}
+ 		if (ImGui::MenuItem(ICON_FOLDER_OPEN " Open", "Ctrl + O")) {
+			OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, false);
+			if (!LoadConfig()) {
+				Modal("Failed to load config", "Error", MB_OK | MB_ICONERROR);
+			}
+		}
 		ImGui::BeginDisabled(!Data.ConfigPath[0]);
- 		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S")) { SaveConfig(); }
+ 		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save", "Ctrl + S") && !SaveConfig()) {
+			Modal("Failed to save config", "Error", MB_OK | MB_ICONERROR);
+		}
  		ImGui::EndDisabled();
- 		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) { OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true); SaveConfig(); }
+ 		if (ImGui::MenuItem(ICON_FLOPPY_DISK " Save as", "Ctrl + Shift + S")) {
+			OpenFileDialogue(Data.ConfigPath, sizeof(Data.ConfigPath), "YAP Project\0*.yaproj\0All Files\0*.*\0", NULL, true);
+			if (!SaveConfig()) {
+				Modal("Failed to load config", "Error", MB_OK | MB_ICONERROR);
+			}
+		}
 		ImGui::EndPopup();
 	}
 
