@@ -3,8 +3,10 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-04-27
+ * @date 2026-04-20
  * @copyright MIT License
+ * 
+ * @todo Feature search
  */
 
 #include "imgui.h"
@@ -415,10 +417,13 @@ bool GUI::Begin() {
 	style.PopupRounding = 5.f;
 
 	// Scaling
-	float x, y;
-	glfwGetMonitorContentScale(glfwGetPrimaryMonitor(), &x, &y);
-	fGuiScale = std::max(x, y);
-	LOG(Info, MODULE_YAP, "Monitor scale: (%f, %f)\n", x, y);
+	int x, y, mon_x, mon_y;
+	glfwGetMonitorWorkarea(glfwGetPrimaryMonitor(), &x, &y, &mon_x, &mon_y);
+	fGuiScale = mon_x / 1920.f;
+	if (mon_y / 1080.f < fGuiScale) {
+		fGuiScale = mon_y / 1080.f;
+	}
+	LOG(Info, MODULE_YAP, "Detected monitor size: (%d, %d)\n", mon_x, mon_y);
 	LOG(Info, MODULE_YAP, "GUI scaling: %f\n", fGuiScale);
 	style.ScaleAllSizes(fGuiScale);
 	iGuiWidth *= fGuiScale;
@@ -438,9 +443,11 @@ bool GUI::Begin() {
 	// Create window
 	glfwWindowHint(GLFW_RESIZABLE, 0);
 	glfwWindowHint(GLFW_DECORATED, 0);
+	glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, 1);
 	GLFWwindow* pWindow = glfwCreateWindow(iGuiWidth, iGuiHeight, "Yet Another Packer", NULL, NULL);
 	if (!pWindow) return false;
 	Data.hWnd = glfwGetWin32Window(pWindow);
+	glfwSetWindowPos(pWindow, x + (mon_x - iGuiWidth) / 2, y + (mon_y - iGuiHeight) / 2);
 	glfwMakeContextCurrent(pWindow);
 	glfwSwapInterval(1);
 	ImGui_ImplGlfw_InitForOpenGL(pWindow, true);
@@ -682,8 +689,7 @@ void GUI::Setup() {
 				new Checkbox("Disable relocations", "Debug.bDisableRelocations"),
 				new Checkbox("Strict mutation", "Debug.bStrictMutation"),
 				new Checkbox("Skip disassembly validation", "Debug.bSkipDisasmValidation"),
-				new Text("DecodedInstruction reduction: %lld bytes (%.2f%%)\nDecodedOperand reduction: %lld bytes (%.2f%%)\nTotal memory reduction (per line): %lld bytes (%.2f%%)", i64DiffInstruction, fPctDiffInstruction, i64DiffOperand, fPctDiffOperand, i64TotalDiff, fPctDiffTotal),
-				new Text("GUI Scale: %f", fGuiScale)
+				new Text("DecodedInstruction reduction: %lld bytes (%.2f%%)\nDecodedOperand reduction: %lld bytes (%.2f%%)\nTotal memory reduction (per line): %lld bytes (%.2f%%)", i64DiffInstruction, fPctDiffInstruction, i64DiffOperand, fPctDiffOperand, i64TotalDiff, fPctDiffTotal)
 			}
 		}
 #endif
