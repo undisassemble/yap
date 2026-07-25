@@ -593,16 +593,16 @@ void GUI::Setup() {
 				new Checkbox("Hide Import Address Table", "Packing.bHideIAT", "Hides imported functions from static analysis tools"),
 				new Checkbox("API emulation", "Packing.bAPIEmulation", "Replaces some WINAPI functions with custom alternatives"),
 				new Checkbox("Delayed entry point", "Packing.bDelayedEntry", "Changes the behavior of the entry point before it is run"),
-				new Checkbox("DLL sideloading mitigations", "Packing.bMitigateSideloading", "Prioritizes DLLs in Windows directories, loading those first instead of DLLs placed in the local directory"),
+				new Checkbox("DLL sideloading mitigations", "Packing.bMitigateSideloading", "Loads DLLs in Windows directories before those in the local directory"),
 				new Checkbox("Only load Microsoft signed DLLs", "Packing.bOnlyLoadMicrosoft", "Only allows DLLs that have been signed by Microsoft to be loaded"),
-				new Checkbox("Direct syscalls", "Packing.bDirectSyscalls", "Skips some WINAPI functions and makes syscalls directly, may break with Windows updates"),
+				new Checkbox("Direct syscalls", "Packing.bDirectSyscalls", "Skips some WINAPI functions, may break with Windows updates"),
 				(new Checkbox("Anti-dump", "Packing.bAntiDump", "Attempts to prevent the process from being dumped"))->FeatureInfo("If enabled, you must use GetSelf() instead of GetModuleHandleA(NULL) to get the applications base address."),
 				new Checkbox("Anti-debug", "Packing.bAntiDebug", "Prevent debuggers from attaching to the process"),
 				(new Checkbox("Anti-VM", "Packing.bAntiVM", "Dont run the app if running in a virtual machine"))->WithChildren(
 					1,
 					new Checkbox("Allow Hyper-V", "Packing.bAllowHyperV", "Still run if the only detected VM is MS Hyper-V")
 				),
-				new Dropdown("Immitate packer", "Packing.iImmitate", "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0", "Changes some details about the packed binary to make it look like another packer"),
+				new Dropdown("Immitate packer", "Packing.iImmitate", "None\0Themida\0WinLicense\0UPX\0MPRESS\0Enigma\0ExeStealth\0", "Changes some details to make the output look like another packer"),
 				(new Checkbox("Process masquerading", "Packing.bEnableMasquerade", "Makes the packed executable appear as a different process"))->WithChildren(
 					1,
 					new InputText(" ", "Packing.sMasquerade", "Process path (shorter is better)")
