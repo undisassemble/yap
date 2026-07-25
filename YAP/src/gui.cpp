@@ -730,22 +730,10 @@ Base* Base::WithChildren(_In_ uint32_t u8NumChildren, ...) {
 	return this;
 }
 
-void DebugWarning() {
+void FeatureIcon(_In_ const ImVec4& col, _In_ const char* pIcon, _In_ const char* pText) {
 	ImGui::SameLine();
-	ImGui::TextColored(ImColor(227, 185, 104, 255), ICON_BUG);
-	ImGui::SetItemTooltip("This feature is experimental, use with caution!");
-}
-
-void FeatureWarning(_In_ const char* text = NULL) {
-	ImGui::SameLine();
-	ImGui::TextColored(ImColor(227, 185, 104, 255), ICON_TRIANGLE_EXCLAMATION);
-	if (text) ImGui::SetItemTooltip("%s", text);
-}
-
-void FeatureInfo(_In_ const char* text = NULL) {
-	ImGui::SameLine();
-	ImGui::TextColored(ImColor(152, 205, 253, 255), ICON_CIRCLE_INFO);
-	if (text) ImGui::SetItemTooltip("%s", text);
+	ImGui::TextColored(col, "%s", pIcon);
+	if (pText) ImGui::SetItemTooltip("%s", pText);
 }
 
 void Base::RenderWidgetContainer(_In_ int iHeight) {
@@ -799,9 +787,9 @@ void Base::RenderDescription() {
 }
 
 void Base::EndWidgetRender() {
-	if (u8Flags & WIDGET_DEBUG) { DebugWarning(); }
-	if (u8Flags & WIDGET_WARNING) { FeatureWarning(pFlagText); }
-	if (u8Flags & WIDGET_INFO) { FeatureInfo(pFlagText); }
+	if (u8Flags & WIDGET_DEBUG) { FeatureIcon(ImColor(227, 185, 104), ICON_BUG, "This feature is experimental, use with caution!"); }
+	if (u8Flags & WIDGET_WARNING) { FeatureIcon(ImColor(227, 185, 104), ICON_TRIANGLE_EXCLAMATION, pFlagText); }
+	if (u8Flags & WIDGET_INFO) { FeatureIcon(ImColor(152, 205, 253), ICON_CIRCLE_INFO, pFlagText); }
 	if (~u8Flags & WIDGET_IS_CHILD && pChild && u8Flags & WIDGET_SHOW_CHILDREN) {
 		ImVec2 l1 = ImVec2(ImGui::GetCursorScreenPos().x, ImGui::GetCursorScreenPos().y);
 		ImVec2 l2 = ImVec2(l1.x + iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - GetScrollbarSpace(), l1.y + 1);
