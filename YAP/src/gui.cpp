@@ -11,6 +11,7 @@
 
 #include "imgui.h"
 #include "util.hpp"
+#include <windows.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include "gui.hpp"
 #include "font.hpp"
@@ -232,7 +233,7 @@ void DrawGUI() {
 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open GitHub")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap", NULL, NULL, 0); }
 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Open Website")) { ShellExecuteA(Data.hWnd, "open", "https://undisassemble.dev/yap", NULL, NULL, 0); }
 		if (ImGui::MenuItem(ICON_CIRCLE_INFO " License")) { ShellExecuteA(Data.hWnd, "open", "https://github.com/undisassemble/yap/blob/main/LICENSE", NULL, NULL, 0); }
-		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Version")) { Modal((char*)VersionString.Data(), ICON_CIRCLE_INFO " Version", MB_OK); }
+		if (ImGui::MenuItem(ICON_CIRCLE_INFO " Version")) { Modal((char*)VersionString.Data(), "Version", MB_OK); }
 		ImGui::EndPopup();
 	}
 
@@ -327,6 +328,7 @@ void DrawGUI() {
 	// Modals
 	if (CurrentModal.pText) {
 		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), 0, ImVec2(0.5f, 0.5f));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5.f);
 		ImGui::OpenPopup(CurrentModal.pTitle);
 		if (ImGui::BeginPopupModal(CurrentModal.pTitle, NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 			switch (CurrentModal.uType & MB_ICONMASK) {
@@ -365,6 +367,7 @@ void DrawGUI() {
 			}
 			ImGui::EndPopup();
 		}
+		ImGui::PopStyleVar();
 	}
 
 	if (!pImGuiWindow) pImGuiWindow = ImGui::GetCurrentWindow();
@@ -391,7 +394,7 @@ bool GUI::Begin() {
 	// Setup style
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.Colors[ImGuiCol_WindowBg] = ImColor(0, 0, 0, 0);
-	style.Colors[ImGuiCol_PopupBg] = ImColor(35, 35, 35, 240);
+	style.Colors[ImGuiCol_PopupBg] = ImColor(35, 35, 35);
 	style.Colors[ImGuiCol_FrameBg] = ImColor(20, 20, 20, 180);
     style.Colors[ImGuiCol_FrameBgHovered] = ImColor(25, 25, 25, 180);
     style.Colors[ImGuiCol_FrameBgActive] = ImColor(30, 30, 30, 180);
@@ -410,6 +413,7 @@ bool GUI::Begin() {
     style.Colors[ImGuiCol_HeaderHovered] = ImColor(60, 60, 60, 220);
     style.Colors[ImGuiCol_HeaderActive] = ImColor(80, 80, 80, 220);
 	style.Colors[ImGuiCol_CheckboxSelectedBg] = style.Colors[ImGuiCol_FrameBg];
+	style.Colors[ImGuiCol_TitleBgActive] = ImColor(60, 60, 60);
 	style.WindowRounding = 0.f;
 	style.WindowBorderSize = 0.f;
 	style.FrameRounding = 5.f;
