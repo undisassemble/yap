@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-04-20
+ * @date 2026-07-25
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -409,6 +409,7 @@ bool GUI::Begin() {
     style.Colors[ImGuiCol_Header] = ImColor(40, 40, 40, 220);
     style.Colors[ImGuiCol_HeaderHovered] = ImColor(60, 60, 60, 220);
     style.Colors[ImGuiCol_HeaderActive] = ImColor(80, 80, 80, 220);
+	style.Colors[ImGuiCol_CheckboxSelectedBg] = style.Colors[ImGuiCol_FrameBg];
 	style.WindowRounding = 0.f;
 	style.WindowBorderSize = 0.f;
 	style.FrameRounding = 5.f;
