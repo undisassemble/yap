@@ -263,9 +263,10 @@ void vLOG(LoggingLevel_t level, const char* mod, const char* str, va_list vargs)
 	// Parse into string and store for later
 	char buffer[512];
 	vsnprintf(buffer, sizeof(buffer), str, vargs);
-	std::pair<LoggingLevel_t, char*> log = { level, reinterpret_cast<char*>(malloc(sizeof(buffer))) };
+	size_t szLog = strlen(buffer) + 11;
+	std::pair<LoggingLevel_t, char*> log = { level, reinterpret_cast<char*>(malloc(szLog)) };
 	logs.Push(log);
-	snprintf(log.second, sizeof(buffer), "[%s]: \t%s", mod, buffer);
+	snprintf(log.second, szLog, "[%s]: \t%s", mod, buffer);
 
 	// Write to console
 	if (Data.bUsingConsole) {

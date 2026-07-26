@@ -325,12 +325,12 @@ void DrawGUI() {
 		ImGui::Text("Task progress");
 		ImGui::SameLine();
 		ImGui::ProgressBar(pg);
-		ImGui::Separator();
-
+		
 		// Log viewer
+		ImGui::SeparatorText("Logs");
 		ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5.f);
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetColorU32(ImGuiCol_FrameBg));
-		if (ImGui::BeginChild("#LogViewer", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetCursorPosY() - ImGui::GetStyle().WindowPadding.y))) {
+		if (ImGui::BeginChild("#LogViewer", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetCursorPosY() - ImGui::GetStyle().WindowPadding.y), 0, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
 			for (int i = 0; i < logs.Size(); i++) {
 				switch (logs[i].first) {
 				case Failed:       //!< [-] prefix

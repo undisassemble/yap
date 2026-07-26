@@ -301,6 +301,7 @@ th_exit:
 	Data.bRunning = false;
 	delete pAssembly;
 	pAssembly = NULL;
+	ClearLogs();
 	return 0;
 }
 
