@@ -77,8 +77,8 @@ void LoadDefaultConfig() {
 	config["Advanced.bMutateAssembly"] = true;
 	config["Advanced.bEnableSubstitution"] = true;
 	config["Advanced.iUPXVersionMajor"] = 5;
-	config["Advanced.iUPXVersionMinor"] = 1;
-	config["Advanced.iUPXVersionPatch"] = 1;
+	config["Advanced.iUPXVersionMinor"] = 2;
+	config["Advanced.iUPXVersionPatch"] = 0;
 	if (!config.contains("Advanced.sSec1Name")) config["Advanced.sSec1Name"] = Buffer(9);
 	if (!config.contains("Advanced.sSec2Name")) config["Advanced.sSec2Name"] = Buffer(9);
 
