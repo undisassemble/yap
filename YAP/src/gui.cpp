@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief GUI functions
  * @version 0.0.0
- * @date 2026-07-25
+ * @date 2026-07-26
  * @copyright MIT License
  * 
  * @todo Feature search
@@ -102,8 +102,14 @@ void UpdateBackground() {
 		{ ImVec2(iGuiWidth, iGuiHeight), fBgColBotRight }
 	};
 	for (std::pair<ImVec2, ImVec4&> item : items) {
-		float dist = sqrt(pow(item.first.x - ColorPosition.x, 2) + pow(item.first.y - ColorPosition.y, 2));
-		float fIntensity = std::get<int>(settings["Style.Accent.iIntensity"]) * (fRadius * 2 - dist) / (fRadius * 200);
+		float fIntensity = 0.f;
+		if (std::get<bool>(settings["Style.bGradient"])) {
+			float dist = sqrt(pow(item.first.x - ColorPosition.x, 2) + pow(item.first.y - ColorPosition.y, 2));
+			fIntensity = std::get<int>(settings["Style.Accent.iIntensity"]) * (fRadius * 2 - dist) / (fRadius * 200);
+			if (std::get<bool>(settings["Style.bInverseGradient"])) fIntensity = 1.f - fIntensity;
+		} else {
+			fIntensity = 0.01f * std::get<int>(settings["Style.Accent.iIntensity"]);
+		}
 		item.second.x = fIntensity * std::get<int>(settings["Style.Accent.iR"]) / 255.f;
 		item.second.y = fIntensity * std::get<int>(settings["Style.Accent.iG"]) / 255.f;
 		item.second.z = fIntensity * std::get<int>(settings["Style.Accent.iB"]) / 255.f;
@@ -196,6 +202,8 @@ void DrawGUI() {
 	if (ImGui::BeginPopup("SettingsPopup")) {
 		ImGui::SetWindowPos(PopupPos, ImGuiCond_Always);
 		if (ImGui::BeginMenu("Style")) {
+			if (ImGui::MenuItem("Enable Gradient", NULL, &std::get<bool>(settings["Style.bGradient"]))) UpdateBackground();
+			if (ImGui::MenuItem("Inverse Gradient", NULL, &std::get<bool>(settings["Style.bInverseGradient"]))) UpdateBackground();
 			if (ImGui::SliderInt("Gradient Angle", &std::get<int>(settings["Style.iGradientAngle"]), 0, 359)) UpdateBackground();
 			if (ImGui::SliderInt("Intensity", &std::get<int>(settings["Style.Accent.iIntensity"]), 0, 100)) UpdateBackground();
 			if (ImGui::SliderInt("R", &std::get<int>(settings["Style.Accent.iR"]), 0, 255)) UpdateBackground();

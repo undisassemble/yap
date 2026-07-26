@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2026-07-25
+ * @date 2026-07-26
  * @copyright MIT License
  */
 
@@ -23,6 +23,8 @@ namespace ConfigTypes {
 };
 
 bool LoadSettings() {
+	settings["Style.bGradient"] = true;
+	settings["Style.bInverseGradient"] = false;
 	settings["Style.iGradientAngle"] = 60;
 	settings["Style.Accent.iR"] = 88;
 	settings["Style.Accent.iG"] = 46;
