@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2026-04-20
+ * @date 2026-07-25
  * @copyright MIT License
  */
 
@@ -11,6 +11,7 @@
 
 std::unordered_map<std::string_view, std::variant<bool, int, Buffer, uint64_t>> config;
 std::unordered_map<std::string_view, std::variant<bool, int>> settings;
+Vector<std::pair<LoggingLevel_t, char*>> logs;
 
 #define MAX_BUF_SIZE 4096
 namespace ConfigTypes {
@@ -259,47 +260,57 @@ void LOG(LoggingLevel_t level, const char* mod, const char* str, ...) {
 }
 
 void vLOG(LoggingLevel_t level, const char* mod, const char* str, va_list vargs) {
-	char buffer[1024];
+	// Parse into string and store for later
+	char buffer[512];
 	vsnprintf(buffer, sizeof(buffer), str, vargs);
+	std::pair<LoggingLevel_t, char*> log = { level, reinterpret_cast<char*>(malloc(sizeof(buffer))) };
+	logs.Push(log);
+	snprintf(log.second, sizeof(buffer), "[%s]: \t%s", mod, buffer);
+
+	// Write to console
 	if (Data.bUsingConsole) {
 		if (level) {
 			switch (level) {
 			case Failed:
-				WriteConsoleA(hStdOut, LOG_ERROR "[", sizeof(LOG_ERROR), NULL, NULL);
+				WriteConsoleA(hStdOut, LOG_ERROR, sizeof(LOG_ERROR) - 1, NULL, NULL);
 				break;
 			case Success:
-				WriteConsoleA(hStdOut, LOG_SUCCESS "[", sizeof(LOG_SUCCESS), NULL, NULL);
+				WriteConsoleA(hStdOut, LOG_SUCCESS, sizeof(LOG_SUCCESS) - 1, NULL, NULL);
 				break;
 			case Warning:
-				WriteConsoleA(hStdOut, LOG_WARNING "[", sizeof(LOG_WARNING), NULL, NULL);
+				WriteConsoleA(hStdOut, LOG_WARNING, sizeof(LOG_WARNING) - 1, NULL, NULL);
 				break;
 			case Info:
-				WriteConsoleA(hStdOut, LOG_INFO "[", sizeof(LOG_INFO), NULL, NULL);
+				WriteConsoleA(hStdOut, LOG_INFO, sizeof(LOG_INFO) - 1, NULL, NULL);
 			}
-			WriteConsoleA(hStdOut, mod, strlen(mod), NULL, NULL);
-			WriteConsoleA(hStdOut, "]: \t", 4, NULL, NULL);
 		}
-		WriteConsoleA(hStdOut, buffer, lstrlenA(buffer), NULL, NULL);
+		WriteConsoleA(hStdOut, log.second, strlen(log.second), NULL, NULL);
 	}
 
+	// Write to log file
 	if (hLogFile) {
 		if (level) {
 			switch (level) {
 			case Failed:
-				WriteFile(hLogFile, "[-] [", 5, NULL, NULL);
+				WriteFile(hLogFile, "[-] ", 4, NULL, NULL);
 				break;
 			case Success:
-				WriteFile(hLogFile, "[+] [", 5, NULL, NULL);
+				WriteFile(hLogFile, "[+] ", 4, NULL, NULL);
 				break;
 			case Warning:
-				WriteFile(hLogFile, "[*] [", 5, NULL, NULL);
+				WriteFile(hLogFile, "[*] ", 4, NULL, NULL);
 				break;
 			case Info:
-				WriteFile(hLogFile, "[?] [", 5, NULL, NULL);
+				WriteFile(hLogFile, "[?] ", 4, NULL, NULL);
 			}
-			WriteFile(hLogFile, mod, strlen(mod), NULL, NULL);
-			WriteFile(hLogFile, "]: \t", 4, NULL, NULL);
 		}
-		WriteFile(hLogFile, buffer, strlen(buffer), NULL, NULL);
+		WriteFile(hLogFile, log.second, strlen(log.second), NULL, NULL);
 	}
+}
+
+void ClearLogs() {
+	for (int i = 0; i < logs.Size(); i++) {
+		if (logs[i].second) free(logs[i].second);
+	}
+	logs.Release();
 }

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility definitions
  * @version 0.0.0
- * @date 2026-03-31
+ * @date 2026-07-25
  * @copyright MIT License
  */
 
@@ -33,8 +33,8 @@
 #define LOG_ERROR "\x1B[31m[-]\x1B[39m "
 #define MODULE_YAP "YAP"
 #define MODULE_VM "VM"
-#define MODULE_PACKER "Packer"
-#define MODULE_REASSEMBLER "ReAsm"
+#define MODULE_PACKER "Pack"
+#define MODULE_REASSEMBLER "Asm"
 #define MODULE_RELIB "ReLib"
 
 /*!
@@ -115,6 +115,7 @@ extern HANDLE hLogFile;
 extern HANDLE hStdOut;
 extern std::unordered_map<std::string_view, std::variant<bool, int, Buffer, uint64_t>> config;
 extern std::unordered_map<std::string_view, std::variant<bool, int>> settings;
+extern Vector<std::pair<LoggingLevel_t, char*>> logs;
 
 uint64_t rand64();
 
@@ -132,6 +133,7 @@ void LoadDefaultConfig();
 bool LoadConfig();
 bool SaveConfig();
 bool LoadSettings();
+void ClearLogs();
 
 template <typename T, typename __parent>
 T child_cast(__parent p) {

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Initialization functions
  * @version 0.0.0
- * @date 2026-03-31
+ * @date 2026-07-25
  * @copyright MIT License
  */
 
@@ -144,6 +144,9 @@ DWORD WINAPI Begin(void* args) {
 	if (Data.bRunning)
 		return 1;
 	Data.bRunning = true;
+
+	// Clear existing logs
+	ClearLogs();
 	LOG(Info, MODULE_YAP, "Starting YAP\n");
 
 	// Reassembler

@@ -26,6 +26,10 @@
 #include <Zycore/Zycore.h>
 
 // Globals
+const ImVec4 WarningColor = ImColor(227, 185, 104);
+const ImVec4 InfoColor = ImColor(152, 205, 253);
+const ImVec4 ErrorColor = ImColor(228, 83, 83);
+const ImVec4 SuccessColor = ImColor(83, 228, 83);
 bool bMinimized = false, bOpen = true, bInitialized = false;
 int iGuiWidth = 850;
 int iGuiHeight = 560;
@@ -106,7 +110,7 @@ void UpdateBackground() {
 		item.second.w = 1.f;
 	}
 
-	ImGui::GetStyle().Colors[ImGuiCol_SliderGrab] = ImGui::GetStyle().Colors[ImGuiCol_SliderGrabActive] = ImGui::GetStyle().Colors[ImGuiCol_CheckMark] = ImColor(std::get<int>(settings["Style.Accent.iR"]), std::get<int>(settings["Style.Accent.iG"]), std::get<int>(settings["Style.Accent.iB"]), 180);
+	ImGui::GetStyle().Colors[ImGuiCol_PlotHistogram] = ImGui::GetStyle().Colors[ImGuiCol_SliderGrab] = ImGui::GetStyle().Colors[ImGuiCol_SliderGrabActive] = ImGui::GetStyle().Colors[ImGuiCol_CheckMark] = ImColor(std::get<int>(settings["Style.Accent.iR"]), std::get<int>(settings["Style.Accent.iG"]), std::get<int>(settings["Style.Accent.iB"]), 180);
 	ImGui::GetStyle().Colors[ImGuiCol_SliderGrabActive].w = 1.f;
 }
 
@@ -318,11 +322,39 @@ void DrawGUI() {
 		}
 		ImGui::Text("Total progress");
 		ImGui::SameLine();
-		ImGui::ProgressBar((Data.State == Assembling || Data.State == Disassembling) ? pAssembly->fProgress : Data.fTotalProgress);
+		ImGui::ProgressBar(Data.fTotalProgress);
 		ImGui::Text("Task: %s", Data.sTask);
 		ImGui::Text("Task progress");
 		ImGui::SameLine();
-		ImGui::ProgressBar(Data.fTaskProgress);
+		ImGui::ProgressBar((Data.State == Assembling || Data.State == Disassembling) ? pAssembly->fProgress : Data.fTaskProgress);
+		ImGui::Separator();
+
+		// Log viewer
+		ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5.f);
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetColorU32(ImGuiCol_FrameBg));
+		if (ImGui::BeginChild("#LogViewer", ImVec2(iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2, iGuiHeight - ImGui::GetCursorPosY() - ImGui::GetStyle().WindowPadding.y))) {
+			for (int i = 0; i < logs.Size(); i++) {
+				switch (logs[i].first) {
+				case Failed:       //!< [-] prefix
+					ImGui::TextColored(ErrorColor, "[-]");	
+					break;
+				case Success:      //!< [+] prefix
+					ImGui::TextColored(SuccessColor, "[+]");
+					break;
+				case Warning:      //!< [*] prefix
+					ImGui::TextColored(WarningColor, "[*]");
+					break;
+				case Info:         //!< [?] prefix
+					ImGui::TextColored(InfoColor, "[?]");
+				}
+				ImGui::SameLine();
+				ImGui::Text("%s", logs[i].second);
+				ImGui::SetScrollY(ImGui::GetCurrentWindow(), ImGui::GetCursorPosY());
+			}
+			ImGui::EndChild();
+		}
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
 	}
 
 	// Modals
@@ -333,15 +365,15 @@ void DrawGUI() {
 		if (ImGui::BeginPopupModal(CurrentModal.pTitle, NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 			switch (CurrentModal.uType & MB_ICONMASK) {
 			case MB_ICONERROR:
-				ImGui::TextColored(ImColor(228, 83, 83, 255), ICON_CIRCLE_EXCLAMATION);
+				ImGui::TextColored(ErrorColor, ICON_CIRCLE_EXCLAMATION);
 				ImGui::SameLine();
 				break;
 			case MB_ICONINFORMATION:
-				ImGui::TextColored(ImColor(152, 205, 253, 255), ICON_CIRCLE_INFO);
+				ImGui::TextColored(InfoColor, ICON_CIRCLE_INFO);
 				ImGui::SameLine();
 				break;
 			case MB_ICONWARNING:
-				ImGui::TextColored(ImColor(227, 185, 104, 255), ICON_TRIANGLE_EXCLAMATION);
+				ImGui::TextColored(WarningColor, ICON_TRIANGLE_EXCLAMATION);
 				ImGui::SameLine();
 			}
 			
@@ -412,8 +444,9 @@ bool GUI::Begin() {
     style.Colors[ImGuiCol_Header] = ImColor(40, 40, 40, 220);
     style.Colors[ImGuiCol_HeaderHovered] = ImColor(60, 60, 60, 220);
     style.Colors[ImGuiCol_HeaderActive] = ImColor(80, 80, 80, 220);
-	style.Colors[ImGuiCol_CheckboxSelectedBg] = style.Colors[ImGuiCol_FrameBg];
 	style.Colors[ImGuiCol_TitleBgActive] = ImColor(60, 60, 60);
+	style.Colors[ImGuiCol_CheckboxSelectedBg] = style.Colors[ImGuiCol_FrameBg];
+	style.Colors[ImGuiCol_PlotHistogram] = style.Colors[ImGuiCol_CheckMark];
 	style.WindowRounding = 0.f;
 	style.WindowBorderSize = 0.f;
 	style.FrameRounding = 5.f;
@@ -791,9 +824,9 @@ void Base::RenderDescription() {
 }
 
 void Base::EndWidgetRender() {
-	if (u8Flags & WIDGET_DEBUG) { FeatureIcon(ImColor(227, 185, 104), ICON_BUG, "This feature is experimental, use with caution!"); }
-	if (u8Flags & WIDGET_WARNING) { FeatureIcon(ImColor(227, 185, 104), ICON_TRIANGLE_EXCLAMATION, pFlagText); }
-	if (u8Flags & WIDGET_INFO) { FeatureIcon(ImColor(152, 205, 253), ICON_CIRCLE_INFO, pFlagText); }
+	if (u8Flags & WIDGET_DEBUG) { FeatureIcon(WarningColor, ICON_BUG, "This feature is experimental, use with caution!"); }
+	if (u8Flags & WIDGET_WARNING) { FeatureIcon(WarningColor, ICON_TRIANGLE_EXCLAMATION, pFlagText); }
+	if (u8Flags & WIDGET_INFO) { FeatureIcon(InfoColor, ICON_CIRCLE_INFO, pFlagText); }
 	if (~u8Flags & WIDGET_IS_CHILD && pChild && u8Flags & WIDGET_SHOW_CHILDREN) {
 		ImVec2 l1 = ImVec2(ImGui::GetCursorScreenPos().x, ImGui::GetCursorScreenPos().y);
 		ImVec2 l2 = ImVec2(l1.x + iGuiWidth - ImGui::GetStyle().WindowPadding.x * 2 - GetScrollbarSpace(), l1.y + 1);
