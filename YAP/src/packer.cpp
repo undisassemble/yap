@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2026-07-25
+ * @date 2026-07-26
  * @copyright MIT License
  *
  * @todo Improve anti-debug
@@ -977,8 +977,8 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	pNT->OptionalHeader.SizeOfHeapCommit = pNT->OptionalHeader.SizeOfStackCommit = 0x1000;
 	if (std::get<int>(config["Packing.iImmitate"]) == UPX) {
 		pNT->FileHeader.NumberOfSymbols = 0x21585055; // UPX!
-		pNT->FileHeader.PointerToSymbolTable = ((std::get<int>(config["Advanced.iUPXVersionPatch"]) + 0x30) << 16) | ((std::get<int>(config["Advanced.iUPXVersionMinor"]) + 0x30) << 8) | 0x2E;
-		pNT->FileHeader.TimeDateStamp = (std::get<int>(config["Advanced.iUPXVersionMajor"]) + 0x30) << 24;
+		pNT->FileHeader.PointerToSymbolTable = (((uint8_t)std::get<int>(config["Advanced.iUPXVersionPatch"]) + 0x30) << 16) | (((uint8_t)std::get<int>(config["Advanced.iUPXVersionMinor"]) + 0x30) << 8) | 0x2E;
+		pNT->FileHeader.TimeDateStamp = ((uint8_t)std::get<int>(config["Advanced.iUPXVersionMajor"]) + 0x30) << 24;
 	}
 	pNT->OptionalHeader.DllCharacteristics = IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE | IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
 	DEBUG_ONLY(if (std::get<bool>(config["Debug.bDisableRelocations"])) pNT->OptionalHeader.DllCharacteristics &= ~IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE);

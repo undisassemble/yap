@@ -669,14 +669,28 @@ void GUI::Setup() {
 			ICON_GEARS " Advanced",
 			{
 				(new Category("Packer"))->WithChildren(
-					7,
+					8,
 					new Checkbox("Fake symbol table", "Advanced.bFakeSymbols"),
 					(new Checkbox("Mutate", "Advanced.bMutateAssembly"))->FeatureWarning("Disabling will make unpacking easier"),
 					(new Checkbox("Substitute", "Advanced.bEnableSubstitution"))->FeatureWarning("Disabling will make unpacking easier"),
 					new Checkbox("Semi-random section names", "Advanced.bSemiRandomSecNames"),
 					new Checkbox("Full-random section names", "Advanced.bTrueRandomSecNames"),
 					new InputText("Section 1 name", "Advanced.sSec1Name"),
-					new InputText("Section 2 name", "Advanced.sSec2Name")
+					new InputText("Section 2 name", "Advanced.sSec2Name"),
+					new Custom([](Custom* me) -> void {
+						me->RenderWidgetContainer();
+						int iMin = 0, iMax = 255;
+						ImGui::PushItemWidth(ImGui::GetFrameHeight() * 1.2f);
+						ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImGui::GetStyle().ItemInnerSpacing);
+						ImGui::DragScalar(".##UPXMajor", ImGuiDataType_S32, &std::get<int>(config["Advanced.iUPXVersionMajor"]), 1.f, &iMin, &iMax);
+						ImGui::SameLine();
+						ImGui::DragScalar(".##UPXMinor", ImGuiDataType_S32, &std::get<int>(config["Advanced.iUPXVersionMinor"]), 1.f, &iMin, &iMax);
+						ImGui::SameLine();
+						ImGui::DragScalar("UPX Version", ImGuiDataType_S32, &std::get<int>(config["Advanced.iUPXVersionPatch"]), 1.f, &iMin, &iMax);
+						ImGui::PopStyleVar();
+						ImGui::PopItemWidth();
+						me->EndWidgetRender();
+					})
 				),
 				(new Category("Reassembler"))->WithChildren(
 					1,
