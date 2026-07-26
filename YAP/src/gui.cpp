@@ -311,22 +311,20 @@ void DrawGUI() {
 		case Packing:
 			ImGui::SeparatorText("Packing");
 			break;
-		case Disassembling:
-			ImGui::SeparatorText("Disassembling");
-			break;
-		case Assembling:
-			ImGui::SeparatorText("Assembling");
+		case Reassembling:
+			ImGui::SeparatorText("Reassembling");
 			break;
 		default:
 			ImGui::Separator();
 		}
 		ImGui::Text("Total progress");
 		ImGui::SameLine();
-		ImGui::ProgressBar(Data.fTotalProgress);
+		float pg = (Data.State == Reassembling) ? pAssembly->fProgress : Data.fTaskProgress;
+		ImGui::ProgressBar(Data.iTotalTasks ? ((float)Data.iCompletedTasks + pg) / (float)Data.iTotalTasks : 0.f);
 		ImGui::Text("Task: %s", Data.sTask);
 		ImGui::Text("Task progress");
 		ImGui::SameLine();
-		ImGui::ProgressBar((Data.State == Assembling || Data.State == Disassembling) ? pAssembly->fProgress : Data.fTaskProgress);
+		ImGui::ProgressBar(pg);
 		ImGui::Separator();
 
 		// Log viewer

@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Packer functions
  * @version 0.0.0
- * @date 2026-03-11
+ * @date 2026-07-25
  * @copyright MIT License
  *
  * @todo Improve anti-debug
@@ -89,9 +89,10 @@ Sha256Digest& Sha256WStr(_In_ wchar_t* pStr) {
 
 void* Alloc(ISzAllocPtr p, size_t size) { return HeapAlloc(GetProcessHeap(), 0, size); }
 void Free(ISzAllocPtr p, void* mem) { HeapFree(GetProcessHeap(), 0, mem); }
-uint64_t compressing = 0;
+uint64_t u64Compressing = 0;
+uint64_t u64Compressed = 0;
 SRes PackingProgress(ICompressProgressPtr p, UInt64 inSize, UInt64 outSize) {
-	Data.fTaskProgress = (float)inSize / (float)compressing;
+	Data.fTaskProgress = ((float)inSize + u64Compressed) / (float)u64Compressing;
 	return 0;
 }
 
@@ -264,17 +265,19 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 	DWORD NumPacked = 0;
 	Data.sTask = "Compressing";
 	uint64_t DecompressKey = rand64();
-	compressing = InternalShellcode.Size();
+	u64Compressing = InternalShellcode.Size();
+	for (WORD i = 0; i < pOriginal->SectionHeaders.Size(); i++)
+		u64Compressing += pOriginal->SectionData[i].Size();
+	u64Compressed = 0;
 	Buffer CompressedInternal = PackSection(InternalShellcode);
+	u64Compressed = InternalShellcode.Size();
 	if (!CompressedInternal.Data() || !CompressedInternal.Size()) return buf;
 	for (WORD i = 0, n = pOriginal->SectionHeaders.Size(); i < n; i++) {
-		Data.fTotalProgress = (float)(i + 1) / (float)(n + 1);
 		if (!pOriginal->SectionHeaders[i].Misc.VirtualSize || !pOriginal->SectionHeaders[i].SizeOfRawData) continue;
 		
 		// Compress data
-		compressing = pOriginal->SectionData[i].Size();
 		Buffer compressed = PackSection(pOriginal->SectionData[i]);
-		compressing = 0;
+		u64Compressed += pOriginal->SectionData[i].Size();
 		if (!compressed.Data() || !compressed.Size()) return buf;
 		LOG(Info, MODULE_PACKER, "Packed section %.8s (%lld)\n", pOriginal->SectionHeaders[i].Name, (int64_t)compressed.Size() - pOriginal->SectionHeaders[i].SizeOfRawData);
 		if (compressed.Size() > _UI32_MAX) {
@@ -286,8 +289,8 @@ Buffer GenerateLoaderShellcode(_In_ PE* pOriginal, _In_ PE* pPackedBinary, _In_ 
 		Copied.OverwriteSection(i, compressed);
 		NumPacked++;
 	}
+	Data.iCompletedTasks++;
 	Data.sTask = "Generating loader";
-	Data.fTotalProgress = 0.f;
 	Data.fTaskProgress = 0.f;
 
 	// Entry point sigs
@@ -824,11 +827,15 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 			Label Compressed = a.newLabel();
 			DWORD ID = 0;
 			int count = 0;
+			u64Compressed = u64Compressing = 0;
+			for (DWORD i = 0; i < FunctionRanges.Size(); i++)
+				u64Compressing += FunctionRanges[i].dwSize;
 			for (DWORD i = 0; i < FunctionRanges.Size(); i++) {
 				Buffer buf;
 				buf.Allocate(FunctionRanges[i].dwSize);
 				pOriginal->ReadRVA(FunctionRanges[i].dwStart, buf.Data(), buf.Size());
 				FunctionBodies.Push(PackSection(buf));
+				u64Compressed += buf.Size();
 				ZeroMemory(buf.Data(), buf.Size());
 				*reinterpret_cast<DWORD*>(PartialUnpackingHook + 2) = ID;
 				ID++;
@@ -872,6 +879,7 @@ Buffer GenerateInternalShellcode(_In_ Asm* pOriginal, _In_ Asm* pPackedBinary) {
 	buf.Allocate(holder.textSection()->buffer().size());
 	memcpy(buf.Data(), holder.textSection()->buffer().data(), buf.Size());
 	LOG(Success, MODULE_PACKER, "Generated internal shellcode\n");
+	Data.iCompletedTasks++;
 	return buf;
 }
 
@@ -1265,6 +1273,5 @@ bool Pack(_In_ Asm* pOriginal, _Out_ Asm* pPackedBinary) {
 	Data.State = Idle;
 	Data.sTask = NULL;
 	Data.fTaskProgress = 0.f;
-	Data.fTotalProgress = 0.f;
 	return true;
 }

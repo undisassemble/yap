@@ -10,6 +10,7 @@
 #pragma once
 
 // Headers
+#include <cstdint>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winternl.h>
@@ -91,14 +92,14 @@ enum PackerTypes_t : int {
 enum State_t : BYTE {
 	Idle,
 	Packing,
-	Disassembling,
-	Assembling
+	Reassembling
 };
 
 struct Data_t {
 	char ConfigPath[MAX_PATH] = { 0 };
 	Buffer Target = Buffer(MAX_PATH), Output = Buffer(MAX_PATH);
-	float fTotalProgress = 0.f;
+	uint8_t iTotalTasks = 0;
+	uint8_t iCompletedTasks = 0;
 	float fTaskProgress = 0.f;
 	char* sTask = NULL;
 	State_t State = Idle;

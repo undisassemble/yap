@@ -149,18 +149,27 @@ DWORD WINAPI Begin(void* args) {
 	ClearLogs();
 	LOG(Info, MODULE_YAP, "Starting YAP\n");
 
+	// Predict total number of tasks
+	Data.iTotalTasks = Data.iCompletedTasks = 0;
+	if (std::get<bool>(config["Reassembly.bEnabled"]))
+		Data.iTotalTasks += 2;
+	if (std::get<bool>(config["Packing.bEnabled"]))
+		Data.iTotalTasks += 2 * std::get<int>(config["Packing.iEncodingCounts"]);
+
 	// Reassembler
 	if (std::get<bool>(config["Reassembly.bEnabled"])) {
 		LOG(Info, MODULE_YAP, "Starting reassembler\n");
 
 		// Disassemble
-		Data.State = Disassembling;
+		Data.State = Reassembling;
+		Data.sTask = "Disassembling";
 		if (!pAssembly->Disassemble(DEBUG_ONLY(!std::get<bool>(config["Debug.bSkipDisasmValidation"])))) {
 			Modal("Disassembly failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Disassembly failed\n");
 			goto th_exit;
 		}
-		Data.State = Idle;
+		Data.sTask = NULL;
+		Data.iCompletedTasks++;
 		pAssembly->FindFunctions();
 
 		// Dump disassembly
@@ -219,12 +228,14 @@ DWORD WINAPI Begin(void* args) {
 		a.bSubstitute = std::get<bool>(config["Reassembly.bSubstitution"]);
 		a.MutationLevel = std::get<int>(config["Reassembly.iMutationLevel"]);
 		pAssembly->SetAssembler(reinterpret_cast<Assembler*>(&a));
-		Data.State = Assembling;
+		Data.sTask = "Disassembling";
 		if (!pAssembly->Assemble()) {
 			Modal("Assembly failed", "Error", MB_OK | MB_ICONERROR);
 			LOG(Failed, MODULE_YAP, "Assembly failed\n");
 			goto th_exit;
 		}
+		Data.iCompletedTasks++;
+		Data.sTask = NULL;
 		Data.State = Idle;
 
 		// Modify again
