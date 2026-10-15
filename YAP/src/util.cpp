@@ -3,7 +3,7 @@
  * @author undisassemble
  * @brief Utility functions
  * @version 0.0.0
- * @date 2026-07-26
+ * @date 2026-10-15
  * @copyright MIT License
  */
 
@@ -78,7 +78,7 @@ void LoadDefaultConfig() {
 	config["Advanced.bEnableSubstitution"] = true;
 	config["Advanced.iUPXVersionMajor"] = 5;
 	config["Advanced.iUPXVersionMinor"] = 2;
-	config["Advanced.iUPXVersionPatch"] = 0;
+	config["Advanced.iUPXVersionPatch"] = 1;
 	if (!config.contains("Advanced.sSec1Name")) config["Advanced.sSec1Name"] = Buffer(9);
 	if (!config.contains("Advanced.sSec2Name")) config["Advanced.sSec2Name"] = Buffer(9);
 
